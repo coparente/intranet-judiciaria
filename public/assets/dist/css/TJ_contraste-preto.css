@@ -1,0 +1,204 @@
+/* fonte branca, fundo preto, sem borda  */
+.content, .skin-blue-light .content-header, .row, .box, .box-header, .content-wrapper, #barraAcessibilidade, .skin-blue-light .main-header .navbar, 
+.liUsuarioServentiaUltimo, .indicesTipoPendencia, .main-sidebar, .sidebar, .skin-blue-light .main-sidebar, .skin-blue-light .main-header .logo,
+.main-header .logo .logo-lg, .skin-blue-light .main-footer, .skin-blue-light .sidebar-menu > li > .treeview-menu, .nav-stacked > li > a,
+.skin-blue-light .main-header .navbar .nav > li > a, .skin-blue-light, .login-box h2, .login-box .ou, .btn-primary, .skin-blue-light .main-header .logo:hover {
+  /* background-color: #000000; */ /* desaqui verificar utilidade */
+  /* border-style: none; */
+  /* color: #ffffff; */ /* desaqui verificar utilidade */
+}
+
+/* fonte branca, fundo preto, borda branca (formulários e botões) */
+.btn-opcoes, .btn-default,  .form-control, .skin-blue-light .sidebar-form input[type="text"], .login-box, .btn-login  {
+  /* background-color: #000000; */ /* desaqui verificar utilidade */
+  /* color: #ffffff; */ /* desaqui verificar utilidade */
+  /* border-color: white;
+  border-width: thin; */
+}
+
+/* fonte branca, fundo preto, borda branca (menus e submenus) */
+.menu, .dropdown-menu, .ulServentiaTemplate, .label-primary, .modal-content {
+  /* background-color: #000000; */ /* desaqui verificar utilidade */
+  /* color: #ffffff; */ /* desaqui verificar utilidade */
+  /* border-color: #ff2424;
+  border: 1px; */
+}
+
+/* fonte branca, fundo preto (tabelas) */
+.table > thead > tr > th,
+.table > tbody > tr > th,
+.table > tfoot > tr > th,
+.table > thead > tr > td,
+.table > tbody > tr > td,
+.table > tbody > tr.active > td,
+.table > tfoot > tr > td,
+.select2-container--open .select2-dropdown--above,
+.select2-container--open .select2-dropdown--below {
+  /* Desaqui
+  background-color: #000000;
+  */
+  /* color: #ffffff; */ /* desaqui verificar utilidade */
+}
+
+
+/* hover */
+.skin-blue-light .sidebar-menu > li > a:hover, .skin-blue-light .sidebar-menu > li:hover > a, .skin-blue-light .sidebar-menu > li.active > a, 
+.treeview-menu .ulMenu .menu-open, .skin-blue-light .sidebar-menu > li > .treeview-menu a:hover, .btn-primary:hover, .btn-login:hover, .contadorBoxCaixaDeEntrada  {
+	/* background-color: #ffffff;
+	color: #000000; */ /* desaqui verificar utilidade */
+}
+
+/*campos do select2*/
+.select2-container--default .select2-selection--single, .select2-container .select2-selection--single{
+	/* background-color: #000;
+	color: #ccc; */ /* desaqui verificar utilidade */
+	
+}
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+**Definicao das cores do sistema
+*/
+:root {
+	--paleta-default: #444;
+	--paleta-primary: #444;
+	--paleta-info: #444;
+	--paleta-warning: #444;
+	--paleta-success: #444;
+	--paleta-danger: #444;
+	
+	--paleta-btdefault: #ff0;
+	--paleta-btprimary: #ff0;
+	--paleta-btinfo: #ff0;
+	--paleta-btwarning: #ff0;
+	--paleta-btsuccess: #ff0;
+	--paleta-btdanger: #ff0;
+	
+		--paleta-modal: #333;
+		
+		--paleta-inputgroup-fundo: #ff0;
+	--paleta-inputgroup-borda: #000;
+	
+	--paleta-text-default: #ff0;
+	--paleta-text-primary: #ff0;
+	--paleta-text-info: #ff0;
+	--paleta-text-warning: #ff0;
+	--paleta-text-success: #ff0;
+	--paleta-text-danger: #ff0;
+	--paleta-text-branco: #ff0;
+	--paleta-text-muted: #ff0;
+	--paleta-text-lead: #ff0;
+	
+	--paleta-alert-danger-fundo: #333;
+	--paleta-alert-danger-texto: #fff;
+	--paleta-alert-danger-borda: #666;
+	--paleta-alert-warning-fundo: #333;
+	--paleta-alert-warning-texto: #fff;
+	--paleta-alert-warning-borda: #666;
+	--paleta-alert-info-fundo: #333;
+	--paleta-alert-info-texto: #fff;
+	--paleta-alert-info-borda: #666;
+	--paleta-alert-success-fundo: #333;
+	--paleta-alert-success-texto: #fff;
+	--paleta-alert-success-borda: #666;
+	
+	--paleta-abas-fundo:#333;
+	--paleta-abas-bordertop: #dee2e6;
+	--paleta-abas-borderbottom: #333;
+	
+	--paleta-branco: #000000;
+	
+	--paleta-preto: #FFFFFF;
+	--paleta-preto-semi-transparente: rgba(255,255,255,0.3);
+	
+	--paleta-cinza-extra-claro: #222;
+	--paleta-cinza-claro: #444444;
+	--paleta-cinza-pouco-claro: #575757; /* verificar utilidade - placeholder */
+	--paleta-cinza-medio: #666666;
+	--paleta-cinza-escuro: #e8e8e8;
+	--paleta-cinza-extra-escuro: #f5f5f5;
+	--paleta-cinza-remover: #222222;
+	--paleta-cinza-999: #fff;
+	--paleta-cinza-box: #000;
+	
+	--paleta-azul-extra-claro: #143252;
+	--paleta-azul-claro: #004a80;
+	--paleta-azul-medio: #FF0;
+	--paleta-azul-escuro: #000;
+	--paleta-titulos: #ff0;
+	--paleta-azul-extra-escuro: #F3F9FE; /*desaqui cor placeholder*/
+	--paleta-azul-info: #fff;
+	
+	--paleta-azul-ciano-medio: #0095dd;
+	
+	--paleta-vermelho-extra-claro: #251010; /* placeholder */
+	--paleta-vermelho-claro: #391717; /* placeholder */
+	--paleta-vermelho-medio: #da3c25;		
+	
+	--paleta-amarelo-extra-claro: #312902;
+	--paleta-amarelo-claro: #5c4f0a; /* placeholder */
+	--paleta-amarelo-pouco-claro: #c2c20a; /* placeholder */
+	--paleta-amarelo-medio: #ffcc00;
+	--paleta-amarelo-warning: #fff;
+	
+	--paleta-laranja-medio: #f39c12;
+	
+	--paleta-azul-dessaturado-claro: #444;
+	--paleta-azul-dessaturado-pouco-claro: #4b5468; /* verificar utilidade -placeholder */
+	--paleta-azul-dessaturado-escuro: #d2d6de;
+	
+	--paleta-verde-extra-claro: #113300; /* placeholder */
+	--paleta-verde-claro: #00733e;
+	--paleta-verde-pouco-claro: #2baa08; /* placeholder */
+	--paleta-verde-escuro: #cffac2;
+	
+	--paleta-box-primaryClaro: #000;
+	--paleta-box-infoClaro: #000;
+	--paleta-box-warningClaro: #000;
+	--paleta-box-successClaro: #000;
+	--paleta-box-dangerClaro: #000;
+	--paleta-box-defaultClaro: #000;
+	--paleta-box-default: #000;
+	
+	--paleta-pre-fundo: #222;
+	--paleta-pre-texto: #fff;
+	
+	--paleta-menu-fundo: #000;
+	--paleta-menu-texto: #fff;
+	--paleta-menu-fundo-hover: #f5f5f5;
+	--paleta-menu-texto-hover: #000;
+	--paleta-menu-fundo-active: #333;
+	--paleta-menu-texto-active: #fff;
+	
+	
+	--paleta-overlay: rgba(255,255,255,0.3);
+	
+	--brasao-normal: url(../img/logo_branco.svg);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,68 @@
+.notificacoes-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+#contador-notificacoes {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background-color: #ff4444;
+    color: white;
+    border-radius: 50%;
+    padding: 2px 6px;
+    font-size: 12px;
+    min-width: 18px;
+    text-align: center;
+}
+
+#notificacoes-container {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    width: 300px;
+    max-height: 400px;
+    overflow-y: auto;
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 1050;
+    margin-top: 5px;
+}
+
+.notificacao-item {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    background-color: white;
+    color: #333;
+}
+
+.notificacao-item:last-child {
+    border-bottom: none;
+}
+
+.notificacao-conteudo {
+    flex: 1;
+    padding-right: 10px;
+}
+
+.notificacao-conteudo p {
+    margin: 0 0 5px 0;
+}
+
+.notificacao-conteudo small {
+    color: #666;
+}
+
+.btn-marcar-lida {
+    background: none;
+    border: none;
+    color: #28a745;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.btn-marcar-lida:hover {
+    color: #218838;
+} 

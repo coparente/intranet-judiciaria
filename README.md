@@ -1,4 +1,4 @@
-# SICUC – (Sistema Integrado da Central Única de Contadores)
+# INTRANET – (Sistema)
 
 ## 📋 Sobre o Sistema
 Sistema desenvolvido em PHP para gerenciamento de processos da Central Única de Contadores. Utiliza uma arquitetura MVC personalizada e interface moderna com Bootstrap 5.

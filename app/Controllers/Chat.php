@@ -35,14 +35,9 @@ class Chat extends Controllers
 
     /**
      * [ index ] - Exibe a página principal do chat
-     * 
-     * @return void
      */
     public function index()
     {
-        // Verifica permissão para o módulo de chat
-        // Middleware::verificarPermissao(10); // ID do módulo 'Chat'
-
         $conversas = $this->chatModel->buscarConversas($_SESSION['usuario_id']);
         
         $dados = [
@@ -63,7 +58,6 @@ class Chat extends Controllers
             return;
         }
 
-        // Buscar conversa
         $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
         
         if (!$conversa || $conversa->usuario_id != $_SESSION['usuario_id']) {
@@ -72,20 +66,15 @@ class Chat extends Controllers
             return;
         }
 
-        // Marcar mensagens como lidas
-        $this->chatModel->marcarComoLida($conversa_id);
-
-        // Buscar mensagens
         $mensagens = $this->chatModel->buscarMensagens($conversa_id);
-
-        $data = [
-            'titulo' => 'Chat - ' . $conversa->contato_nome,
+        
+        $dados = [
+            'tituloPagina' => 'Conversa - ' . $conversa->contato_nome,
             'conversa' => $conversa,
-            'mensagens' => $mensagens,
-            'conversas' => $this->chatModel->buscarConversas($_SESSION['usuario_id'])
+            'mensagens' => $mensagens
         ];
 
-        $this->view('chat/conversa', $data);
+        $this->view('chat/conversa', $dados);
     }
 
     /**
@@ -132,44 +121,6 @@ class Chat extends Controllers
     }
 
     /**
-     * [ atualizarConversa ] - Atualiza os dados de uma conversa
-     * 
-     * @param int $id ID da conversa
-     * @return void
-     */
-    public function atualizarConversa($id)
-    {
-        // Verifica permissão para o módulo de chat
-        Middleware::verificarPermissao(10); // ID do módulo 'Chat'
-
-        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-            $formulario = filter_input_array(INPUT_POST, FILTER_SANITIZE_STRING);
-            
-            $conversa = $this->chatModel->buscarConversaPorId($id);
-            
-            if (!$conversa) {
-                Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Conversa não encontrada', 'alert alert-danger');
-                Helper::redirecionar('chat/index');
-                return;
-            }
-            
-            // Atualiza os dados da conversa
-            $dados = [
-                'id' => $id,
-                'contato_nome' => $formulario['nome']
-            ];
-            
-            if ($this->chatModel->atualizarConversa($dados)) {
-                Helper::mensagem('chat', '<i class="fas fa-check"></i> Conversa atualizada com sucesso', 'alert alert-success');
-            } else {
-                Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro ao atualizar conversa', 'alert alert-danger');
-            }
-            
-            Helper::redirecionar("chat/conversa/{$id}");
-        }
-    }
-
-    /**
      * [ enviarMensagem ] - Envia uma mensagem via WhatsApp
      */
     public function enviarMensagem($conversa_id = null)
@@ -211,140 +162,36 @@ class Chat extends Controllers
             $resultado = $this->enviarPrimeiraMensagem($conversa->contato_numero, $mensagem);
         } else {
             // Conversa já iniciada - enviar mensagem normal
-            $resultado = SerproHelper::enviarMensagem($conversa->contato_numero, 'text', $mensagem);
+            $resultado = SerproHelper::enviarMensagemTexto($conversa->contato_numero, $mensagem);
         }
 
         if ($resultado['status'] == 200 || $resultado['status'] == 201) {
             // Salvar no banco
+            $messageId = null;
+            if (isset($resultado['response']['id'])) {
+                $messageId = $resultado['response']['id'];
+            }
+
             $this->chatModel->salvarMensagem([
                 'conversa_id' => $conversa_id,
                 'remetente_id' => $_SESSION['usuario_id'],
                 'tipo' => 'text',
                 'conteudo' => $mensagem,
-                'message_id' => $resultado['response']['messages'][0]['id'] ?? uniqid(),
+                'message_id' => $messageId ?? uniqid(),
                 'status' => 'enviado',
                 'enviado_em' => date('Y-m-d H:i:s')
             ]);
 
             // Atualizar conversa
             $this->chatModel->atualizarConversa($conversa_id);
-            
-            Helper::mensagem('chat', '<i class="fas fa-check"></i> Mensagem enviada com sucesso!', 'alert alert-success');
+
+            Helper::mensagem('chat', '<i class="fas fa-check"></i> Mensagem enviada com sucesso', 'alert alert-success');
         } else {
-            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro ao enviar mensagem: ' . ($resultado['error'] ?? 'Erro desconhecido'), 'alert alert-danger');
+            $erro = $resultado['error'] ?? 'Erro desconhecido';
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro ao enviar mensagem: ' . $erro, 'alert alert-danger');
         }
 
         Helper::redirecionar("chat/conversa/{$conversa_id}");
-    }
-
-    /**
-     * [ carregarNovasMensagens ] - Carrega novas mensagens de uma conversa (AJAX)
-     * 
-     * @param int $conversa_id ID da conversa
-     * @param int $ultima_mensagem_id ID da última mensagem carregada
-     * @return void
-     */
-    public function carregarNovasMensagens($conversa_id, $ultima_mensagem_id = 0)
-    {
-        // Verifica permissão para o módulo de chat
-        // Middleware::verificarPermissao(10); // ID do módulo 'Chat'
-        
-        $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
-        
-        if (!$conversa) {
-            echo json_encode(['erro' => 'Conversa não encontrada']);
-            return;
-        }
-        
-        // Verifica se o usuário tem acesso a esta conversa
-        if ($conversa->usuario_id != $_SESSION['usuario_id'] && $_SESSION['usuario_perfil'] !== 'admin') {
-            echo json_encode(['erro' => 'Você não tem permissão para acessar esta conversa']);
-            return;
-        }
-        
-        // Busca novas mensagens
-        $mensagens = $this->chatModel->buscarNovasMensagens($conversa_id, $ultima_mensagem_id);
-        
-        // Marca as mensagens como lidas
-        if (!empty($mensagens)) {
-            $this->chatModel->marcarMensagensComoLidas($conversa_id);
-        }
-        
-        echo json_encode(['mensagens' => $mensagens]);
-    }
-
-    /**
-     * [ excluirConversa ] - Exclui uma conversa
-     * 
-     * @param int $id ID da conversa
-     * @return void
-     */
-    public function excluirConversa($id)
-    {
-        // Verifica permissão para o módulo de chat
-        Middleware::verificarPermissao(10); // ID do módulo 'Chat'
-        
-        $conversa = $this->chatModel->buscarConversaPorId($id);
-        
-        if (!$conversa) {
-            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Conversa não encontrada', 'alert alert-danger');
-            Helper::redirecionar('chat/index');
-            return;
-        }
-        
-        // Verifica se o usuário tem acesso a esta conversa
-        if ($conversa->usuario_id != $_SESSION['usuario_id'] && $_SESSION['usuario_perfil'] !== 'admin') {
-            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Você não tem permissão para excluir esta conversa', 'alert alert-danger');
-            Helper::redirecionar('chat/index');
-            return;
-        }
-        
-        if ($this->chatModel->excluirConversa($id)) {
-            Helper::mensagem('chat', '<i class="fas fa-check"></i> Conversa excluída com sucesso', 'alert alert-success');
-        } else {
-            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro ao excluir conversa', 'alert alert-danger');
-        }
-        
-        Helper::redirecionar('chat/index');
-    }
-
-    /**
-     * [ verificarStatusAPI ] - Verifica se a API do SERPRO está online (AJAX)
-     * 
-     * @return void
-     */
-    public function verificarStatusAPI()
-    {
-        // Verifica permissão para o módulo de chat
-        Middleware::verificarPermissao(10); // ID do módulo 'Chat'
-        
-        // Limpa qualquer saída anterior
-        ob_clean();
-        
-        // Define o cabeçalho para JSON
-        header('Content-Type: application/json');
-        
-        try {
-            $status = SerproHelper::verificarStatusAPI();
-            $response = [
-                'online' => $status,
-            ];
-            
-            // Adiciona mensagem de erro se houver
-            if (!$status) {
-                $response['error'] = SerproHelper::getLastError();
-            }
-            
-            echo json_encode($response);
-        } catch (Exception $e) {
-            echo json_encode([
-                'online' => false,
-                'error' => $e->getMessage()
-            ]);
-        }
-        
-        // Garante que nenhum HTML seja adicionado à resposta
-        exit;
     }
 
     /**
@@ -395,17 +242,22 @@ class Chat extends Controllers
             $resultado = $this->enviarPrimeiraMensagem($numero, $mensagem);
         } else {
             // Conversa já iniciada - enviar mensagem normal
-            $resultado = SerproHelper::enviarMensagem($numero, 'text', $mensagem);
+            $resultado = SerproHelper::enviarMensagemTexto($numero, $mensagem);
         }
 
         if ($resultado['status'] == 200 || $resultado['status'] == 201) {
             // Salvar no banco
+            $messageId = null;
+            if (isset($resultado['response']['id'])) {
+                $messageId = $resultado['response']['id'];
+            }
+
             $this->chatModel->salvarMensagem([
                 'conversa_id' => $conversa->id,
                 'remetente_id' => $_SESSION['usuario_id'],
                 'tipo' => 'text',
                 'conteudo' => $mensagem,
-                'message_id' => $resultado['response']['messages'][0]['id'] ?? uniqid(),
+                'message_id' => $messageId ?? uniqid(),
                 'status' => 'enviado',
                 'enviado_em' => date('Y-m-d H:i:s')
             ]);
@@ -428,17 +280,65 @@ class Chat extends Controllers
      */
     private function enviarPrimeiraMensagem($numero, $mensagem)
     {
-        $nomeTemplate = 'simple_greeting'; // Nome do template aprovado
+        // Nome do template que deve estar aprovado na Meta
+        $nomeTemplate = 'simple_greeting'; // Substitua pelo nome do seu template aprovado
         
-        // Parâmetros do template
+        // Parâmetros do template (se o template tiver variáveis)
         $parametros = [
             [
                 'tipo' => 'text',
                 'valor' => $mensagem
             ]
+            // ,
+            // [
+            //     "tipo" => "text",
+            //     "valor" => "João Pereira" // {{2}} Nome do agente
+            // ],
+            // [
+            //     "tipo" => "text",
+            //     "valor" => "3ª Vara Cível de Goiânia" // {{3}} Comarca
+            // ],
+            // [
+            //     "tipo" => "text",
+            //     "valor" => "1234567-89.2024.8.09.0001" // {{4}} Número do processo
+            // ]
         ];
 
         return SerproHelper::enviarTemplate($numero, $nomeTemplate, $parametros);
+    }
+
+    /**
+     * [ verificarStatusAPI ] - Verifica se a API do SERPRO está online (AJAX)
+     */
+    public function verificarStatusAPI()
+    {
+        // Limpa qualquer saída anterior
+        ob_clean();
+        
+        // Define o cabeçalho para JSON
+        header('Content-Type: application/json');
+        
+        try {
+            $status = SerproHelper::verificarStatusAPI();
+            $response = [
+                'online' => $status,
+            ];
+            
+            // Adiciona mensagem de erro se houver
+            if (!$status) {
+                $response['error'] = SerproHelper::getLastError();
+            }
+            
+            echo json_encode($response);
+        } catch (Exception $e) {
+            echo json_encode([
+                'online' => false,
+                'error' => $e->getMessage()
+            ]);
+        }
+        
+        // Garante que nenhum HTML seja adicionado à resposta
+        exit;
     }
 
     /**
@@ -484,4 +384,185 @@ class Chat extends Controllers
         $resultado = $this->chatModel->marcarConversaComoLida($input['conversa_id']);
         echo json_encode(['success' => $resultado]);
     }
+
+    /**
+     * Webhook para receber mensagens do SERPRO
+     */
+    public function webhook()
+    {
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            // Verificação do webhook
+            $verify_token = $_GET['hub_verify_token'] ?? '';
+            $challenge = $_GET['hub_challenge'] ?? '';
+            
+            if ($verify_token === WEBHOOK_VERIFY_TOKEN) {
+                echo $challenge;
+                exit;
+            } else {
+                http_response_code(403);
+                exit;
+            }
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $input = file_get_contents('php://input');
+            $payload = json_decode($input, true);
+            
+            if ($payload) {
+                $mensagem = SerproHelper::processarWebhook($payload);
+                
+                if ($mensagem && $mensagem['type'] !== 'status') {
+                    // Processar mensagem recebida
+                    $this->processarMensagemRecebida($mensagem);
+                }
+            }
+            
+            http_response_code(200);
+            echo 'OK';
+            exit;
+        }
+    }
+
+    /**
+     * Processa mensagem recebida via webhook
+     */
+    private function processarMensagemRecebida($mensagem)
+    {
+        $numero = $mensagem['from'];
+        
+        // Buscar ou criar conversa
+        $conversa = $this->chatModel->buscarOuCriarConversaPorNumero($numero);
+        
+        if ($conversa) {
+            // Salvar mensagem recebida
+            $conteudo = '';
+            switch ($mensagem['type']) {
+                case 'text':
+                    $conteudo = $mensagem['text'];
+                    break;
+                case 'image':
+                case 'audio':
+                case 'video':
+                case 'document':
+                    $conteudo = json_encode($mensagem[$mensagem['type']]);
+                    break;
+            }
+            
+            $this->chatModel->salvarMensagem([
+                'conversa_id' => $conversa->id,
+                'remetente_id' => null, // Mensagem recebida
+                'tipo' => $mensagem['type'],
+                'conteudo' => $conteudo,
+                'message_id' => $mensagem['id'],
+                'status' => 'recebido',
+                'recebido_em' => date('Y-m-d H:i:s', $mensagem['timestamp'])
+            ]);
+            
+            // Atualizar conversa
+            $this->chatModel->atualizarConversa($conversa->id);
+        }
+    }
+
+    /**
+     * [ excluirConversa ] - Exclui uma conversa
+     */
+    public function excluirConversa($id = null)
+    {
+        // Verifica se tem permissão para acessar o módulo
+        if (
+            !isset($_SESSION['usuario_perfil']) ||
+            !in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])
+        ) {
+            Helper::mensagem('dashboard', '<i class="fas fa-ban"></i> Acesso negado: Apenas administradores e analistas podem acessar essa página', 'alert alert-danger');
+            Helper::mensagemSweetAlert('dashboard', 'Acesso negado: Apenas administradores e analistas podem acessar essa página', 'error');
+            Helper::redirecionar('dashboard/inicial');
+        }
+        // Verificar se o ID foi fornecido
+        if (!$id) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> ID da conversa não fornecido', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        // Verificar se a conversa existe
+        $conversa = $this->chatModel->buscarConversaPorId($id);
+        if (!$conversa) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Conversa não encontrada', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            $input = json_decode(file_get_contents('php://input'), true);
+            
+            if (!$input || !isset($input['conversa_id'])) {
+                echo json_encode(['success' => false, 'error' => 'ID da conversa não fornecido']);
+                return;
+            }
+
+            $conversa_id = $input['conversa_id'];
+            
+            // Verificar se a conversa pertence ao usuário logado
+            $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
+            
+            if (!$conversa || $conversa->usuario_id != $_SESSION['usuario_id']) {
+                echo json_encode(['success' => false, 'error' => 'Conversa não encontrada ou sem permissão']);
+                return;
+            }
+
+            // Excluir a conversa
+            $resultado = $this->chatModel->excluirConversa($conversa_id);
+            
+            if ($resultado) {
+                echo json_encode(['success' => true, 'message' => 'Conversa excluída com sucesso']);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Erro ao excluir conversa']);
+            }
+        } else {
+            echo json_encode(['success' => false, 'error' => 'Método não permitido']);
+        }
+    }
+
+    // /**
+    //  * [ excluir ] - Exclui um processo
+    //  * 
+    //  * @param int $id ID do processo
+    //  * @return void
+    //  */
+    // public function excluir($id = null)
+    // {
+    //     // Verifica se tem permissão para acessar o módulo
+    //     if (
+    //         !isset($_SESSION['usuario_perfil']) ||
+    //         !in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])
+    //     ) {
+    //         Helper::mensagem('dashboard', '<i class="fas fa-ban"></i> Acesso negado: Apenas administradores e analistas podem acessar essa página', 'alert alert-danger');
+    //         Helper::mensagemSweetAlert('dashboard', 'Acesso negado: Apenas administradores e analistas podem acessar essa página', 'error');
+    //         Helper::redirecionar('dashboard/inicial');
+    //     }
+    //     // Verificar se o ID foi fornecido
+    //     if (!$id) {
+    //         Helper::mensagem('ciri', '<i class="fas fa-exclamation-triangle"></i> ID do processo não fornecido', 'alert alert-danger');
+    //         Helper::redirecionar('ciri/listar');
+    //         return;
+    //     }
+
+    //     // Verificar se o processo existe
+    //     $processo = $this->ciriModel->obterProcessoPorId($id);
+    //     if (!$processo) {
+    //         Helper::mensagem('ciri', '<i class="fas fa-exclamation-triangle"></i> Processo não encontrado', 'alert alert-danger');
+    //         Helper::redirecionar('ciri/listar');
+    //         return;
+    //     }
+
+    //     // Excluir o processo
+    //     if ($this->ciriModel->excluirProcesso($id)) {
+    //         Helper::mensagem('ciri', '<i class="fas fa-check"></i> Processo excluído com sucesso', 'alert alert-success');
+    //         Helper::mensagemSweetAlert('ciri', 'Processo excluído com sucesso', 'success');
+    //     } else {
+    //         Helper::mensagem('ciri', '<i class="fas fa-times"></i> Erro ao excluir processo', 'alert alert-danger');
+    //         Helper::mensagemSweetAlert('ciri', 'Erro ao excluir processo', 'error');
+    //     }
+
+    //     Helper::redirecionar('ciri/listar');
+    // }
+}
 }

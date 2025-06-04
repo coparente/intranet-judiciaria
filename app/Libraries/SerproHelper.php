@@ -35,14 +35,13 @@ class SerproHelper
     }
 
     /**
-     * Obtém token de acesso
+     * Obtém token de acesso seguindo a documentação oficial
      */
     public static function getToken()
     {
-        $url = self::$baseUrl . '/oauth/token';
+        $url = self::$baseUrl . '/oauth2/token';
         
         $data = [
-            'grant_type' => 'client_credentials',
             'client_id' => self::$clientId,
             'client_secret' => self::$clientSecret
         ];
@@ -84,219 +83,264 @@ class SerproHelper
     }
 
     /**
-     * Verifica status da API
+     * Envia template (primeira mensagem) seguindo a documentação
+     */
+    public static function enviarTemplate($destinatario, $nomeTemplate, $parametros = [])
+    {
+        $token = self::getToken();
+        if (!$token) {
+            return ['status' => 401, 'error' => 'Erro ao obter token: ' . self::$lastError];
+        }
+
+        $url = self::$baseUrl . '/client/' . self::$phoneNumberId . '/v2/requisicao/mensagem/template';
+        
+        $payload = [
+            'nomeTemplate' => $nomeTemplate,
+            'wabaId' => self::$wabaId,
+            'destinatarios' => [$destinatario]
+        ];
+
+        // Adiciona parâmetros se fornecidos
+        if (!empty($parametros)) {
+            $payload['body'] = [
+                'parametros' => $parametros
+            ];
+        }
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $token,
+            'Content-Type: application/json'
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            self::$lastError = "Erro cURL: " . $error;
+            return ['status' => 500, 'error' => self::$lastError];
+        }
+
+        $responseData = json_decode($response, true);
+
+        return [
+            'status' => $httpCode,
+            'response' => $responseData,
+            'error' => $httpCode >= 400 ? $response : null
+        ];
+    }
+
+    /**
+     * Envia mensagem de texto (conversa já iniciada)
+     */
+    public static function enviarMensagemTexto($destinatario, $mensagem, $messageId = null)
+    {
+        $token = self::getToken();
+        if (!$token) {
+            return ['status' => 401, 'error' => 'Erro ao obter token: ' . self::$lastError];
+        }
+
+        $url = self::$baseUrl . '/client/' . self::$phoneNumberId . '/v2/requisicao/mensagem/texto';
+        
+        $payload = [
+            'destinatario' => $destinatario,
+            'body' => $mensagem,
+            'preview_url' => false
+        ];
+
+        // Adiciona contexto se fornecido (resposta a uma mensagem)
+        if ($messageId) {
+            $payload['message_id'] = $messageId;
+        }
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $token,
+            'Content-Type: application/json'
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            self::$lastError = "Erro cURL: " . $error;
+            return ['status' => 500, 'error' => self::$lastError];
+        }
+
+        $responseData = json_decode($response, true);
+
+        return [
+            'status' => $httpCode,
+            'response' => $responseData,
+            'error' => $httpCode >= 400 ? $response : null
+        ];
+    }
+
+    /**
+     * Envia mídia (imagem, documento, etc.)
+     */
+    public static function enviarMidia($destinatario, $tipoMidia, $idMedia, $caption = null, $messageId = null)
+    {
+        $token = self::getToken();
+        if (!$token) {
+            return ['status' => 401, 'error' => 'Erro ao obter token: ' . self::$lastError];
+        }
+
+        $url = self::$baseUrl . '/client/' . self::$phoneNumberId . '/v2/requisicao/mensagem/media';
+        
+        $payload = [
+            'destinatario' => $destinatario,
+            'tipoMedia' => $tipoMidia,
+            'idMedia' => $idMedia
+        ];
+
+        if ($caption) {
+            $payload['caption'] = $caption;
+        }
+
+        if ($messageId) {
+            $payload['message_id'] = $messageId;
+        }
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $token,
+            'Content-Type: application/json'
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            self::$lastError = "Erro cURL: " . $error;
+            return ['status' => 500, 'error' => self::$lastError];
+        }
+
+        $responseData = json_decode($response, true);
+
+        return [
+            'status' => $httpCode,
+            'response' => $responseData,
+            'error' => $httpCode >= 400 ? $response : null
+        ];
+    }
+
+    /**
+     * Faz upload de mídia para a Meta
+     */
+    public static function uploadMidia($arquivo, $tipoMidia)
+    {
+        $token = self::getToken();
+        if (!$token) {
+            return ['status' => 401, 'error' => 'Erro ao obter token: ' . self::$lastError];
+        }
+
+        $url = self::$baseUrl . '/client/' . self::$phoneNumberId . '/v2/media';
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, [
+            'mediaType' => $tipoMidia,
+            'file' => new CURLFile($arquivo['tmp_name'], $tipoMidia, $arquivo['name'])
+        ]);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $token
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            self::$lastError = "Erro cURL: " . $error;
+            return ['status' => 500, 'error' => self::$lastError];
+        }
+
+        $responseData = json_decode($response, true);
+
+        return [
+            'status' => $httpCode,
+            'response' => $responseData,
+            'error' => $httpCode >= 400 ? $response : null
+        ];
+    }
+
+    /**
+     * Consulta status de uma requisição
+     */
+    public static function consultarStatus($idRequisicao)
+    {
+        $token = self::getToken();
+        if (!$token) {
+            return ['status' => 401, 'error' => 'Erro ao obter token: ' . self::$lastError];
+        }
+
+        $url = self::$baseUrl . '/client/' . self::$phoneNumberId . '/v2/requisicao/' . $idRequisicao;
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $token
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            self::$lastError = "Erro cURL: " . $error;
+            return ['status' => 500, 'error' => self::$lastError];
+        }
+
+        $responseData = json_decode($response, true);
+
+        return [
+            'status' => $httpCode,
+            'response' => $responseData,
+            'error' => $httpCode >= 400 ? $response : null
+        ];
+    }
+
+    /**
+     * Verifica se a API está online
      */
     public static function verificarStatusAPI()
     {
         $token = self::getToken();
-        
-        if (!$token) {
-            return [
-                'online' => false,
-                'error' => 'Falha na autenticação: ' . self::$lastError
-            ];
-        }
-
-        // Testar endpoint de status ou informações da conta
-        $url = self::$baseUrl . '/client/' . self::$clientId . '/v2/conta';
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Authorization: Bearer ' . $token,
-            'Content-Type: application/json'
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-
-        if ($error) {
-            return [
-                'online' => false,
-                'error' => 'Erro de conexão: ' . $error
-            ];
-        }
-
-        if ($httpCode === 200) {
-            return [
-                'online' => true,
-                'message' => 'API funcionando normalmente'
-            ];
-        } else {
-            return [
-                'online' => false,
-                'error' => 'API retornou código: ' . $httpCode,
-                'response' => $response
-            ];
-        }
-    }
-
-    /**
-     * Envia mensagem de texto (funciona sem template após primeira conversa)
-     */
-    public static function enviarMensagem($numero, $tipo, $conteudo, $caption = '', $filename = '')
-    {
-        $token = self::getToken();
-        if (!$token) {
-            return ['status' => 401, 'error' => 'Falha na autenticação: ' . self::$lastError];
-        }
-
-        // Formatar número (remover caracteres especiais)
-        $numero = preg_replace('/[^0-9]/', '', $numero);
-        
-        // URL correta baseada na documentação do SERPRO
-        $url = self::$baseUrl . '/client/' . self::$clientId . '/v2/requisicao/mensagem';
-
-        // Estrutura da mensagem baseada na documentação
-        $data = [
-            'wabaId' => self::$wabaId,
-            'destinatarios' => [$numero]
-        ];
-
-        // Configurar dados por tipo
-        switch ($tipo) {
-            case 'text':
-                $data['tipo'] = 'text';
-                $data['conteudo'] = $conteudo;
-                break;
-
-            case 'image':
-                $data['tipo'] = 'image';
-                $data['midia'] = $conteudo; // URL da imagem
-                if ($caption) {
-                    $data['legenda'] = $caption;
-                }
-                break;
-
-            case 'document':
-                $data['tipo'] = 'document';
-                $data['midia'] = $conteudo; // URL do documento
-                if ($filename) {
-                    $data['nomeArquivo'] = $filename;
-                }
-                if ($caption) {
-                    $data['legenda'] = $caption;
-                }
-                break;
-
-            case 'video':
-                $data['tipo'] = 'video';
-                $data['midia'] = $conteudo; // URL do vídeo
-                if ($caption) {
-                    $data['legenda'] = $caption;
-                }
-                break;
-
-            case 'audio':
-                $data['tipo'] = 'audio';
-                $data['midia'] = $conteudo; // URL do áudio
-                break;
-
-            default:
-                return ['status' => 400, 'error' => 'Tipo de mensagem não suportado'];
-        }
-
-        // Fazer requisição
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Authorization: Bearer ' . $token,
-            'Content-Type: application/json',
-            'Accept: application/json'
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-
-        if ($error) {
-            return ['status' => 500, 'error' => $error];
-        }
-
-        return [
-            'status' => $httpCode,
-            'response' => json_decode($response, true),
-            'error' => $httpCode !== 200 ? json_decode($response, true)['error']['message'] ?? 'Erro desconhecido' : null
-        ];
-    }
-
-    /**
-     * Envia template (necessário para iniciar conversa)
-     */
-    public static function enviarTemplate($numero, $nomeTemplate, $parametros = [], $idMedia = null)
-    {
-        $token = self::getToken();
-        if (!$token) {
-            return ['status' => 401, 'error' => 'Falha na autenticação: ' . self::$lastError];
-        }
-
-        // Formatar número
-        $numero = preg_replace('/[^0-9]/', '', $numero);
-
-        // URL correta baseada no seu exemplo
-        $url = self::$baseUrl . '/client/' . self::$clientId . '/v2/requisicao/mensagem/template';
-
-        $data = [
-            'nomeTemplate' => $nomeTemplate,
-            'wabaId' => self::$wabaId,
-            'destinatarios' => [$numero]
-        ];
-
-        if (!empty($parametros)) {
-            $data['body'] = ['parametros' => $parametros];
-        }
-
-        if (!empty($idMedia)) {
-            $data['header'] = ['idMedia' => $idMedia];
-        }
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Authorization: Bearer ' . $token,
-            'Content-Type: application/json'
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-
-        if ($error) {
-            return ['status' => 500, 'error' => $error];
-        }
-
-        return [
-            'status' => $httpCode,
-            'response' => json_decode($response, true),
-            'error' => $httpCode !== 200 && $httpCode !== 201 ? json_decode($response, true)['error']['message'] ?? 'Erro desconhecido' : null
-        ];
-    }
-
-    /**
-     * Verifica se já existe conversa ativa (últimas 24h)
-     */
-    public static function temConversaAtiva($numero)
-    {
-        // Aqui você pode implementar lógica para verificar se há conversa ativa
-        // Por enquanto, vamos assumir que sempre precisa de template para iniciar
-        return false;
+        return $token !== false;
     }
 
     /**
@@ -304,9 +348,6 @@ class SerproHelper
      */
     public static function processarWebhook($payload)
     {
-        // Log do payload para debug
-        error_log("Webhook recebido: " . json_encode($payload));
-
         if (!isset($payload['entry'])) {
             return false;
         }
@@ -369,7 +410,8 @@ class SerproHelper
                     'type' => 'status',
                     'id' => $status['id'],
                     'status' => $status['status'],
-                    'timestamp' => $status['timestamp']
+                    'timestamp' => $status['timestamp'],
+                    'idRequisicao' => $status['idRequisicao'] ?? null
                 ];
             }
         }

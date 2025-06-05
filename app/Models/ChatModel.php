@@ -206,20 +206,6 @@ class ChatModel
     }
 
     /**
-     * Busca mensagens de uma conversa
-     */
-    // public function buscarMensagens($conversa_id)
-    // {
-    //     $sql = "SELECT * FROM mensagens_chat 
-    //             WHERE conversa_id = :conversa_id 
-    //             ORDER BY enviado_em ASC";
-
-    //     $this->db->query($sql);
-    //     $this->db->bind(':conversa_id', $conversa_id);
-    //     return $this->db->resultados();
-    // }
-
-    /**
      * Exclui uma conversa pelo ID
      * 
      * @param int $conversa_id ID da conversa a ser excluída
@@ -246,6 +232,37 @@ class ChatModel
         $this->db->bind(':contato_numero', $numero);
         $this->db->bind(':usuario_id', $usuario_id);
         return $this->db->resultado();
+    }
+
+    /**
+     * Busca ou cria conversa por número (sem usuário específico)
+     */
+    public function buscarOuCriarConversaPorNumero($numero, $contato_nome = null)
+    {
+        // Buscar conversa existente por número
+        $sql = "SELECT * FROM conversas WHERE contato_numero = :contato_numero LIMIT 1";
+        $this->db->query($sql);
+        $this->db->bind(':contato_numero', $numero);
+        $conversa = $this->db->resultado();
+        
+        if ($conversa) {
+            return $conversa;
+        }
+
+        // Se não encontrou, criar nova conversa
+        $sql = "INSERT INTO conversas (contato_nome, contato_numero, criado_em, atualizado_em) 
+                VALUES (:contato_nome, :contato_numero, NOW(), NOW())";
+        
+        $this->db->query($sql);
+        $this->db->bind(':contato_nome', $contato_nome ?: 'Contato ' . $numero);
+        $this->db->bind(':contato_numero', $numero);
+        
+        if ($this->db->executa()) {
+            $conversa_id = $this->db->ultimoIdInserido();
+            return $this->buscarConversaPorId($conversa_id);
+        }
+        
+        return false;
     }
 
     /**
@@ -276,5 +293,174 @@ class ChatModel
         $this->db->query($sql);
         $this->db->bind(':conversa_id', $conversa_id);
         return $this->db->executa();
+    }
+
+    /**
+     * Conta total de conversas do usuário
+     */
+    public function contarConversas($usuario_id = null)
+    {
+        if ($usuario_id) {
+            $sql = "SELECT COUNT(*) as total FROM conversas WHERE usuario_id = :usuario_id";
+            $this->db->query($sql);
+            $this->db->bind(':usuario_id', $usuario_id);
+        } else {
+            $sql = "SELECT COUNT(*) as total FROM conversas";
+            $this->db->query($sql);
+        }
+        
+        $resultado = $this->db->resultado();
+        return $resultado ? $resultado->total : 0;
+    }
+
+    /**
+     * Conta mensagens enviadas
+     */
+    public function contarMensagensEnviadas($usuario_id = null)
+    {
+        if ($usuario_id) {
+            $sql = "SELECT COUNT(*) as total FROM mensagens_chat m
+                    INNER JOIN conversas c ON m.conversa_id = c.id
+                    WHERE c.usuario_id = :usuario_id AND m.remetente_id IS NOT NULL";
+            $this->db->query($sql);
+            $this->db->bind(':usuario_id', $usuario_id);
+        } else {
+            $sql = "SELECT COUNT(*) as total FROM mensagens_chat WHERE remetente_id IS NOT NULL";
+            $this->db->query($sql);
+        }
+        
+        $resultado = $this->db->resultado();
+        return $resultado ? $resultado->total : 0;
+    }
+
+    /**
+     * Conta mensagens recebidas
+     */
+    public function contarMensagensRecebidas($usuario_id = null)
+    {
+        if ($usuario_id) {
+            $sql = "SELECT COUNT(*) as total FROM mensagens_chat m
+                    INNER JOIN conversas c ON m.conversa_id = c.id
+                    WHERE c.usuario_id = :usuario_id AND m.remetente_id IS NULL";
+            $this->db->query($sql);
+            $this->db->bind(':usuario_id', $usuario_id);
+        } else {
+            $sql = "SELECT COUNT(*) as total FROM mensagens_chat WHERE remetente_id IS NULL";
+            $this->db->query($sql);
+        }
+        
+        $resultado = $this->db->resultado();
+        return $resultado ? $resultado->total : 0;
+    }
+
+    /**
+     * Conta conversas ativas (com mensagens nos últimos 7 dias)
+     */
+    public function contarConversasAtivas($usuario_id = null)
+    {
+        if ($usuario_id) {
+            $sql = "SELECT COUNT(DISTINCT c.id) as total FROM conversas c
+                    INNER JOIN mensagens_chat m ON c.id = m.conversa_id
+                    WHERE c.usuario_id = :usuario_id AND m.enviado_em >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+            $this->db->query($sql);
+            $this->db->bind(':usuario_id', $usuario_id);
+        } else {
+            $sql = "SELECT COUNT(DISTINCT c.id) as total FROM conversas c
+                    INNER JOIN mensagens_chat m ON c.id = m.conversa_id
+                    WHERE m.enviado_em >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+            $this->db->query($sql);
+        }
+        
+        $resultado = $this->db->resultado();
+        return $resultado ? $resultado->total : 0;
+    }
+
+    /**
+     * Salva configuração do chat
+     */
+    public function salvarConfiguracao($chave, $valor)
+    {
+        // Primeiro, verifica se a configuração já existe
+        $sql = "SELECT id FROM chat_configuracoes WHERE chave = :chave LIMIT 1";
+        $this->db->query($sql);
+        $this->db->bind(':chave', $chave);
+        $existente = $this->db->resultado();
+
+        if ($existente) {
+            // Atualizar configuração existente
+            $sql = "UPDATE chat_configuracoes SET valor = :valor, atualizado_em = NOW() WHERE chave = :chave";
+            $this->db->query($sql);
+            $this->db->bind(':valor', $valor);
+            $this->db->bind(':chave', $chave);
+        } else {
+            // Criar nova configuração
+            $sql = "INSERT INTO chat_configuracoes (chave, valor, criado_em, atualizado_em) 
+                    VALUES (:chave, :valor, NOW(), NOW())";
+            $this->db->query($sql);
+            $this->db->bind(':chave', $chave);
+            $this->db->bind(':valor', $valor);
+        }
+
+        return $this->db->executa();
+    }
+
+    /**
+     * Obtém configurações do chat
+     */
+    public function obterConfiguracoes()
+    {
+        // Primeiro, tenta criar a tabela se não existir
+        $this->criarTabelaConfiguracoes();
+
+        $sql = "SELECT chave, valor FROM chat_configuracoes";
+        $this->db->query($sql);
+        $resultados = $this->db->resultados();
+
+        $configuracoes = [];
+        if ($resultados) {
+            foreach ($resultados as $config) {
+                $configuracoes[$config->chave] = $config->valor;
+            }
+        }
+
+        // Valores padrão se não existirem
+        $padroes = [
+            'template_padrao' => 'simple_greeting',
+            'webhook_url' => URL . '/chat/webhook',
+            'auto_resposta' => '0',
+            'horario_atendimento' => '08:00-18:00'
+        ];
+
+        return array_merge($padroes, $configuracoes);
+    }
+
+    /**
+     * Cria tabela de configurações se não existir
+     */
+    private function criarTabelaConfiguracoes()
+    {
+        $sql = "CREATE TABLE IF NOT EXISTS chat_configuracoes (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    chave VARCHAR(100) NOT NULL UNIQUE,
+                    valor TEXT,
+                    criado_em DATETIME NOT NULL,
+                    atualizado_em DATETIME NOT NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+        
+        $this->db->query($sql);
+        $this->db->executa();
+    }
+
+    /**
+     * Obtém configuração específica
+     */
+    public function obterConfiguracao($chave, $valorPadrao = null)
+    {
+        $sql = "SELECT valor FROM chat_configuracoes WHERE chave = :chave LIMIT 1";
+        $this->db->query($sql);
+        $this->db->bind(':chave', $chave);
+        $resultado = $this->db->resultado();
+
+        return $resultado ? $resultado->valor : $valorPadrao;
     }
 }

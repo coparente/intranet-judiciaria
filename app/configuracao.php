@@ -24,7 +24,9 @@ define('SENHA', $_ENV['DEV_DB_PASSWORD'] ?: getenv('PROD_DB_PASSWORD') ?: '');
  */
 define('APP_NOME', 'Dir Judiciária');
 define('APP_VERSAO', '1.0.0');
-define('URL', 'http://10.90.18.141/intranet-judiciaria');
+// define('URL', 'http://10.90.18.141/intranet-judiciaria');
+// define('URL', 'http://localhost/intranet-judiciaria');
+define('URL', 'http://192.168.2.122/intranet-judiciaria');
 // define('URL', 'http://localhost/SICUC');
 
 /**

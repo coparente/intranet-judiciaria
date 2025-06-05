@@ -270,6 +270,14 @@ CREATE TABLE `mensagens_chat` (
   KEY `message_id` (`message_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Tabela de configurações do chat
+CREATE TABLE IF NOT EXISTS chat_configuracoes (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    chave VARCHAR(100) NOT NULL UNIQUE,
+                    valor TEXT,
+                    criado_em DATETIME NOT NULL,
+                    atualizado_em DATETIME NOT NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
 -- Inserção de dados iniciais para a tabela usuarios
 INSERT INTO usuarios (nome, email, senha, perfil, biografia, status, criado_em) VALUES

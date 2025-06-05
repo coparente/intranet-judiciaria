@@ -31,6 +31,9 @@ class Chat extends Controllers
 
         // Carrega o helper do SERPRO
         require_once APPROOT . '/Libraries/SerproHelper.php';
+        
+        // Inicializa o SerproHelper com as configurações
+        SerproHelper::init();
     }
 
     /**
@@ -490,79 +493,665 @@ class Chat extends Controllers
             Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Conversa não encontrada', 'alert alert-danger');
             Helper::redirecionar('chat/index');
             return;
-        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-            $input = json_decode(file_get_contents('php://input'), true);
-            
-            if (!$input || !isset($input['conversa_id'])) {
-                echo json_encode(['success' => false, 'error' => 'ID da conversa não fornecido']);
-                return;
-            }
+        }
 
-            $conversa_id = $input['conversa_id'];
-            
-            // Verificar se a conversa pertence ao usuário logado
-            $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
-            
-            if (!$conversa || $conversa->usuario_id != $_SESSION['usuario_id']) {
-                echo json_encode(['success' => false, 'error' => 'Conversa não encontrada ou sem permissão']);
-                return;
-            }
-
-            // Excluir a conversa
-            $resultado = $this->chatModel->excluirConversa($conversa_id);
-            
-            if ($resultado) {
-                echo json_encode(['success' => true, 'message' => 'Conversa excluída com sucesso']);
-            } else {
-                echo json_encode(['success' => false, 'error' => 'Erro ao excluir conversa']);
-            }
+        // Excluir a conversa
+        $resultado = $this->chatModel->excluirConversa($id);
+        
+        if ($resultado) {
+            Helper::mensagem('chat', '<i class="fas fa-check-circle"></i> Conversa excluída com sucesso', 'alert alert-success');
+            Helper::redirecionar('chat/index');
         } else {
-            echo json_encode(['success' => false, 'error' => 'Método não permitido']);
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Erro ao excluir conversa', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
         }
     }
 
-    // /**
-    //  * [ excluir ] - Exclui um processo
-    //  * 
-    //  * @param int $id ID do processo
-    //  * @return void
-    //  */
-    // public function excluir($id = null)
-    // {
-    //     // Verifica se tem permissão para acessar o módulo
-    //     if (
-    //         !isset($_SESSION['usuario_perfil']) ||
-    //         !in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])
-    //     ) {
-    //         Helper::mensagem('dashboard', '<i class="fas fa-ban"></i> Acesso negado: Apenas administradores e analistas podem acessar essa página', 'alert alert-danger');
-    //         Helper::mensagemSweetAlert('dashboard', 'Acesso negado: Apenas administradores e analistas podem acessar essa página', 'error');
-    //         Helper::redirecionar('dashboard/inicial');
-    //     }
-    //     // Verificar se o ID foi fornecido
-    //     if (!$id) {
-    //         Helper::mensagem('ciri', '<i class="fas fa-exclamation-triangle"></i> ID do processo não fornecido', 'alert alert-danger');
-    //         Helper::redirecionar('ciri/listar');
-    //         return;
-    //     }
+    /**
+     * [ gerenciarTemplates ] - Gerencia templates do WhatsApp Business
+     */
+    public function gerenciarTemplates()
+    {
+        // Detectar se é uma requisição AJAX
+        $isAjax = $_SERVER['REQUEST_METHOD'] == 'POST' || 
+                 isset($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+                 strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
 
-    //     // Verificar se o processo existe
-    //     $processo = $this->ciriModel->obterProcessoPorId($id);
-    //     if (!$processo) {
-    //         Helper::mensagem('ciri', '<i class="fas fa-exclamation-triangle"></i> Processo não encontrado', 'alert alert-danger');
-    //         Helper::redirecionar('ciri/listar');
-    //         return;
-    //     }
+        // Verifica se o usuário está logado
+        if (!isset($_SESSION['usuario_id'])) {
+            if ($isAjax) {
+                header('Content-Type: application/json');
+                echo json_encode(['status' => 401, 'error' => 'Usuário não autenticado. Faça login novamente.']);
+                return;
+            }
+            Helper::redirecionar('usuarios/login');
+            return;
+        }
 
-    //     // Excluir o processo
-    //     if ($this->ciriModel->excluirProcesso($id)) {
-    //         Helper::mensagem('ciri', '<i class="fas fa-check"></i> Processo excluído com sucesso', 'alert alert-success');
-    //         Helper::mensagemSweetAlert('ciri', 'Processo excluído com sucesso', 'success');
-    //     } else {
-    //         Helper::mensagem('ciri', '<i class="fas fa-times"></i> Erro ao excluir processo', 'alert alert-danger');
-    //         Helper::mensagemSweetAlert('ciri', 'Erro ao excluir processo', 'error');
-    //     }
+        // Verifica permissão
+        if (!isset($_SESSION['usuario_perfil']) || !in_array($_SESSION['usuario_perfil'], ['admin'])) {
+            if ($isAjax) {
+                header('Content-Type: application/json');
+                echo json_encode(['status' => 403, 'error' => 'Acesso negado. Apenas administradores podem gerenciar templates.']);
+                return;
+            }
+            
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat');
+            return;
+        }
 
-    //     Helper::redirecionar('ciri/listar');
-    // }
-}
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            // Definir cabeçalho JSON para todas as respostas AJAX
+            header('Content-Type: application/json');
+            
+            $acao = $_POST['acao'] ?? '';
+            
+            try {
+                switch ($acao) {
+                    case 'listar':
+                        $templates = SerproHelper::listarTemplates();
+                        echo json_encode($templates);
+                        break;
+                        
+                    case 'criar':
+                        $dadosTemplate = [
+                            'name' => $_POST['name'],
+                            'category' => $_POST['category'],
+                            'language' => $_POST['language'],
+                            'components' => json_decode($_POST['components'], true)
+                        ];
+                        $resultado = SerproHelper::criarTemplate($dadosTemplate);
+                        echo json_encode($resultado);
+                        break;
+                        
+                    case 'excluir':
+                        $nomeTemplate = $_POST['nome_template'];
+                        $resultado = SerproHelper::excluirTemplate($nomeTemplate);
+                        echo json_encode($resultado);
+                        break;
+                        
+                    default:
+                        echo json_encode(['status' => 400, 'error' => 'Ação não reconhecida']);
+                        break;
+                }
+            } catch (Exception $e) {
+                echo json_encode(['status' => 500, 'error' => 'Erro interno: ' . $e->getMessage()]);
+            }
+            
+            return;
+        }
+
+        // Para requisições GET, carregar templates diretamente no PHP
+        $templates = [];
+        $templateError = null;
+        
+        try {
+            $resultado = SerproHelper::listarTemplates();
+            if ($resultado['status'] == 200 && isset($resultado['response'])) {
+                $templates = $resultado['response'];
+            } else {
+                $templateError = 'Erro ao carregar templates: ' . ($resultado['error'] ?? 'Erro desconhecido');
+            }
+        } catch (Exception $e) {
+            $templateError = 'Erro ao conectar com a API: ' . $e->getMessage();
+        }
+
+        $dados = [
+            'tituloPagina' => 'Gerenciar Templates',
+            'templates' => $templates,
+            'templateError' => $templateError
+        ];
+        
+        $this->view('chat/templates', $dados);
+    }
+
+    /**
+     * [ gerenciarWebhooks ] - Gerencia webhooks do SERPRO
+     */
+    public function gerenciarWebhooks()
+    {
+        // Detectar se é uma requisição AJAX
+        $isAjax = $_SERVER['REQUEST_METHOD'] == 'POST' || 
+                 isset($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+                 strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+
+        // Verifica se o usuário está logado
+        if (!isset($_SESSION['usuario_id'])) {
+            if ($isAjax) {
+                header('Content-Type: application/json');
+                echo json_encode(['status' => 401, 'error' => 'Usuário não autenticado. Faça login novamente.']);
+                return;
+            }
+            Helper::redirecionar('usuarios/login');
+            return;
+        }
+
+        // Verifica permissão
+        if (!isset($_SESSION['usuario_perfil']) || !in_array($_SESSION['usuario_perfil'], ['admin'])) {
+            if ($isAjax) {
+                header('Content-Type: application/json');
+                echo json_encode(['status' => 403, 'error' => 'Acesso negado. Apenas administradores podem gerenciar webhooks.']);
+                return;
+            }
+            
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat');
+            return;
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            // Definir cabeçalho JSON para todas as respostas AJAX
+            header('Content-Type: application/json');
+            
+            $acao = $_POST['acao'] ?? '';
+            
+            try {
+                switch ($acao) {
+                    case 'listar':
+                        $resultado = SerproHelper::listarWebhooks();
+                        echo json_encode($resultado);
+                        break;
+                        
+                    case 'cadastrar':
+                        $webhook = [
+                            'uri' => $_POST['uri'],
+                            'jwtToken' => $_POST['jwt_token'] ?? null
+                        ];
+                        $resultado = SerproHelper::cadastrarWebhook($webhook);
+                        echo json_encode($resultado);
+                        break;
+                        
+                    case 'atualizar':
+                        $webhook = [
+                            'id' => $_POST['webhook_id'],
+                            'uri' => $_POST['uri'],
+                            'jwtToken' => $_POST['jwt_token'] ?? null
+                        ];
+                        $resultado = SerproHelper::atualizarWebhook($webhook);
+                        echo json_encode($resultado);
+                        break;
+                        
+                    case 'excluir':
+                        $webhookId = $_POST['webhook_id'];
+                        $resultado = SerproHelper::excluirWebhook($webhookId);
+                        echo json_encode($resultado);
+                        break;
+                        
+                    default:
+                        echo json_encode(['status' => 400, 'error' => 'Ação não reconhecida']);
+                        break;
+                }
+            } catch (Exception $e) {
+                echo json_encode(['status' => 500, 'error' => 'Erro interno: ' . $e->getMessage()]);
+            }
+            
+            return;
+        }
+
+        // Para requisições GET, carregar webhooks diretamente no PHP
+        $webhooks = [];
+        $webhookError = null;
+        
+        try {
+            $resultado = SerproHelper::listarWebhooks();
+            if ($resultado['status'] == 200 && isset($resultado['response']['data'])) {
+                $webhooks = $resultado['response']['data'];
+            } else {
+                $webhookError = 'Erro ao carregar webhooks: ' . ($resultado['error'] ?? 'Erro desconhecido');
+            }
+        } catch (Exception $e) {
+            $webhookError = 'Erro ao conectar com a API: ' . $e->getMessage();
+        }
+
+        $dados = [
+            'tituloPagina' => 'Gerenciar Webhooks',
+            'webhooks' => $webhooks,
+            'webhookError' => $webhookError
+        ];
+        
+        $this->view('chat/webhooks', $dados);
+    }
+
+    /**
+     * [ uploadMidia ] - Faz upload de mídia para a Meta
+     */
+    public function uploadMidia()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'error' => 'Método não permitido']);
+            return;
+        }
+
+        if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+            echo json_encode(['success' => false, 'error' => 'Erro no upload do arquivo']);
+            return;
+        }
+
+        $arquivo = $_FILES['file'];
+        $tipoMidia = $_POST['media_type'] ?? $arquivo['type'];
+
+        // Validar tipo de arquivo
+        $tiposPermitidos = [
+            'image/jpeg', 'image/png', 'image/gif',
+            'video/mp4', 'video/3gpp',
+            'audio/aac', 'audio/amr', 'audio/mpeg', 'audio/mp4', 'audio/ogg',
+            'application/pdf', 'application/msword', 'text/plain',
+            'application/vnd.ms-powerpoint', 'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ];
+
+        if (!in_array($tipoMidia, $tiposPermitidos)) {
+            echo json_encode(['success' => false, 'error' => 'Tipo de arquivo não permitido']);
+            return;
+        }
+
+        // Verificar tamanho
+        $limiteTamanho = 5 * 1024 * 1024; // 5MB padrão
+        if (strpos($tipoMidia, 'video/') === 0 || strpos($tipoMidia, 'audio/') === 0) {
+            $limiteTamanho = 16 * 1024 * 1024; // 16MB para vídeo/áudio
+        } elseif (strpos($tipoMidia, 'application/') === 0) {
+            $limiteTamanho = 95 * 1024 * 1024; // 95MB para documentos
+        }
+
+        if ($arquivo['size'] > $limiteTamanho) {
+            echo json_encode(['success' => false, 'error' => 'Arquivo muito grande']);
+            return;
+        }
+
+        $resultado = SerproHelper::uploadMidia($arquivo, $tipoMidia);
+        
+        if ($resultado['status'] == 200) {
+            echo json_encode([
+                'success' => true,
+                'media_id' => $resultado['response']['id'],
+                'media_type' => $tipoMidia
+            ]);
+        } else {
+            echo json_encode([
+                'success' => false,
+                'error' => $resultado['error'] ?? 'Erro no upload'
+            ]);
+        }
+    }
+
+    /**
+     * [ downloadMidia ] - Baixa mídia da Meta
+     */
+    public function downloadMidia($media_id = null)
+    {
+        if (!$media_id) {
+            http_response_code(404);
+            return;
+        }
+
+        $resultado = SerproHelper::downloadMidia($media_id);
+        
+        if ($resultado['status'] == 200) {
+            // Definir headers apropriados
+            header('Content-Type: ' . $resultado['content_type']);
+            header('Content-Disposition: attachment; filename="' . $media_id . '"');
+            echo $resultado['data'];
+        } else {
+            http_response_code(404);
+        }
+    }
+
+    /**
+     * [ enviarMensagemInterativa ] - Envia mensagens com botões ou listas
+     */
+    public function enviarMensagemInterativa()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'error' => 'Método não permitido']);
+            return;
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        
+        if (!$input || !isset($input['conversa_id']) || !isset($input['tipo'])) {
+            echo json_encode(['success' => false, 'error' => 'Dados incompletos']);
+            return;
+        }
+
+        $conversa = $this->chatModel->buscarConversaPorId($input['conversa_id']);
+        
+        if (!$conversa || $conversa->usuario_id != $_SESSION['usuario_id']) {
+            echo json_encode(['success' => false, 'error' => 'Conversa não encontrada']);
+            return;
+        }
+
+        $resultado = false;
+        
+        switch ($input['tipo']) {
+            case 'botoes':
+                $resultado = SerproHelper::enviarMensagemBotoes(
+                    $conversa->contato_numero,
+                    $input['texto_body'],
+                    $input['botoes'],
+                    $input['message_id'] ?? null
+                );
+                break;
+                
+            case 'lista':
+                $resultado = SerproHelper::enviarMensagemLista(
+                    $conversa->contato_numero,
+                    $input['texto_body'],
+                    $input['button_text'],
+                    $input['secoes'],
+                    $input['message_id'] ?? null
+                );
+                break;
+                
+            case 'localizacao':
+                $resultado = SerproHelper::enviarSolicitacaoLocalizacao(
+                    $conversa->contato_numero,
+                    $input['texto_body'],
+                    $input['message_id'] ?? null
+                );
+                break;
+        }
+
+        if ($resultado && ($resultado['status'] == 200 || $resultado['status'] == 201)) {
+            // Salvar no banco
+            $this->chatModel->salvarMensagem([
+                'conversa_id' => $input['conversa_id'],
+                'remetente_id' => $_SESSION['usuario_id'],
+                'tipo' => 'interativa_' . $input['tipo'],
+                'conteudo' => json_encode($input),
+                'message_id' => $resultado['response']['id'] ?? uniqid(),
+                'status' => 'enviado',
+                'enviado_em' => date('Y-m-d H:i:s')
+            ]);
+
+            $this->chatModel->atualizarConversa($input['conversa_id']);
+            
+            echo json_encode(['success' => true]);
+        } else {
+            echo json_encode([
+                'success' => false,
+                'error' => $resultado['error'] ?? 'Erro ao enviar mensagem interativa'
+            ]);
+        }
+    }
+
+    /**
+     * [ consultarStatus ] - Consulta status detalhado de uma mensagem
+     */
+    public function consultarStatus($requisicao_id = null)
+    {
+        if (!$requisicao_id) {
+            echo json_encode(['error' => 'ID da requisição não informado']);
+            return;
+        }
+
+        $resultado = SerproHelper::consultarStatus($requisicao_id);
+        echo json_encode($resultado);
+    }
+
+    /**
+     * [ qrCode ] - Gerencia QR Codes para conexão
+     */
+    public function qrCode()
+    {
+        // Detectar se é uma requisição AJAX
+        $isAjax = $_SERVER['REQUEST_METHOD'] == 'POST' || 
+                 isset($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+                 strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+
+        // Verifica se o usuário está logado
+        if (!isset($_SESSION['usuario_id'])) {
+            if ($isAjax) {
+                header('Content-Type: application/json');
+                echo json_encode(['status' => 401, 'error' => 'Usuário não autenticado. Faça login novamente.']);
+                return;
+            }
+            Helper::redirecionar('usuarios/login');
+            return;
+        }
+
+        // Verifica permissão
+        if (!isset($_SESSION['usuario_perfil']) || !in_array($_SESSION['usuario_perfil'], ['admin'])) {
+            if ($isAjax) {
+                header('Content-Type: application/json');
+                echo json_encode(['status' => 403, 'error' => 'Acesso negado. Apenas administradores podem gerenciar QR codes.']);
+                return;
+            }
+            
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat');
+            return;
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            // Definir cabeçalho JSON para todas as respostas AJAX
+            header('Content-Type: application/json');
+            
+            $acao = $_POST['acao'] ?? '';
+            
+            try {
+                switch ($acao) {
+                    case 'gerar':
+                        $dados = [
+                            'mensagem_preenchida' => $_POST['mensagem'] ?? 'Olá! Entre em contato conosco.',
+                            'codigo' => $_POST['codigo'] ?? ''
+                        ];
+                        $resultado = SerproHelper::gerarQRCode($dados);
+                        echo json_encode($resultado);
+                        break;
+                        
+                    case 'listar':
+                        $resultado = SerproHelper::listarQRCodes();
+                        echo json_encode($resultado);
+                        break;
+                        
+                    case 'excluir':
+                        $qrId = $_POST['qr_id'];
+                        $resultado = SerproHelper::excluirQRCode($qrId);
+                        echo json_encode($resultado);
+                        break;
+                        
+                    default:
+                        echo json_encode(['status' => 400, 'error' => 'Ação não reconhecida']);
+                        break;
+                }
+            } catch (Exception $e) {
+                echo json_encode(['status' => 500, 'error' => 'Erro interno: ' . $e->getMessage()]);
+            }
+            
+            return;
+        }
+
+        // Para requisições GET, carregar QR codes diretamente no PHP
+        $qrCodes = [];
+        $qrCodeError = null;
+        
+        try {
+            $resultado = SerproHelper::listarQRCodes();
+            if ($resultado['status'] == 200 && isset($resultado['response'])) {
+                $qrCodes = $resultado['response'];
+            } else {
+                $qrCodeError = 'Erro ao carregar QR codes: ' . ($resultado['error'] ?? 'Erro desconhecido');
+            }
+        } catch (Exception $e) {
+            $qrCodeError = 'Erro ao conectar com a API: ' . $e->getMessage();
+        }
+
+        $dados = [
+            'tituloPagina' => 'QR Codes',
+            'qrCodes' => $qrCodes,
+            'qrCodeError' => $qrCodeError
+        ];
+        
+        $this->view('chat/qr_codes', $dados);
+    }
+
+    /**
+     * [ metricas ] - Exibe métricas do chat
+     */
+    public function metricas()
+    {
+        // Verifica permissão
+        if (!isset($_SESSION['usuario_perfil']) || !in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat');
+            return;
+        }
+
+        $inicio = $_GET['inicio'] ?? date('Y-m-01'); // Primeiro dia do mês
+        $fim = $_GET['fim'] ?? date('Y-m-d'); // Hoje
+
+        // Métricas da API SERPRO
+        $metricas = SerproHelper::obterMetricas($inicio, $fim);
+        
+        // Métricas locais do banco de dados
+        $metricasLocais = [
+            'total_conversas' => $this->chatModel->contarConversas($_SESSION['usuario_id']),
+            'mensagens_enviadas' => $this->chatModel->contarMensagensEnviadas($_SESSION['usuario_id']),
+            'mensagens_recebidas' => $this->chatModel->contarMensagensRecebidas($_SESSION['usuario_id']),
+            'conversas_ativas' => $this->chatModel->contarConversasAtivas($_SESSION['usuario_id'])
+        ];
+
+        $dados = [
+            'tituloPagina' => 'Métricas do Chat',
+            'metricas' => $metricas,
+            'metricas_locais' => $metricasLocais,
+            'periodo' => ['inicio' => $inicio, 'fim' => $fim]
+        ];
+
+        $this->view('chat/metricas', $dados);
+    }
+
+    /**
+     * [ configuracoes ] - Página de configurações do chat
+     */
+    public function configuracoes()
+    {
+        // Verifica permissão
+        if (!isset($_SESSION['usuario_perfil']) || !in_array($_SESSION['usuario_perfil'], ['admin'])) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat');
+            return;
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            // Atualizar configurações
+            $configuracoes = [
+                'template_padrao' => $_POST['template_padrao'] ?? '',
+                'webhook_url' => $_POST['webhook_url'] ?? '',
+                'auto_resposta' => isset($_POST['auto_resposta']) ? 1 : 0,
+                'horario_atendimento' => $_POST['horario_atendimento'] ?? ''
+            ];
+            
+            // Salvar no banco ou arquivo de configuração
+            foreach ($configuracoes as $chave => $valor) {
+                $this->chatModel->salvarConfiguracao($chave, $valor);
+            }
+            
+            Helper::mensagem('chat', '<i class="fas fa-check"></i> Configurações salvas com sucesso', 'alert alert-success');
+        }
+
+        $configuracoes = $this->chatModel->obterConfiguracoes();
+        
+        $dados = [
+            'tituloPagina' => 'Configurações do Chat',
+            'configuracoes' => $configuracoes
+        ];
+
+        $this->view('chat/configuracoes', $dados);
+    }
+
+    /**
+     * [ carregarNovasMensagens ] - Carrega novas mensagens de uma conversa via AJAX
+     */
+    public function carregarNovasMensagens($conversa_id = null, $ultima_mensagem_id = 0)
+    {
+        if (!$conversa_id) {
+            echo json_encode(['error' => 'ID da conversa não informado']);
+            return;
+        }
+
+        // Verificar se o usuário tem acesso à conversa
+        $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
+        if (!$conversa || $conversa->usuario_id != $_SESSION['usuario_id']) {
+            echo json_encode(['error' => 'Acesso negado']);
+            return;
+        }
+
+        $novasMensagens = $this->chatModel->buscarNovasMensagens($conversa_id, $ultima_mensagem_id);
+        
+        echo json_encode([
+            'success' => true,
+            'mensagens' => $novasMensagens
+        ]);
+    }
+
+    /**
+     * [ testarAPI ] - Testa conectividade com a API SERPRO
+     */
+    public function testarAPI()
+    {
+        // Verifica permissão
+        if (!isset($_SESSION['usuario_perfil']) || !in_array($_SESSION['usuario_perfil'], ['admin'])) {
+            if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+                header('Content-Type: application/json');
+                echo json_encode(['status' => 403, 'error' => 'Acesso negado']);
+                return;
+            }
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat');
+            return;
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            header('Content-Type: application/json');
+            
+            try {
+                // Testa obtenção de token
+                $token = SerproHelper::getToken();
+                
+                if ($token) {
+                    // Testa listagem de templates
+                    $templates = SerproHelper::listarTemplates();
+                    
+                    echo json_encode([
+                        'status' => 200,
+                        'token_obtido' => true,
+                        'token_length' => strlen($token),
+                        'api_templates' => $templates,
+                        'configuracoes' => [
+                            'base_url' => SERPRO_BASE_URL,
+                            'client_id' => SERPRO_CLIENT_ID,
+                            'waba_id' => SERPRO_WABA_ID,
+                            'phone_number_id' => SERPRO_PHONE_NUMBER_ID
+                        ]
+                    ]);
+                } else {
+                    echo json_encode([
+                        'status' => 401,
+                        'token_obtido' => false,
+                        'error' => SerproHelper::getLastError(),
+                        'configuracoes' => [
+                            'base_url' => SERPRO_BASE_URL,
+                            'client_id' => SERPRO_CLIENT_ID,
+                            'waba_id' => SERPRO_WABA_ID,
+                            'phone_number_id' => SERPRO_PHONE_NUMBER_ID
+                        ]
+                    ]);
+                }
+                
+            } catch (Exception $e) {
+                echo json_encode([
+                    'status' => 500,
+                    'error' => 'Erro interno: ' . $e->getMessage()
+                ]);
+            }
+            
+            return;
+        }
+
+        Helper::redirecionar('chat/configuracoes');
+    }
 }

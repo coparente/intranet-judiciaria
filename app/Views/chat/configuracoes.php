@@ -156,12 +156,12 @@
                                                     <a href="<?= URL ?>/chat/qrCode" class="btn btn-primary btn-sm">
                                                         <i class="fas fa-qrcode me-1"></i> Gerenciar QR Codes
                                                     </a>
-                                                    <div class="mb-2">
+                                                    <div class="mt-2">
                                                         <a href="<?= URL ?>/chat/metricas" class="btn btn-primary btn-sm">
                                                             <i class="fas fa-chart-bar me-1"></i> Ver Métricas
                                                         </a>
                                                     </div>
-                                                    <button type="button" class="btn btn-outline-warning btn-sm" onclick="testarAPI()">
+                                                    <button type="button" class="btn btn-warning btn-sm mt-2" onclick="testarAPI()">
                                                         <i class="fas fa-flask me-1"></i> Testar API
                                                     </button>
                                                 </div>

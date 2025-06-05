@@ -195,7 +195,7 @@ class SerproHelper
     /**
      * Envia mídia (imagem, documento, etc.)
      */
-    public static function enviarMidia($destinatario, $tipoMidia, $idMedia, $caption = null, $messageId = null)
+    public static function enviarMidia($destinatario, $tipoMidia, $idMedia, $caption = null, $messageId = null, $filename = null)
     {
         $token = self::getToken();
         if (!$token) {
@@ -204,20 +204,82 @@ class SerproHelper
 
         $url = self::$baseUrl . '/client/' . self::$phoneNumberId . '/v2/requisicao/mensagem/media';
         
+        // Para documentos, tentar diferentes variações de campo filename
+        if ($tipoMidia === 'document' && $filename) {
+            $variationsToTry = [
+                ['filename' => $filename],
+                ['fileName' => $filename], 
+                ['name' => $filename],
+                ['nomeArquivo' => $filename],
+                ['document' => ['filename' => $filename]],
+                ['document' => ['fileName' => $filename]],
+                ['document' => ['name' => $filename]]
+            ];
+            
+            foreach ($variationsToTry as $index => $variation) {
+                $payload = [
+                    'destinatario' => $destinatario,
+                    'tipoMedia' => $tipoMidia,
+                    'idMedia' => $idMedia
+                ];
+                
+                // Adicionar a variação atual
+                $payload = array_merge($payload, $variation);
+                
+                // Adicionar message_id se fornecido
+                if ($messageId) {
+                    $payload['message_id'] = $messageId;
+                }
+                
+                error_log("MÍDIA: Tentativa " . ($index + 1) . " - Payload: " . json_encode($payload));
+                
+                $resultado = self::executarRequisicaoMidia($url, $token, $payload);
+                
+                if ($resultado['status'] === 200 || $resultado['status'] === 201) {
+                    error_log("MÍDIA: Sucesso com variação " . ($index + 1) . " - " . json_encode($variation));
+                    return $resultado;
+                } else {
+                    error_log("MÍDIA: Tentativa " . ($index + 1) . " falhou - Status: " . $resultado['status']);
+                }
+            }
+            
+            // Se chegou até aqui, nenhuma variação funcionou
+            error_log("MÍDIA: Todas as variações falharam");
+            return $resultado; // Retorna o último resultado
+        }
+        
+        // Para outros tipos de mídia (imagem, vídeo, áudio)
         $payload = [
             'destinatario' => $destinatario,
             'tipoMedia' => $tipoMidia,
             'idMedia' => $idMedia
         ];
 
-        if ($caption) {
-            $payload['caption'] = $caption;
+        // Regras para outros tipos
+        if ($tipoMidia === 'image') {
+            if ($caption) {
+                $payload['caption'] = $caption;
+            }
+        } elseif ($tipoMidia === 'video' || $tipoMidia === 'audio') {
+            if ($caption) {
+                $payload['caption'] = $caption;
+            }
         }
 
         if ($messageId) {
             $payload['message_id'] = $messageId;
         }
 
+        error_log("MÍDIA: Tipo='$tipoMidia', Payload enviado - " . json_encode($payload));
+        
+        return self::executarRequisicaoMidia($url, $token, $payload);
+    }
+    
+    /**
+     * Executa a requisição de mídia
+     */
+    private static function executarRequisicaoMidia($url, $token, $payload)
+    {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, true);
@@ -228,7 +290,7 @@ class SerproHelper
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -256,10 +318,17 @@ class SerproHelper
     {
         $token = self::getToken();
         if (!$token) {
+            error_log("Erro ao obter token: " . self::$lastError);
             return ['status' => 401, 'error' => 'Erro ao obter token: ' . self::$lastError];
         }
 
         $url = self::$baseUrl . '/client/' . self::$phoneNumberId . '/v2/media';
+        
+        // Verificar se o arquivo existe
+        if (!file_exists($arquivo['tmp_name'])) {
+            error_log("Arquivo temporário não existe: " . $arquivo['tmp_name']);
+            return ['status' => 400, 'error' => 'Arquivo temporário não encontrado'];
+        }
         
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -279,6 +348,11 @@ class SerproHelper
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
         curl_close($ch);
+
+        // Log apenas em caso de erro
+        if ($error || $httpCode >= 400) {
+            error_log("ERRO UPLOAD - HTTP: $httpCode, cURL: $error, Response: $response");
+        }
 
         if ($error) {
             self::$lastError = "Erro cURL: " . $error;
@@ -1126,6 +1200,54 @@ class SerproHelper
             'response' => $responseData,
             'error' => $httpCode >= 400 ? $response : null
         ];
+    }
+
+    /**
+     * Envia mídia através de link
+     */
+    public static function enviarMidiaLink($destinatario, $tipoMidia, $linkMedia, $caption = null, $messageId = null, $filename = null)
+    {
+        $token = self::getToken();
+        if (!$token) {
+            return ['status' => 401, 'error' => 'Erro ao obter token: ' . self::$lastError];
+        }
+
+        $url = self::$baseUrl . '/client/' . self::$phoneNumberId . '/v2/requisicao/mensagem/media';
+        
+        $payload = [
+            'destinatario' => $destinatario,
+            'tipoMedia' => $tipoMidia,
+            'linkMedia' => $linkMedia
+        ];
+
+        // Regras específicas por tipo de mídia conforme API SERPRO
+        if ($tipoMidia === 'document') {
+            // Para documentos: filename é obrigatório, caption não é permitido
+            if ($filename) {
+                $payload['filename'] = $filename; // Usar padrão para links
+            }
+            // NÃO adicionar caption para documentos
+        } elseif ($tipoMidia === 'image') {
+            // Para imagens: caption é permitido, filename não é necessário
+            if ($caption) {
+                $payload['caption'] = $caption;
+            }
+        } elseif ($tipoMidia === 'video' || $tipoMidia === 'audio') {
+            // Para vídeo/áudio: caption pode ser permitido (verificar documentação)
+            if ($caption) {
+                $payload['caption'] = $caption;
+            }
+        }
+
+        // Adicionar message_id se fornecido (para responder a uma mensagem)
+        if ($messageId) {
+            $payload['message_id'] = $messageId;
+        }
+
+        // Log do payload para debug
+        error_log("MÍDIA: Tipo='$tipoMidia', Payload enviado - " . json_encode($payload));
+
+        return self::executarRequisicaoMidia($url, $token, $payload);
     }
 }
 

@@ -24,9 +24,9 @@ define('SENHA', $_ENV['DEV_DB_PASSWORD'] ?: getenv('PROD_DB_PASSWORD') ?: '');
  */
 define('APP_NOME', 'Dir Judiciária');
 define('APP_VERSAO', '1.0.0');
-// define('URL', 'http://10.90.18.141/intranet-judiciaria');
+define('URL', 'http://10.90.18.141/intranet-judiciaria');
 // define('URL', 'http://localhost/intranet-judiciaria');
-define('URL', 'http://192.168.2.122/intranet-judiciaria');
+// define('URL', 'http://192.168.2.122/intranet-judiciaria');
 // define('URL', 'http://localhost/SICUC');
 
 /**
@@ -42,8 +42,9 @@ define('SERPRO_CLIENT_SECRET', 'ewW08ZJW1F1G6dkr8tExGGDQwTyua2jF');
 define('SERPRO_BASE_URL', 'https://api.whatsapp.serpro.gov.br');
 define('SERPRO_WABA_ID', '472202335973627');
 define('SERPRO_PHONE_NUMBER_ID', '642958872237822');
+
 // Configurações do Webhook
-define('WEBHOOK_VERIFY_TOKEN', 'seu_token_de_verificacao_aqui');
+define('WEBHOOK_VERIFY_TOKEN', 'tjgo_intranet_webhook_2025_secreto_serpro');
 
 
 

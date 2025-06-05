@@ -41,6 +41,82 @@ class ChatModel
     }
 
     /**
+     * Busca conversas com filtros e paginação
+     */
+    public function buscarConversasComFiltros($usuario_id, $filtroContato = '', $filtroNumero = '', $limite = 10, $offset = 0)
+    {
+        $sql = "SELECT c.*, 
+                (SELECT COUNT(*) FROM mensagens_chat m 
+                 WHERE m.conversa_id = c.id AND m.lido = 0 AND m.remetente_id IS NULL) as nao_lidas,
+                (SELECT m2.conteudo FROM mensagens_chat m2 
+                 WHERE m2.conversa_id = c.id 
+                 ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_mensagem,
+                (SELECT m2.enviado_em FROM mensagens_chat m2 
+                 WHERE m2.conversa_id = c.id 
+                 ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_atividade
+                FROM conversas c 
+                WHERE c.usuario_id = :usuario_id";
+
+        // Aplicar filtros
+        $params = [':usuario_id' => $usuario_id];
+        
+        if (!empty($filtroContato)) {
+            $sql .= " AND c.contato_nome LIKE :filtro_contato";
+            $params[':filtro_contato'] = '%' . $filtroContato . '%';
+        }
+        
+        if (!empty($filtroNumero)) {
+            $sql .= " AND c.contato_numero LIKE :filtro_numero";
+            $params[':filtro_numero'] = '%' . $filtroNumero . '%';
+        }
+        
+        $sql .= " ORDER BY c.atualizado_em DESC LIMIT :limite OFFSET :offset";
+
+        $this->db->query($sql);
+        
+        // Bind dos parâmetros
+        foreach ($params as $param => $valor) {
+            $this->db->bind($param, $valor);
+        }
+        
+        $this->db->bind(':limite', $limite, PDO::PARAM_INT);
+        $this->db->bind(':offset', $offset, PDO::PARAM_INT);
+        
+        return $this->db->resultados();
+    }
+
+    /**
+     * Conta conversas com filtros
+     */
+    public function contarConversasComFiltros($usuario_id, $filtroContato = '', $filtroNumero = '')
+    {
+        $sql = "SELECT COUNT(*) as total FROM conversas c WHERE c.usuario_id = :usuario_id";
+
+        // Aplicar filtros
+        $params = [':usuario_id' => $usuario_id];
+        
+        if (!empty($filtroContato)) {
+            $sql .= " AND c.contato_nome LIKE :filtro_contato";
+            $params[':filtro_contato'] = '%' . $filtroContato . '%';
+        }
+        
+        if (!empty($filtroNumero)) {
+            $sql .= " AND c.contato_numero LIKE :filtro_numero";
+            $params[':filtro_numero'] = '%' . $filtroNumero . '%';
+        }
+
+        $this->db->query($sql);
+        
+        // Bind dos parâmetros
+        foreach ($params as $param => $valor) {
+            $this->db->bind($param, $valor);
+        }
+        
+        $resultado = $this->db->resultado();
+        return $resultado ? $resultado->total : 0;
+    }
+
+    /**
      * Buscar ou criar conversa
      */
     public function buscarOuCriarConversa($usuario_id, $numero, $contato_nome = null, $processo_id = null)
@@ -462,5 +538,48 @@ class ChatModel
         $resultado = $this->db->resultado();
 
         return $resultado ? $resultado->valor : $valorPadrao;
+    }
+
+    /**
+     * Busca mensagens com status específicos para verificação de atualização
+     */
+    public function buscarMensagensComStatus($conversa_id, $status_array)
+    {
+        try {
+            // Criar placeholders nomeados
+            $placeholders = [];
+            for ($i = 0; $i < count($status_array); $i++) {
+                $placeholders[] = ":status_$i";
+            }
+            $statusPlaceholders = implode(',', $placeholders);
+            
+            $sql = "SELECT m.id, m.conversa_id, m.remetente_id, m.tipo, m.conteudo, 
+                    m.midia_url, m.midia_nome, m.message_id, m.status, m.lido, 
+                    m.lido_em, m.enviado_em, m.atualizado_em, u.nome as remetente_nome 
+                    FROM mensagens_chat m 
+                    LEFT JOIN usuarios u ON m.remetente_id = u.id 
+                    WHERE m.conversa_id = :conversa_id 
+                    AND m.status IN ($statusPlaceholders) 
+                    AND m.remetente_id IS NOT NULL 
+                    AND m.message_id IS NOT NULL
+                    ORDER BY m.enviado_em ASC";
+            
+            $this->db->query($sql);
+            
+            // Bind da conversa_id
+            $this->db->bind(':conversa_id', $conversa_id);
+            
+            // Bind dos status
+            foreach ($status_array as $index => $status) {
+                $this->db->bind(":status_$index", $status);
+            }
+            
+            return $this->db->resultados();
+            
+        } catch (Exception $e) {
+            // Log do erro para debugging
+            error_log("Erro em buscarMensagensComStatus: " . $e->getMessage());
+            return [];
+        }
     }
 }

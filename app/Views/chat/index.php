@@ -31,7 +31,93 @@
                                 </a>
                             </div>
                         </div>
+                        
+                        <!-- Filtros -->
+                        <div class="card-body border-bottom">
+                            <form method="GET" action="<?= URL ?>/chat/index" class="row g-3">
+                                <div class="col-lg-4 col-md-6">
+                                    <label for="filtro_contato" class="form-label">
+                                        <i class="fas fa-user me-1"></i> Filtrar por Contato
+                                    </label>
+                                    <input type="text" class="form-control" id="filtro_contato" name="filtro_contato" 
+                                           placeholder="Nome do contato..." 
+                                           value="<?= htmlspecialchars($_GET['filtro_contato'] ?? '') ?>"
+                                           autocomplete="off">
+                                </div>
+                                <div class="col-lg-4 col-md-6">
+                                    <label for="filtro_numero" class="form-label">
+                                        <i class="fas fa-phone me-1"></i> Filtrar por Número
+                                    </label>
+                                    <input type="text" class="form-control" id="filtro_numero" name="filtro_numero" 
+                                           placeholder="Número de telefone..." 
+                                           value="<?= htmlspecialchars($_GET['filtro_numero'] ?? '') ?>"
+                                           autocomplete="off">
+                                </div>
+                                <div class="col-lg-4 col-12 d-flex align-items-end">
+                                    <button type="submit" class="btn btn-primary flex-grow-1">
+                                        <i class="fas fa-search me-1"></i> Filtrar
+                                    </button>
+                                    <div class="ms-2">
+                                        <a href="<?= URL ?>/chat/index" class="btn btn-secondary">
+                                            <i class="fas fa-times me-1"></i> Limpar
+                                        </a>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
                         <div class="card-body">
+                            <!-- Informações de paginação -->
+                            <?php if (isset($dados['total_registros'])): ?>
+                                <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3">
+                                    <div class="text-muted mb-2 mb-md-0">
+                                        <?php if ($dados['total_registros'] > 0): ?>
+                                            Mostrando <?= $dados['registro_inicio'] ?> a <?= $dados['registro_fim'] ?> 
+                                            de <?= $dados['total_registros'] ?> conversa<?= $dados['total_registros'] != 1 ? 's' : '' ?>
+                                            <?php if (!empty($_GET['filtro_contato']) || !empty($_GET['filtro_numero'])): ?>
+                                                <span class="badge bg-info ms-2" title="Filtros aplicados">
+                                                    <i class="fas fa-filter me-1"></i> Filtrado
+                                                </span>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            <?php if (!empty($_GET['filtro_contato']) || !empty($_GET['filtro_numero'])): ?>
+                                                <span class="text-warning">
+                                                    <i class="fas fa-search me-1"></i>
+                                                    Nenhuma conversa encontrada com os filtros aplicados
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="text-muted">
+                                                    <i class="fas fa-info-circle me-1"></i>
+                                                    Nenhuma conversa cadastrada
+                                                </span>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+                                    </div>
+                                    
+                                    <?php if (!empty($_GET['filtro_contato']) || !empty($_GET['filtro_numero'])): ?>
+                                        <div class="text-start text-md-end">
+                                            <small class="text-muted d-block mb-1">
+                                                Filtros ativos:
+                                            </small>
+                                            <div>
+                                                <?php if (!empty($_GET['filtro_contato'])): ?>
+                                                    <span class="badge bg-light text-dark me-1 mb-1">
+                                                        <i class="fas fa-user me-1"></i>
+                                                        <?= htmlspecialchars($_GET['filtro_contato']) ?>
+                                                    </span>
+                                                <?php endif; ?>
+                                                <?php if (!empty($_GET['filtro_numero'])): ?>
+                                                    <span class="badge bg-light text-dark me-1 mb-1">
+                                                        <i class="fas fa-phone me-1"></i>
+                                                        <?= htmlspecialchars($_GET['filtro_numero']) ?>
+                                                    </span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+
                             <div class="table-responsive">
                                 <table class="table table-hover">
                                     <thead>
@@ -46,7 +132,21 @@
                                     <tbody>
                                         <?php if (empty($dados['conversas'])) : ?>
                                             <tr>
-                                                <td colspan="5" class="text-center">Nenhuma conversa encontrada</td>
+                                                <td colspan="5" class="text-center py-4">
+                                                    <?php if (!empty($_GET['filtro_contato']) || !empty($_GET['filtro_numero'])): ?>
+                                                        <i class="fas fa-search fa-2x text-muted mb-2"></i>
+                                                        <p class="text-muted mb-0">Nenhuma conversa encontrada com os filtros aplicados</p>
+                                                        <a href="<?= URL ?>/chat/index" class="btn btn-sm btn-outline-primary mt-2">
+                                                            <i class="fas fa-times me-1"></i> Limpar Filtros
+                                                        </a>
+                                                    <?php else: ?>
+                                                        <i class="fas fa-comments fa-2x text-muted mb-2"></i>
+                                                        <p class="text-muted mb-0">Nenhuma conversa encontrada</p>
+                                                        <a href="<?= URL ?>/chat/novaConversa" class="btn btn-sm btn-outline-primary mt-2">
+                                                            <i class="fas fa-plus me-1"></i> Criar Nova Conversa
+                                                        </a>
+                                                    <?php endif; ?>
+                                                </td>
                                             </tr>
                                         <?php else : ?>
                                             <?php foreach ($dados['conversas'] as $conversa) : ?>
@@ -110,6 +210,67 @@
                                     </tbody>
                                 </table>
                             </div>
+
+                            <!-- Paginação -->
+                            <?php if (isset($dados['total_paginas']) && $dados['total_paginas'] > 1): ?>
+                                <nav aria-label="Navegação de páginas" class="mt-4">
+                                    <ul class="pagination justify-content-center">
+                                        <!-- Primeira página -->
+                                        <?php if ($dados['pagina_atual'] > 1): ?>
+                                            <li class="page-item">
+                                                <a class="page-link" href="<?= URL ?>/chat/index?pagina=1<?= $dados['query_string'] ?>">
+                                                    <i class="fas fa-angle-double-left"></i>
+                                                </a>
+                                            </li>
+                                        <?php endif; ?>
+
+                                        <!-- Página anterior -->
+                                        <?php if ($dados['pagina_atual'] > 1): ?>
+                                            <li class="page-item">
+                                                <a class="page-link" href="<?= URL ?>/chat/index?pagina=<?= $dados['pagina_atual'] - 1 ?><?= $dados['query_string'] ?>">
+                                                    <i class="fas fa-angle-left"></i>
+                                                </a>
+                                            </li>
+                                        <?php endif; ?>
+
+                                        <!-- Páginas numeradas -->
+                                        <?php
+                                        $inicio = max(1, $dados['pagina_atual'] - 2);
+                                        $fim = min($dados['total_paginas'], $dados['pagina_atual'] + 2);
+                                        
+                                        for ($i = $inicio; $i <= $fim; $i++): ?>
+                                            <li class="page-item <?= $i == $dados['pagina_atual'] ? 'active' : '' ?>">
+                                                <a class="page-link" href="<?= URL ?>/chat/index?pagina=<?= $i ?><?= $dados['query_string'] ?>">
+                                                    <?= $i ?>
+                                                </a>
+                                            </li>
+                                        <?php endfor; ?>
+
+                                        <!-- Próxima página -->
+                                        <?php if ($dados['pagina_atual'] < $dados['total_paginas']): ?>
+                                            <li class="page-item">
+                                                <a class="page-link" href="<?= URL ?>/chat/index?pagina=<?= $dados['pagina_atual'] + 1 ?><?= $dados['query_string'] ?>">
+                                                    <i class="fas fa-angle-right"></i>
+                                                </a>
+                                            </li>
+                                        <?php endif; ?>
+
+                                        <!-- Última página -->
+                                        <?php if ($dados['pagina_atual'] < $dados['total_paginas']): ?>
+                                            <li class="page-item">
+                                                <a class="page-link" href="<?= URL ?>/chat/index?pagina=<?= $dados['total_paginas'] ?><?= $dados['query_string'] ?>">
+                                                    <i class="fas fa-angle-double-right"></i>
+                                                </a>
+                                            </li>
+                                        <?php endif; ?>
+                                    </ul>
+                                    
+                                    <!-- Informação adicional -->
+                                    <div class="text-center text-muted mt-2">
+                                        Página <?= $dados['pagina_atual'] ?> de <?= $dados['total_paginas'] ?>
+                                    </div>
+                                </nav>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -171,11 +332,60 @@
                 });
         }
 
+        // Melhorias para os filtros
+        const filtroContato = document.getElementById('filtro_contato');
+        const filtroNumero = document.getElementById('filtro_numero');
+        const form = filtroContato ? filtroContato.closest('form') : null;
+        
+        // Adicionar listener para Enter nos campos de filtro
+        [filtroContato, filtroNumero].forEach(campo => {
+            if (campo) {
+                campo.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (form) form.submit();
+                    }
+                });
+                
+                // Destacar campo quando tem valor
+                if (campo.value.trim()) {
+                    campo.classList.add('border-primary');
+                }
+                
+                // Adicionar evento para destacar campo ativo
+                campo.addEventListener('input', function() {
+                    if (this.value.trim()) {
+                        this.classList.add('border-primary');
+                    } else {
+                        this.classList.remove('border-primary');
+                    }
+                });
+            }
+        });
+        
+        // Adicionar atalho Ctrl+F para focar no primeiro campo de filtro
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'f' && filtroContato) {
+                e.preventDefault();
+                filtroContato.focus();
+                filtroContato.select();
+            }
+        });
+
         // Verificar status da API ao carregar a página
         verificarStatusAPI();
 
         // Verificar status da API a cada 30 segundos
         setInterval(verificarStatusAPI, 30000);
+        
+        // Adicionar tooltip informativo se houver filtros ativos
+        const filtrosAtivos = document.querySelector('.badge.bg-info');
+        if (filtrosAtivos) {
+            filtrosAtivos.title = 'Filtros aplicados: ' + 
+                (filtroContato.value ? 'Contato: "' + filtroContato.value + '"' : '') +
+                (filtroContato.value && filtroNumero.value ? ', ' : '') +
+                (filtroNumero.value ? 'Número: "' + filtroNumero.value + '"' : '');
+        }
     });
 </script>
 

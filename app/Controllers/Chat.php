@@ -24,8 +24,14 @@ class Chat extends Controllers
         $this->chatModel = $this->model('ChatModel');
         $this->usuarioModel = $this->model('UsuarioModel');
         
-        // Verifica se o usuário está logado
-        if (!isset($_SESSION['usuario_id'])) {
+        // Métodos que não exigem autenticação
+        $metodosPublicos = ['webhook'];
+        $metodoAtual = $_GET['url'] ?? '';
+        $partesUrl = explode('/', trim($metodoAtual, '/'));
+        $metodo = isset($partesUrl[1]) ? $partesUrl[1] : '';
+        
+        // Verifica se o usuário está logado (exceto para métodos públicos)
+        if (!in_array($metodo, $metodosPublicos) && !isset($_SESSION['usuario_id'])) {
             Helper::redirecionar('usuarios/login');
         }
 
@@ -41,11 +47,60 @@ class Chat extends Controllers
      */
     public function index()
     {
-        $conversas = $this->chatModel->buscarConversas($_SESSION['usuario_id']);
+        // Parâmetros de filtro
+        $filtroContato = $_GET['filtro_contato'] ?? '';
+        $filtroNumero = $_GET['filtro_numero'] ?? '';
+        
+        // Parâmetros de paginação
+        $registrosPorPagina = 10;
+        $paginaAtual = isset($_GET['pagina']) && is_numeric($_GET['pagina']) ? (int)$_GET['pagina'] : 1;
+        $paginaAtual = max(1, $paginaAtual); // Garantir que não seja menor que 1
+        
+        // Calcular offset
+        $offset = ($paginaAtual - 1) * $registrosPorPagina;
+        
+        // Buscar conversas com filtros e paginação
+        $conversas = $this->chatModel->buscarConversasComFiltros(
+            $_SESSION['usuario_id'],
+            $filtroContato,
+            $filtroNumero,
+            $registrosPorPagina,
+            $offset
+        );
+        
+        // Contar total de registros para paginação
+        $totalRegistros = $this->chatModel->contarConversasComFiltros(
+            $_SESSION['usuario_id'],
+            $filtroContato,
+            $filtroNumero
+        );
+        
+        // Calcular informações de paginação
+        $totalPaginas = ceil($totalRegistros / $registrosPorPagina);
+        $registroInicio = $totalRegistros > 0 ? $offset + 1 : 0;
+        $registroFim = min($offset + $registrosPorPagina, $totalRegistros);
+        
+        // Construir query string para manter filtros na paginação
+        $queryParams = [];
+        if (!empty($filtroContato)) {
+            $queryParams[] = 'filtro_contato=' . urlencode($filtroContato);
+        }
+        if (!empty($filtroNumero)) {
+            $queryParams[] = 'filtro_numero=' . urlencode($filtroNumero);
+        }
+        $queryString = !empty($queryParams) ? '&' . implode('&', $queryParams) : '';
         
         $dados = [
             'tituloPagina' => 'Chat',
-            'conversas' => $conversas
+            'conversas' => $conversas,
+            'total_registros' => $totalRegistros,
+            'total_paginas' => $totalPaginas,
+            'pagina_atual' => $paginaAtual,
+            'registro_inicio' => $registroInicio,
+            'registro_fim' => $registroFim,
+            'query_string' => $queryString,
+            'filtro_contato' => $filtroContato,
+            'filtro_numero' => $filtroNumero
         ];
 
         $this->view('chat/index', $dados);
@@ -67,6 +122,17 @@ class Chat extends Controllers
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Conversa não encontrada', 'alert alert-danger');
             Helper::redirecionar('chat');
             return;
+        }
+
+        // Processar ações POST
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $acao = $_POST['acao'] ?? '';
+            
+            switch ($acao) {
+                case 'verificar_status':
+                    $this->processarVerificacaoStatusManual($conversa_id, $conversa);
+                    break;
+            }
         }
 
         $mensagens = $this->chatModel->buscarMensagens($conversa_id);
@@ -149,9 +215,28 @@ class Chat extends Controllers
         }
 
         $mensagem = trim($_POST['mensagem'] ?? '');
+        $temArquivo = isset($_FILES['midia']) && $_FILES['midia']['error'] === UPLOAD_ERR_OK;
         
-        if (empty($mensagem)) {
-            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Mensagem não pode estar vazia', 'alert alert-danger');
+        // Verificar se há mensagem ou arquivo
+        if (empty($mensagem) && !$temArquivo) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> É necessário informar uma mensagem ou anexar um arquivo', 'alert alert-danger');
+            Helper::redirecionar("chat/conversa/{$conversa_id}");
+            return;
+        }
+
+        // Verificar erro de upload APENAS se um arquivo foi selecionado (mas falhou)
+        if (isset($_FILES['midia']) && $_FILES['midia']['error'] !== UPLOAD_ERR_OK && $_FILES['midia']['error'] !== UPLOAD_ERR_NO_FILE) {
+            $errosUpload = [
+                UPLOAD_ERR_INI_SIZE => 'Arquivo muito grande (limite do servidor)',
+                UPLOAD_ERR_FORM_SIZE => 'Arquivo muito grande (limite do formulário)', 
+                UPLOAD_ERR_PARTIAL => 'Upload parcial',
+                UPLOAD_ERR_NO_TMP_DIR => 'Pasta temporária não encontrada',
+                UPLOAD_ERR_CANT_WRITE => 'Erro ao escrever arquivo',
+                UPLOAD_ERR_EXTENSION => 'Upload bloqueado por extensão'
+            ];
+            
+            $erroMsg = $errosUpload[$_FILES['midia']['error']] ?? 'Erro desconhecido no upload';
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro no upload: ' . $erroMsg, 'alert alert-danger');
             Helper::redirecionar("chat/conversa/{$conversa_id}");
             return;
         }
@@ -160,41 +245,223 @@ class Chat extends Controllers
         $mensagensExistentes = $this->chatModel->contarMensagens($conversa_id);
         $precisaTemplate = ($mensagensExistentes == 0);
 
-        if ($precisaTemplate) {
-            // Primeira mensagem - usar template
-            $resultado = $this->enviarPrimeiraMensagem($conversa->contato_numero, $mensagem);
-        } else {
-            // Conversa já iniciada - enviar mensagem normal
-            $resultado = SerproHelper::enviarMensagemTexto($conversa->contato_numero, $mensagem);
-        }
+        $resultado = null;
 
-        if ($resultado['status'] == 200 || $resultado['status'] == 201) {
-            // Salvar no banco
-            $messageId = null;
-            if (isset($resultado['response']['id'])) {
-                $messageId = $resultado['response']['id'];
+        try {
+            if ($temArquivo) {
+                // Processar envio de mídia
+                $resultado = $this->processarEnvioMidia($conversa, $_FILES['midia'], $mensagem, $precisaTemplate);
+            } else {
+                // Processar envio de texto
+                error_log("DEBUG: Enviando mensagem de texto");
+                
+                if ($precisaTemplate) {
+                    // Primeira mensagem - tentar template, se falhar usar mensagem normal
+                    $resultado = $this->enviarPrimeiraMensagem($conversa->contato_numero, $mensagem);
+                    
+                    // Se o template falhar, tentar mensagem normal
+                    if (!$resultado || ($resultado['status'] !== 200 && $resultado['status'] !== 201)) {
+                        error_log("DEBUG: Template falhou, tentando mensagem normal");
+                        $resultado = SerproHelper::enviarMensagemTexto($conversa->contato_numero, $mensagem);
+                    }
+                } else {
+                    // Conversa já iniciada - enviar mensagem normal
+                    $resultado = SerproHelper::enviarMensagemTexto($conversa->contato_numero, $mensagem);
+                }
             }
 
-            $this->chatModel->salvarMensagem([
-                'conversa_id' => $conversa_id,
-                'remetente_id' => $_SESSION['usuario_id'],
-                'tipo' => 'text',
-                'conteudo' => $mensagem,
-                'message_id' => $messageId ?? uniqid(),
-                'status' => 'enviado',
-                'enviado_em' => date('Y-m-d H:i:s')
-            ]);
+            if ($resultado && ($resultado['status'] == 200 || $resultado['status'] == 201)) {
+                // Salvar no banco
+                $messageId = $resultado['response']['id'] ?? uniqid();
+                
+                $dadosMensagem = [
+                    'conversa_id' => $conversa_id,
+                    'remetente_id' => $_SESSION['usuario_id'],
+                    'message_id' => $messageId,
+                    'status' => 'enviado',
+                    'enviado_em' => date('Y-m-d H:i:s')
+                ];
 
-            // Atualizar conversa
-            $this->chatModel->atualizarConversa($conversa_id);
+                if ($temArquivo) {
+                    // Determinar tipo de mídia
+                    $tipoMidia = $this->determinarTipoMidia($_FILES['midia']['type']);
+                    
+                    $dadosMensagem['tipo'] = $tipoMidia;
+                    $dadosMensagem['conteudo'] = $mensagem; // Caption se houver
+                    $dadosMensagem['midia_nome'] = $_FILES['midia']['name'];
+                    $dadosMensagem['midia_url'] = null; // Será preenchido quando baixarmos da API
+                } else {
+                    $dadosMensagem['tipo'] = 'text';
+                    $dadosMensagem['conteudo'] = $mensagem;
+                }
 
-            Helper::mensagem('chat', '<i class="fas fa-check"></i> Mensagem enviada com sucesso', 'alert alert-success');
-        } else {
-            $erro = $resultado['error'] ?? 'Erro desconhecido';
-            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro ao enviar mensagem: ' . $erro, 'alert alert-danger');
+                $this->chatModel->salvarMensagem($dadosMensagem);
+
+                // Atualizar conversa
+                $this->chatModel->atualizarConversa($conversa_id);
+
+                Helper::mensagem('chat', '<i class="fas fa-check"></i> ' . ($temArquivo ? 'Mídia enviada' : 'Mensagem enviada') . ' com sucesso', 'alert alert-success');
+            } else {
+                $erro = $resultado['error'] ?? 'Erro desconhecido';
+                error_log("ERRO ENVIO: " . print_r($resultado, true));
+                Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro ao enviar: ' . $erro, 'alert alert-danger');
+            }
+        } catch (Exception $e) {
+            error_log("EXCEÇÃO ENVIO: " . $e->getMessage());
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro interno: ' . $e->getMessage(), 'alert alert-danger');
         }
 
         Helper::redirecionar("chat/conversa/{$conversa_id}");
+    }
+
+    /**
+     * Processa envio de mídia
+     */
+    private function processarEnvioMidia($conversa, $arquivo, $caption, $precisaTemplate)
+    {
+        // Validar arquivo
+        $validacao = $this->validarArquivoMidia($arquivo);
+        if (!$validacao['valido']) {
+            throw new Exception($validacao['erro']);
+        }
+
+        // Fazer upload da mídia primeiro
+        $resultadoUpload = SerproHelper::uploadMidia($arquivo, $arquivo['type']);
+        
+        // CORREÇÃO: Aceitar tanto 200 quanto 201 como sucesso
+        if ($resultadoUpload['status'] !== 200 && $resultadoUpload['status'] !== 201) {
+            throw new Exception('Erro no upload da mídia: ' . ($resultadoUpload['error'] ?? 'Erro desconhecido'));
+        }
+
+        $mediaId = $resultadoUpload['response']['id'];
+        error_log("MÍDIA: Upload bem-sucedido - Media ID: $mediaId");
+        
+        // Determinar tipo de mídia
+        $tipoMidia = $this->mapearTipoMidiaParaAPI($arquivo['type']);
+        
+        // Preparar parâmetros conforme tipo de mídia
+        $filename = null;
+        $captionParaEnvio = null;
+        
+        if ($tipoMidia === 'document') {
+            // Para documentos: filename obrigatório, caption não permitido
+            $filename = $arquivo['name'];
+            error_log("MÍDIA: Enviando documento com filename: $filename");
+            
+            // Se há caption, enviar como mensagem de texto separada APÓS o documento
+            if (!empty($caption)) {
+                // Não enviar caption junto com documento, será enviado depois
+                error_log("MÍDIA: Caption será enviado como mensagem separada após documento");
+            }
+        } elseif ($tipoMidia === 'image') {
+            // Para imagens: caption permitido
+            $captionParaEnvio = $caption;
+            error_log("MÍDIA: Enviando imagem" . ($caption ? " com caption" : " sem caption"));
+        } else {
+            // Para vídeo/áudio: testar se caption é permitido
+            $captionParaEnvio = $caption;
+            error_log("MÍDIA: Enviando $tipoMidia" . ($caption ? " com caption" : " sem caption"));
+        }
+        
+        if ($precisaTemplate && !empty($caption) && $tipoMidia !== 'document') {
+            // Se é primeira mensagem e tem caption (exceto documentos), enviar template primeiro
+            $resultadoTemplate = $this->enviarPrimeiraMensagem($conversa->contato_numero, $caption);
+            
+            if ($resultadoTemplate['status'] !== 200 && $resultadoTemplate['status'] !== 201) {
+                throw new Exception('Erro ao enviar template: ' . ($resultadoTemplate['error'] ?? 'Erro desconhecido'));
+            }
+            
+            // Aguardar um pouco antes de enviar a mídia
+            sleep(1);
+            // Não enviar caption novamente na mídia
+            $captionParaEnvio = null;
+        }
+        
+        $resultadoEnvio = SerproHelper::enviarMidia($conversa->contato_numero, $tipoMidia, $mediaId, $captionParaEnvio, null, $filename);
+        error_log("MÍDIA: Resultado envio - Status: " . $resultadoEnvio['status']);
+        
+        // Se documento foi enviado com sucesso e há caption, enviar como mensagem separada
+        if ($tipoMidia === 'document' && 
+            ($resultadoEnvio['status'] === 200 || $resultadoEnvio['status'] === 201) && 
+            !empty($caption)) {
+            
+            error_log("MÍDIA: Enviando caption como mensagem separada...");
+            sleep(1); // Aguardar um pouco
+            
+            // Enviar caption como mensagem de texto normal
+            $resultadoCaption = SerproHelper::enviarMensagemTexto($conversa->contato_numero, $caption);
+            error_log("MÍDIA: Caption enviado - Status: " . ($resultadoCaption['status'] ?? 'erro'));
+        }
+        
+        return $resultadoEnvio;
+    }
+
+    /**
+     * Valida arquivo de mídia
+     */
+    private function validarArquivoMidia($arquivo)
+    {
+        $tiposPermitidos = [
+            'image/jpeg', 'image/png', 'image/gif',
+            'video/mp4', 'video/3gpp',
+            'audio/aac', 'audio/amr', 'audio/mpeg', 'audio/mp4', 'audio/ogg',
+            'application/pdf', 'application/msword', 'text/plain',
+            'application/vnd.ms-powerpoint', 'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ];
+
+        if (!in_array($arquivo['type'], $tiposPermitidos)) {
+            return ['valido' => false, 'erro' => 'Tipo de arquivo não permitido: ' . $arquivo['type']];
+        }
+
+        // Verificar tamanho
+        $limiteTamanho = 5 * 1024 * 1024; // 5MB padrão
+        if (strpos($arquivo['type'], 'video/') === 0 || strpos($arquivo['type'], 'audio/') === 0) {
+            $limiteTamanho = 16 * 1024 * 1024; // 16MB para vídeo/áudio
+        } elseif (strpos($arquivo['type'], 'application/') === 0) {
+            $limiteTamanho = 95 * 1024 * 1024; // 95MB para documentos
+        }
+
+        if ($arquivo['size'] > $limiteTamanho) {
+            $limiteMB = round($limiteTamanho / (1024 * 1024), 1);
+            return ['valido' => false, 'erro' => "Arquivo muito grande. Limite: {$limiteMB}MB"];
+        }
+
+        return ['valido' => true, 'erro' => null];
+    }
+
+    /**
+     * Mapeia tipo MIME para tipo da API
+     */
+    private function mapearTipoMidiaParaAPI($mimeType)
+    {
+        if (strpos($mimeType, 'image/') === 0) {
+            return 'image';
+        } elseif (strpos($mimeType, 'video/') === 0) {
+            return 'video';
+        } elseif (strpos($mimeType, 'audio/') === 0) {
+            return 'audio';
+        } else {
+            return 'document';
+        }
+    }
+
+    /**
+     * Determina tipo de mídia para salvar no banco
+     */
+    private function determinarTipoMidia($mimeType)
+    {
+        if (strpos($mimeType, 'image/') === 0) {
+            return 'image';
+        } elseif (strpos($mimeType, 'video/') === 0) {
+            return 'video';
+        } elseif (strpos($mimeType, 'audio/') === 0) {
+            return 'audio';
+        } else {
+            return 'document';
+        }
     }
 
     /**
@@ -458,7 +725,7 @@ class Chat extends Controllers
                 'conteudo' => $conteudo,
                 'message_id' => $mensagem['id'],
                 'status' => 'recebido',
-                'recebido_em' => date('Y-m-d H:i:s', $mensagem['timestamp'])
+                'enviado_em' => date('Y-m-d H:i:s', $mensagem['timestamp'])
             ]);
             
             // Atualizar conversa
@@ -1153,5 +1420,348 @@ class Chat extends Controllers
         }
 
         Helper::redirecionar('chat/configuracoes');
+    }
+
+    /**
+     * [ atualizarStatusMensagens ] - Verifica e atualiza status das mensagens via API SERPRO
+     */
+    public function atualizarStatusMensagens($conversa_id = null)
+    {
+        header('Content-Type: application/json');
+        
+        try {
+            if (!$conversa_id) {
+                echo json_encode(['success' => false, 'error' => 'ID da conversa não informado']);
+                return;
+            }
+
+            // Verificar se o usuário tem acesso à conversa
+            $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
+            if (!$conversa || $conversa->usuario_id != $_SESSION['usuario_id']) {
+                echo json_encode(['success' => false, 'error' => 'Acesso negado à conversa']);
+                return;
+            }
+
+            // Buscar mensagens enviadas pendentes de atualização de status
+            $mensagensParaVerificar = $this->chatModel->buscarMensagensComStatus($conversa_id, ['enviado', 'entregue']);
+            
+            if (empty($mensagensParaVerificar)) {
+                echo json_encode([
+                    'success' => true,
+                    'mensagens_atualizadas' => [],
+                    'total_verificadas' => 0,
+                    'info' => 'Nenhuma mensagem pendente de verificação'
+                ]);
+                return;
+            }
+            
+            $mensagensAtualizadas = [];
+            $errosVerificacao = [];
+            
+            foreach ($mensagensParaVerificar as $mensagem) {
+                if (!empty($mensagem->message_id)) {
+                    try {
+                        $resultado = SerproHelper::consultarStatus($mensagem->message_id);
+                        
+                        if ($resultado['status'] == 200 && isset($resultado['response']['requisicoesEnvio'])) {
+                            foreach ($resultado['response']['requisicoesEnvio'] as $requisicao) {
+                                if ($requisicao['destinatario'] == $conversa->contato_numero) {
+                                    $novoStatus = $this->determinarStatusMensagem($requisicao);
+                                    
+                                    if ($novoStatus && $novoStatus != $mensagem->status) {
+                                        // Atualizar status no banco
+                                        $updateResult = $this->chatModel->atualizarStatusMensagem($mensagem->message_id, $novoStatus);
+                                        
+                                        if ($updateResult) {
+                                            $mensagensAtualizadas[] = [
+                                                'id' => $mensagem->id,
+                                                'message_id' => $mensagem->message_id,
+                                                'status_anterior' => $mensagem->status,
+                                                'status_novo' => $novoStatus
+                                            ];
+                                        } else {
+                                            $errosVerificacao[] = "Erro ao atualizar mensagem {$mensagem->id} no banco";
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        } else {
+                            $errosVerificacao[] = "Erro na API para mensagem {$mensagem->message_id}: " . ($resultado['error'] ?? 'Status ' . $resultado['status']);
+                        }
+                    } catch (Exception $e) {
+                        $errosVerificacao[] = "Exceção ao verificar mensagem {$mensagem->message_id}: " . $e->getMessage();
+                    }
+                }
+            }
+            
+            $response = [
+                'success' => true,
+                'mensagens_atualizadas' => $mensagensAtualizadas,
+                'total_verificadas' => count($mensagensParaVerificar),
+                'total_atualizadas' => count($mensagensAtualizadas)
+            ];
+            
+            if (!empty($errosVerificacao)) {
+                $response['warnings'] = $errosVerificacao;
+            }
+            
+            echo json_encode($response);
+            
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Erro interno: ' . $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    /**
+     * [ determinarStatusMensagem ] - Determina o status baseado na resposta da API SERPRO
+     */
+    private function determinarStatusMensagem($requisicao)
+    {
+        // Ordem de prioridade: lido > entregue > enviado > falhou
+        if (!empty($requisicao['read'])) {
+            return 'lido';
+        } elseif (!empty($requisicao['delivered'])) {
+            return 'entregue';
+        } elseif (!empty($requisicao['sent'])) {
+            return 'enviado';
+        } elseif (!empty($requisicao['failed'])) {
+            return 'falhou';
+        }
+        
+        return null; // Não mudou
+    }
+
+    /**
+     * [ verificarStatusMensagem ] - Verifica status de uma mensagem específica
+     */
+    public function verificarStatusMensagem($message_id = null)
+    {
+        if (!$message_id) {
+            echo json_encode(['error' => 'ID da mensagem não informado']);
+            return;
+        }
+
+        $resultado = SerproHelper::consultarStatus($message_id);
+        
+        if ($resultado['status'] == 200) {
+            echo json_encode([
+                'success' => true,
+                'dados_completos' => $resultado['response'],
+                'status_requisicao' => $resultado['status']
+            ]);
+        } else {
+            echo json_encode([
+                'success' => false,
+                'error' => $resultado['error'] ?? 'Erro ao consultar status',
+                'status_requisicao' => $resultado['status']
+            ]);
+        }
+    }
+
+    /**
+     * [ debugAPI ] - Debug da conectividade com API SERPRO
+     */
+    public function debugAPI()
+    {
+        header('Content-Type: application/json');
+        
+        try {
+            $debug = [
+                'configuracao' => [
+                    'base_url' => defined('SERPRO_BASE_URL') ? SERPRO_BASE_URL : 'Não definido',
+                    'client_id' => defined('SERPRO_CLIENT_ID') ? (SERPRO_CLIENT_ID ? 'Definido' : 'Vazio') : 'Não definido',
+                    'waba_id' => defined('SERPRO_WABA_ID') ? (SERPRO_WABA_ID ? 'Definido' : 'Vazio') : 'Não definido',
+                    'phone_number_id' => defined('SERPRO_PHONE_NUMBER_ID') ? (SERPRO_PHONE_NUMBER_ID ? 'Definido' : 'Vazio') : 'Não definido'
+                ],
+                'sessao' => [
+                    'usuario_logado' => isset($_SESSION['usuario_id']),
+                    'usuario_id' => $_SESSION['usuario_id'] ?? null,
+                    'usuario_perfil' => $_SESSION['usuario_perfil'] ?? null
+                ]
+            ];
+            
+            // Testar obtenção de token
+            try {
+                $token = SerproHelper::getToken();
+                $debug['token'] = [
+                    'obtido' => !empty($token),
+                    'comprimento' => $token ? strlen($token) : 0,
+                    'erro' => $token ? null : SerproHelper::getLastError()
+                ];
+            } catch (Exception $e) {
+                $debug['token'] = [
+                    'obtido' => false,
+                    'erro' => $e->getMessage()
+                ];
+            }
+            
+            // Testar verificação de status da API
+            try {
+                $statusAPI = SerproHelper::verificarStatusAPI();
+                $debug['api_status'] = [
+                    'online' => $statusAPI,
+                    'erro' => $statusAPI ? null : SerproHelper::getLastError()
+                ];
+            } catch (Exception $e) {
+                $debug['api_status'] = [
+                    'online' => false,
+                    'erro' => $e->getMessage()
+                ];
+            }
+            
+            echo json_encode([
+                'success' => true,
+                'debug_info' => $debug
+            ]);
+            
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    /**
+     * [ processarVerificacaoStatusManual ] - Processa verificação de status manual
+     */
+    private function processarVerificacaoStatusManual($conversa_id, $conversa)
+    {
+        try {
+            // Buscar mensagens enviadas pendentes de atualização de status
+            $mensagensParaVerificar = $this->chatModel->buscarMensagensComStatus($conversa_id, ['enviado', 'entregue']);
+            
+            if (empty($mensagensParaVerificar)) {
+                Helper::mensagem('chat', '<i class="fas fa-info-circle"></i> Nenhuma mensagem pendente de verificação', 'alert alert-info');
+                return;
+            }
+            
+            $mensagensAtualizadas = 0;
+            $erros = [];
+            
+            foreach ($mensagensParaVerificar as $mensagem) {
+                if (!empty($mensagem->message_id)) {
+                    try {
+                        $resultado = SerproHelper::consultarStatus($mensagem->message_id);
+                        
+                        if ($resultado['status'] == 200 && isset($resultado['response']['requisicoesEnvio'])) {
+                            foreach ($resultado['response']['requisicoesEnvio'] as $requisicao) {
+                                if ($requisicao['destinatario'] == $conversa->contato_numero) {
+                                    $novoStatus = $this->determinarStatusMensagem($requisicao);
+                                    
+                                    if ($novoStatus && $novoStatus != $mensagem->status) {
+                                        // Atualizar status no banco
+                                        if ($this->chatModel->atualizarStatusMensagem($mensagem->message_id, $novoStatus)) {
+                                            $mensagensAtualizadas++;
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        } else {
+                            $erros[] = "Erro na API para mensagem {$mensagem->message_id}";
+                        }
+                    } catch (Exception $e) {
+                        $erros[] = "Erro ao verificar mensagem {$mensagem->message_id}: " . $e->getMessage();
+                    }
+                }
+            }
+            
+            // Mostrar resultado
+            if ($mensagensAtualizadas > 0) {
+                Helper::mensagem('chat', "<i class='fas fa-check-circle'></i> {$mensagensAtualizadas} mensagem(ns) tiveram status atualizado", 'alert alert-success');
+            } else {
+                Helper::mensagem('chat', '<i class="fas fa-info-circle"></i> Nenhuma atualização de status encontrada', 'alert alert-info');
+            }
+            
+            if (!empty($erros)) {
+                foreach ($erros as $erro) {
+                    Helper::mensagem('chat', "<i class='fas fa-exclamation-triangle'></i> {$erro}", 'alert alert-warning');
+                }
+            }
+            
+        } catch (Exception $e) {
+            Helper::mensagem('chat', "<i class='fas fa-ban'></i> Erro na verificação: " . $e->getMessage(), 'alert alert-danger');
+        }
+    }
+
+    /**
+     * [ debugEnvioMidia ] - Debug do envio de mídia
+     */
+    public function debugEnvioMidia()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['error' => 'Método não permitido']);
+            return;
+        }
+
+        header('Content-Type: application/json');
+
+        try {
+            // Verificar se foi enviado um arquivo
+            if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Nenhum arquivo foi enviado ou erro no upload',
+                    'files_info' => $_FILES
+                ]);
+                return;
+            }
+
+            $arquivo = $_FILES['file'];
+            $destinatario = $_POST['destinatario'] ?? '5562999999999'; // Número de teste
+            $caption = $_POST['caption'] ?? 'Teste de envio de mídia';
+
+            echo json_encode([
+                'step' => 'Iniciando debug...',
+                'arquivo_info' => [
+                    'nome' => $arquivo['name'],
+                    'tipo' => $arquivo['type'],
+                    'tamanho' => $arquivo['size'],
+                    'tmp_name' => $arquivo['tmp_name']
+                ],
+                'destinatario' => $destinatario,
+                'caption' => $caption
+            ]);
+
+            // Passo 1: Upload da mídia
+            $resultadoUpload = SerproHelper::uploadMidia($arquivo, $arquivo['type']);
+            
+            if ($resultadoUpload['status'] !== 200) {
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Falha no upload da mídia',
+                    'upload_response' => $resultadoUpload
+                ]);
+                return;
+            }
+
+            $mediaId = $resultadoUpload['response']['id'];
+
+            // Passo 2: Envio da mídia
+            $tipoMidia = $this->mapearTipoMidiaParaAPI($arquivo['type']);
+            $resultadoEnvio = SerproHelper::enviarMidia($destinatario, $tipoMidia, $mediaId, $caption);
+
+            echo json_encode([
+                'success' => true,
+                'upload_result' => $resultadoUpload,
+                'send_result' => $resultadoEnvio,
+                'media_id' => $mediaId,
+                'tipo_midia' => $tipoMidia
+            ]);
+
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Exceção: ' . $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
     }
 }

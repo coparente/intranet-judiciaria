@@ -1,7 +1,49 @@
 <?php include 'app/Views/include/nav.php' ?>
 
 <style>
+.file-preview {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    border-left: 4px solid #007bff;
+}
 
+.file-preview .file-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 50px;
+    height: 50px;
+    background: white;
+    border-radius: 0.25rem;
+    border: 1px solid #dee2e6;
+}
+
+.btn-send:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.progress {
+    background-color: #e9ecef;
+}
+
+.progress-bar {
+    background-color: #007bff;
+    transition: width 0.3s ease;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.uploading {
+    animation: pulse 1.5s infinite;
+}
 </style>
 
 <main>
@@ -33,6 +75,12 @@
                                 <div class="status-indicator" id="statusIndicator"></div>
                                 <span id="apiStatusText">Verificando...</span>
                             </div>
+                            <form method="POST" action="<?= URL ?>/chat/conversa/<?= $dados['conversa']->id ?>" style="display: inline;">
+                                <input type="hidden" name="acao" value="verificar_status">
+                                <button type="submit" class="btn btn-outline-secondary btn-sm" title="Verificar status das mensagens">
+                                    <i class="fas fa-sync-alt"></i> Verificar Status
+                                </button>
+                            </form>
                             <div class="dropdown">
                                 <button class="btn btn-light btn-sm dropdown-toggle" type="button" data-toggle="dropdown">
                                     <i class="fas fa-ellipsis-v"></i>
@@ -115,13 +163,15 @@
                                             <?php if ($isUsuario): ?>
                                                 <span class="message-status">
                                                     <?php if ($mensagem->status == 'enviado'): ?>
-                                                        <i class="fas fa-check" title="Enviado"></i>
+                                                        <i class="fas fa-check" title="Enviado"></i> <span class="status-badge enviado">Enviado</span>
                                                     <?php elseif ($mensagem->status == 'entregue'): ?>
-                                                        <i class="fas fa-check-double" title="Entregue"></i>
+                                                        <i class="fas fa-check-double" title="Entregue"></i> <span class="status-badge entregue">Entregue</span>
                                                     <?php elseif ($mensagem->status == 'lido'): ?>
-                                                        <i class="fas fa-check-double text-info" title="Lido"></i>
+                                                        <i class="fas fa-check-double text-lido" title="Lido"></i> <span class="status-badge lido">Lido</span>
+                                                    <?php elseif ($mensagem->status == 'falhou'): ?>
+                                                        <i class="fas fa-exclamation-triangle text-danger" title="Falhou"></i> <span class="status-badge falhou">Falhou</span>
                                                     <?php else: ?>
-                                                        <i class="fas fa-clock" title="Pendente"></i>
+                                                        <i class="fas fa-clock" title="Pendente"></i> <span class="status-badge pendente">Pendente</span>
                                                     <?php endif; ?>
                                                 </span>
                                             <?php endif; ?>
@@ -151,36 +201,41 @@
                     <!-- Preview de arquivo (quando selecionado) -->
                     <div class="file-preview d-none" id="filePreview">
                         <div class="d-flex align-items-center gap-3">
-                            <i class="fas fa-file fa-2x"></i>
-                            <div class="file-preview-info">
-                                <div class="fw-bold" id="fileName"></div>
-                                <small id="fileSize"></small>
+                            <div class="file-icon" id="fileIcon">
+                                <i class="fas fa-file fa-2x text-muted"></i>
                             </div>
+                            <div class="file-preview-info flex-grow-1">
+                                <div class="fw-bold" id="fileName"></div>
+                                <small class="text-muted" id="fileSize"></small>
+                                <div class="progress mt-1 d-none" id="uploadProgress" style="height: 3px;">
+                                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFilePreview()" id="removeFileBtn">
+                                <i class="fas fa-times"></i>
+                            </button>
                         </div>
-                        <button type="button" class="btn btn-sm btn-light" onclick="removeFilePreview()">
-                            <i class="fas fa-times"></i>
-                        </button>
                     </div>
 
                     <!-- Área de Input -->
                     <div class="chat-input-area">
                         <form action="<?= URL ?>/chat/enviarMensagem/<?= $dados['conversa']->id ?>" method="POST" enctype="multipart/form-data" id="messageForm">
                             <div class="input-group-modern">
-                                <button type="button" class="btn-attachment" onclick="document.getElementById('fileInput').click()" title="Anexar arquivo">
+                                <button type="button" class="btn-attachment" onclick="document.getElementById('fileInput').click()" title="Anexar arquivo" id="attachBtn">
                                     <i class="fas fa-paperclip"></i>
                                 </button>
                                 <textarea 
                                     class="message-input" 
                                     name="mensagem" 
                                     id="messageInput" 
-                                    placeholder="Digite sua mensagem..." 
-                                    rows="1"
-                                    required></textarea>
+                                    placeholder="Digite sua mensagem ou anexe um arquivo..." 
+                                    rows="1"></textarea>
                                 <button type="submit" class="btn-send" id="sendButton" disabled title="Enviar mensagem">
-                                    <i class="fas fa-paper-plane"></i>
+                                    <i class="fas fa-paper-plane" id="sendIcon"></i>
                                 </button>
                             </div>
-                            <input type="file" id="fileInput" name="midia" style="display: none;" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt">
+                            <input type="file" id="fileInput" name="midia" style="display: none;" 
+                                   accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx">
                         </form>
                     </div>
                 </div>
@@ -237,7 +292,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const apiStatusText = document.getElementById('apiStatusText');
     
     let lastMessageId = <?= !empty($dados['mensagens']) ? end($dados['mensagens'])->id : 0 ?>;
-    let isApiOnline = false;
+    let isApiOnline = null; // null = verificando, true = online, false = offline
     
     // Scroll para o final das mensagens
     function scrollToBottom() {
@@ -255,7 +310,7 @@ document.addEventListener('DOMContentLoaded', function() {
         this.style.height = Math.min(this.scrollHeight, 100) + 'px';
         
         // Habilitar/desabilitar botão de envio
-        sendButton.disabled = !this.value.trim() || !isApiOnline;
+        updateSendButton();
     });
     
     // Enter para enviar (Shift+Enter para nova linha)
@@ -272,18 +327,99 @@ document.addEventListener('DOMContentLoaded', function() {
     fileInput.addEventListener('change', function() {
         const file = this.files[0];
         if (file) {
+            // Validar arquivo
+            if (!validateFile(file)) {
+                this.value = '';
+                return;
+            }
+            
+            // Atualizar preview
             fileName.textContent = file.name;
             fileSize.textContent = formatFileSize(file.size);
+            updateFileIcon(file.type);
             filePreview.classList.remove('d-none');
+            
+            // Atualizar botão de envio
+            updateSendButton();
         } else {
             filePreview.classList.add('d-none');
+            updateSendButton();
         }
     });
+    
+    // Função para atualizar o botão de envio
+    function updateSendButton() {
+        const hasText = messageInput.value.trim();
+        const hasFile = fileInput.files.length > 0;
+        
+        // Habilitar botão se há texto ou arquivo, mesmo se a API ainda está sendo verificada
+        // Apenas desabilitar se explicitamente sabemos que a API está offline
+        sendButton.disabled = (!hasText && !hasFile) || (isApiOnline === false);
+    }
+    
+    // Validar arquivo
+    function validateFile(file) {
+        const allowedTypes = [
+            'image/jpeg', 'image/png', 'image/gif',
+            'video/mp4', 'video/3gpp',
+            'audio/aac', 'audio/amr', 'audio/mpeg', 'audio/mp4', 'audio/ogg',
+            'application/pdf', 'application/msword', 'text/plain',
+            'application/vnd.ms-powerpoint', 'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ];
+        
+        if (!allowedTypes.includes(file.type)) {
+            alert('Tipo de arquivo não permitido: ' + file.type);
+            return false;
+        }
+        
+        // Verificar tamanho
+        let maxSize = 5 * 1024 * 1024; // 5MB padrão
+        if (file.type.startsWith('video/') || file.type.startsWith('audio/')) {
+            maxSize = 16 * 1024 * 1024; // 16MB
+        } else if (file.type.startsWith('application/')) {
+            maxSize = 95 * 1024 * 1024; // 95MB
+        }
+        
+        if (file.size > maxSize) {
+            const maxMB = Math.round(maxSize / (1024 * 1024));
+            alert(`Arquivo muito grande. Limite: ${maxMB}MB`);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    // Atualizar ícone do arquivo
+    function updateFileIcon(fileType) {
+        const iconElement = document.querySelector('#fileIcon i');
+        
+        if (fileType.startsWith('image/')) {
+            iconElement.className = 'fas fa-image fa-2x text-primary';
+        } else if (fileType.startsWith('video/')) {
+            iconElement.className = 'fas fa-video fa-2x text-danger';
+        } else if (fileType.startsWith('audio/')) {
+            iconElement.className = 'fas fa-music fa-2x text-warning';
+        } else if (fileType === 'application/pdf') {
+            iconElement.className = 'fas fa-file-pdf fa-2x text-danger';
+        } else if (fileType.includes('word') || fileType.includes('document')) {
+            iconElement.className = 'fas fa-file-word fa-2x text-primary';
+        } else if (fileType.includes('excel') || fileType.includes('sheet')) {
+            iconElement.className = 'fas fa-file-excel fa-2x text-success';
+        } else if (fileType.includes('powerpoint') || fileType.includes('presentation')) {
+            iconElement.className = 'fas fa-file-powerpoint fa-2x text-warning';
+        } else {
+            iconElement.className = 'fas fa-file fa-2x text-muted';
+        }
+    }
     
     // Remover preview de arquivo
     window.removeFilePreview = function() {
         fileInput.value = '';
         filePreview.classList.add('d-none');
+        updateSendButton();
     };
     
     // Formatar tamanho do arquivo
@@ -295,9 +431,29 @@ document.addEventListener('DOMContentLoaded', function() {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
     
+    // Evento de submit do formulário - apenas feedback visual
+    document.getElementById('messageForm').addEventListener('submit', function(e) {
+        const sendIcon = document.getElementById('sendIcon');
+        const sendButton = document.getElementById('sendButton');
+        
+        // Mostrar feedback visual
+        sendButton.disabled = true;
+        sendIcon.className = 'fas fa-spinner fa-spin';
+        
+        // Se há arquivo, mostrar progresso
+        if (fileInput.files.length > 0) {
+            const progressBar = document.getElementById('uploadProgress');
+            progressBar.classList.remove('d-none');
+        }
+    });
+    
     // Verificar status da API
     function checkApiStatus() {
         const timestamp = new Date().getTime();
+        
+        // Durante a verificação, mostrar status de carregamento
+        statusIndicator.className = 'status-indicator warning';
+        apiStatusText.textContent = 'Verificando...';
         
         fetch(`<?= URL ?>/chat/verificarStatusAPI?_=${timestamp}`, {
             method: 'POST',
@@ -321,19 +477,20 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.online) {
                 statusIndicator.className = 'status-indicator';
                 apiStatusText.textContent = 'Online';
-                sendButton.disabled = !messageInput.value.trim();
             } else {
                 statusIndicator.className = 'status-indicator offline';
                 apiStatusText.textContent = 'Offline';
-                sendButton.disabled = true;
             }
+            updateSendButton();
         })
         .catch(error => {
             console.error('Erro ao verificar status da API:', error);
             statusIndicator.className = 'status-indicator warning';
-            apiStatusText.textContent = 'Erro';
-            isApiOnline = false;
-            sendButton.disabled = true;
+            apiStatusText.textContent = 'Erro na verificação';
+            
+            // Em caso de erro na verificação, permitir tentativa de envio
+            isApiOnline = null;
+            updateSendButton();
         });
     }
     
@@ -389,16 +546,19 @@ document.addEventListener('DOMContentLoaded', function() {
         if (isUser) {
             switch (message.status) {
                 case 'enviado':
-                    status = '<i class="fas fa-check" title="Enviado"></i>';
+                    status = '<i class="fas fa-check" title="Enviado"></i> <span class="status-badge enviado">Enviado</span>';
                     break;
                 case 'entregue':
-                    status = '<i class="fas fa-check-double" title="Entregue"></i>';
+                    status = '<i class="fas fa-check-double" title="Entregue"></i> <span class="status-badge entregue">Entregue</span>';
                     break;
                 case 'lido':
-                    status = '<i class="fas fa-check-double text-info" title="Lido"></i>';
+                    status = '<i class="fas fa-check-double text-lido" title="Lido"></i> <span class="status-badge lido">Lido</span>';
+                    break;
+                case 'falhou':
+                    status = '<i class="fas fa-exclamation-triangle text-danger" title="Falhou"></i> <span class="status-badge falhou">Falhou</span>';
                     break;
                 default:
-                    status = '<i class="fas fa-clock" title="Pendente"></i>';
+                    status = '<i class="fas fa-clock" title="Pendente"></i> <span class="status-badge pendente">Pendente</span>';
             }
         }
         
@@ -429,10 +589,69 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
     
+    // Verificar status das mensagens (automático)
+    function verificarStatusMensagens() {
+        fetch(`<?= URL ?>/chat/atualizarStatusMensagens/<?= $dados['conversa']->id ?>`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.mensagens_atualizadas.length > 0) {
+                    // Atualizar badges de status na tela
+                    data.mensagens_atualizadas.forEach(mensagem => {
+                        atualizarStatusMensagemNaTela(mensagem.id, mensagem.status_novo);
+                    });
+                    
+                    console.log(`${data.mensagens_atualizadas.length} mensagens tiveram status atualizado automaticamente`);
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao verificar status das mensagens:', error);
+            });
+    }
+    
+    // Atualizar status de mensagem específica na tela
+    function atualizarStatusMensagemNaTela(mensagemId, novoStatus) {
+        const messageWrapper = document.querySelector(`[data-message-id="${mensagemId}"]`);
+        if (messageWrapper) {
+            const statusElement = messageWrapper.querySelector('.message-status');
+            if (statusElement) {
+                let novoHTML = '';
+                
+                switch (novoStatus) {
+                    case 'enviado':
+                        novoHTML = '<i class="fas fa-check" title="Enviado"></i> <span class="status-badge enviado">Enviado</span>';
+                        break;
+                    case 'entregue':
+                        novoHTML = '<i class="fas fa-check-double" title="Entregue"></i> <span class="status-badge entregue">Entregue</span>';
+                        break;
+                    case 'lido':
+                        novoHTML = '<i class="fas fa-check-double text-lido" title="Lido"></i> <span class="status-badge lido">Lido</span>';
+                        break;
+                    case 'falhou':
+                        novoHTML = '<i class="fas fa-exclamation-triangle text-danger" title="Falhou"></i> <span class="status-badge falhou">Falhou</span>';
+                        break;
+                    default:
+                        novoHTML = '<i class="fas fa-clock" title="Pendente"></i> <span class="status-badge pendente">Pendente</span>';
+                }
+                
+                statusElement.innerHTML = novoHTML;
+                
+                // Adicionar animação de atualização
+                statusElement.classList.add('status-updated');
+                
+                // Remover animação após completar
+                setTimeout(() => {
+                    statusElement.classList.remove('status-updated');
+                }, 600);
+            }
+        }
+    }
+    
     // Verificações periódicas
     checkApiStatus();
+    updateSendButton(); // Verificação inicial
     setInterval(checkApiStatus, 30000); // A cada 30 segundos
     setInterval(loadNewMessages, 5000); // A cada 5 segundos
+    setInterval(verificarStatusMensagens, 15000); // A cada 15 segundos - verificar status das mensagens
 });
 </script>
 

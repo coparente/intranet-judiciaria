@@ -525,7 +525,7 @@ body.dark-mode .tooltip {
     min-height: 600px;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #52a8da 0%, #84cdda 100%);
     border-radius: 15px;
     overflow: hidden;
     box-shadow: 0 10px 30px rgba(0,0,0,0.2);
@@ -660,7 +660,7 @@ body.dark-mode .tooltip {
 }
 
 .message-bubble.sent {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4ce77abe 0%, #8bdab5 100%);
     color: white;
     margin-left: auto;
     border-bottom-right-radius: 6px;
@@ -1101,3 +1101,119 @@ body.dark-mode .tooltip {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
+
+
+/* Estilos para melhor visualização dos status das mensagens */
+.message-status {
+    margin-left: 5px;
+    font-size: 12px;
+}
+
+.message-status i {
+    transition: all 0.3s ease;
+}
+
+/* Status: Pendente */
+.message-status .fa-clock {
+    color: #6c757d;
+    animation: pulse 1.5s infinite;
+}
+
+/* Status: Enviado */
+.message-status .fa-check {
+    color: #28a745;
+}
+
+/* Status: Entregue */
+.message-status .fa-check-double {
+    color: #17a2b8;
+}
+
+/* Status: Lido */
+.message-status .fa-check-double.text-lido {
+    color: #007bff8a !important;
+    font-weight: bold;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Melhorar visualização da área de tempo e status */
+.message-time {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: 5px;
+}
+
+.message-bubble.received .message-time {
+    color: rgba(0, 0, 0, 0.6);
+}
+
+/* Indicador visual mais destacado */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.status-badge.pendente {
+    background: rgba(108, 117, 125, 0.2);
+    color: #6c757d;
+}
+
+.status-badge.enviado {
+    background: rgba(40, 167, 69, 0.2);
+    color: #28a745;
+}
+
+.status-badge.entregue {
+    background: rgba(23, 162, 184, 0.2);
+    color: #17a2b8;
+}
+
+.status-badge.lido {
+    background: rgba(0, 123, 255, 0.2);
+    color: #007bff;
+}
+
+.status-badge.falhou {
+    background: rgba(220, 53, 69, 0.2);
+    color: #dc3545;
+}
+
+/* Animação para status atualizado */
+.status-updated {
+    animation: statusPulse 0.6s ease-in-out;
+}
+
+@keyframes statusPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+/* 
+MODO DISCRETO: Para ter apenas os ícones sem os badges de texto,
+descomente a linha abaixo:
+*/
+/* .status-badge { display: none !important; } */
+
+/* 
+LEGENDA DOS STATUS:
+🕐 Pendente (relógio) - Mensagem ainda não foi enviada
+✓ Enviado (check simples verde) - Mensagem foi enviada
+✓✓ Entregue (check duplo azul) - Mensagem foi entregue
+✓✓ Lido (check duplo azul mais escuro) - Mensagem foi lida pelo destinatário
+⚠️ Falhou (triângulo vermelho) - Erro no envio da mensagem
+*/

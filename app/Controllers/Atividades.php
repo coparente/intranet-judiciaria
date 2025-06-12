@@ -61,7 +61,7 @@ class Atividades extends Controllers
     {
         try {
             // Debug para ver os parâmetros recebidos
-            error_log('Parâmetros recebidos: ' . print_r($_POST, true));
+            // error_log('Parâmetros recebidos: ' . print_r($_POST, true));
 
             $params = [
                 'draw' => isset($_POST['draw']) ? intval($_POST['draw']) : 1,
@@ -87,7 +87,7 @@ class Atividades extends Controllers
             $atividades = $this->atividadeModel->listarAtividadesDataTable($params);
 
             // Debug do resultado
-            error_log('Resultado da consulta: ' . print_r($atividades, true));
+            // error_log('Resultado da consulta: ' . print_r($atividades, true));
 
             $response = [
                 'draw' => $params['draw'],
@@ -99,7 +99,7 @@ class Atividades extends Controllers
             echo json_encode($response, JSON_PRETTY_PRINT);
             exit;
         } catch (Exception $e) {
-            error_log('Erro na getAtividades: ' . $e->getMessage());
+            // error_log('Erro na getAtividades: ' . $e->getMessage());
             echo json_encode([
                 'draw' => isset($params['draw']) ? intval($params['draw']) : 0,
                 'recordsTotal' => 0,

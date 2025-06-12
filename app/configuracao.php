@@ -9,28 +9,27 @@ require_once __DIR__ . '/../vendor/autoload.php';
 define('APP', dirname(__FILE__));
 define('APPROOT', dirname(__FILE__));
 
+
+$ambiente = 'producao';
+// $ambiente = 'local';
+
 /**
  * Configurações do Banco de Dados
  */
-// define('HOST', 'localhost');
-// define('PORTA',  '3306');
-// define('BANCO', 'dir_judiciaria');
-// define('USUARIO', 'root');
-// define('SENHA', '');
 
-
-define('HOST', 'localhost');
-define('PORTA', '3306');
-define('BANCO', 'copare52_dir_judiciaria');
-define('USUARIO', 'copare52_dir_judiciaria');
-define('SENHA', 'parente1010');
-
-
-// define('HOST', $_ENV['DEV_DB_HOST'] ?: getenv('PROD_DB_HOST') ?: 'localhost');
-// define('PORTA', $_ENV['DEV_DB_PORT'] ? intval($_ENV['DEV_DB_PORT']) : (getenv('PROD_DB_PORT') ? intval(getenv('PROD_DB_PORT')) : 3306));
-// define('BANCO', $_ENV['DEV_DB_NAME'] ?: getenv('PROD_DB_NAME') ?: 'dir_judiciaria');
-// define('USUARIO', $_ENV['DEV_DB_USERNAME'] ?: getenv('PROD_DB_USERNAME') ?: 'root');
-// define('SENHA', $_ENV['DEV_DB_PASSWORD'] ?: getenv('PROD_DB_PASSWORD') ?: '');
+if ($ambiente === 'local') {
+    define('HOST', 'localhost');
+    define('PORTA', 3306);
+    define('BANCO', 'dir_judiciaria');
+    define('USUARIO', 'root');
+    define('SENHA', '');
+} else {
+    define('HOST', 'localhost');
+    define('PORTA', 3306);
+    define('BANCO', 'copare52_dir_judiciaria');
+    define('USUARIO', 'copare52_dir_judiciaria');
+    define('SENHA', 'parente1010');
+}
 
 
 /**
@@ -38,8 +37,12 @@ define('SENHA', 'parente1010');
  */
 define('APP_NOME', 'Dir Judiciária');
 define('APP_VERSAO', '1.2.0');
-define('URL', 'http://sistemas.coparente.top/intranet');
-// define('URL', 'http://10.90.18.141/intranet-judiciaria');
+
+if ($ambiente === 'local') {
+    define('URL', 'http://10.90.18.141/intranet-judiciaria');
+} else {
+    define('URL', 'http://sistemas.coparente.top/intranet');
+}
 
 
 

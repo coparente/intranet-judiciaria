@@ -14,7 +14,7 @@
  * @version 1.0.0
  * @access protected    
  */
-class CIRI extends Controllers
+class Ciri extends Controllers
 {
     private $processosPorPagina = ITENS_POR_PAGINA;
     private $ciriModel;
@@ -61,6 +61,7 @@ class CIRI extends Controllers
      */
     public function listar($pagina = 1)
     {
+        error_log('Entrou no listar');
         // Verifica se tem permissão para acessar o módulo
         if (
             !isset($_SESSION['usuario_perfil']) ||
@@ -71,7 +72,7 @@ class CIRI extends Controllers
             Helper::redirecionar('dashboard/inicial');
         }
         // Verifica permissão para o módulo de listagem de processos
-        Middleware::verificarPermissao(10); // ID do módulo 'Listar Processos CIRI'
+        // Middleware::verificarPermissao(10); // ID do módulo 'Listar Processos CIRI'
         // Filtros de busca
         $filtros = [
             'numero_processo' => filter_input(INPUT_GET, 'numero_processo', FILTER_SANITIZE_STRING),

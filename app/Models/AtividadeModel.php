@@ -68,12 +68,12 @@ class AtividadeModel {
                     JOIN usuarios u ON a.usuario_id = u.id";
             
             // Debug da query
-            error_log('SQL Base: ' . $sql);
+            // error_log('SQL Base: ' . $sql);
 
             // Total de registros sem filtro
             $this->db->query("SELECT COUNT(*) as total FROM atividades");
             $recordsTotal = $this->db->resultado()->total;
-            error_log('Total de registros: ' . $recordsTotal);
+            // error_log('Total de registros: ' . $recordsTotal);
 
             // Busca
             $where = [];
@@ -112,7 +112,7 @@ class AtividadeModel {
             $this->db->bind(':offset', (int)$params['start'], PDO::PARAM_INT);
 
             $resultados = $this->db->resultados();
-            error_log('Resultados encontrados: ' . count($resultados));
+            // error_log('Resultados encontrados: ' . count($resultados));
 
             return [
                 'draw' => isset($params['draw']) ? intval($params['draw']) : 0,
@@ -121,7 +121,7 @@ class AtividadeModel {
                 'data' => $resultados
             ];
         } catch (Exception $e) {
-            error_log('Erro no DataTable: ' . $e->getMessage());
+            // error_log('Erro no DataTable: ' . $e->getMessage());
             throw $e;
         }
     }

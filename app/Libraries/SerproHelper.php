@@ -1003,10 +1003,16 @@ class SerproHelper
 
         $url = self::$baseUrl . '/client/' . self::$phoneNumberId . '/v2/qrcode';
         
+        // Estrutura correta conforme documentação da API SERPRO
+        $payload = [
+            'mensagemPrePreenchida' => $dados['mensagem_preenchida'] ?? $dados['mensagem'] ?? 'Olá! Entre em contato conosco.',
+            'tipoDeImagem' => 'PNG'
+        ];
+        
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($dados));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Authorization: Bearer ' . $token,
             'Content-Type: application/json'
@@ -1044,7 +1050,7 @@ class SerproHelper
             return ['status' => 401, 'error' => 'Erro ao obter token: ' . self::$lastError];
         }
 
-        $url = self::$baseUrl . '/client/' . self::$phoneNumberId . '/v2/qrcode';
+        $url = self::$baseUrl . '/client/' . self::$phoneNumberId . '/v2/qrcode?tipoDeImagem=PNG';
         
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -1071,6 +1077,96 @@ class SerproHelper
             'status' => $httpCode,
             'response' => $responseData,
             'error' => $httpCode >= 400 ? $response : null
+        ];
+    }
+
+    /**
+     * [ listarQRCodesComImagem ] - Lista QR Codes com URLs das imagens
+     */
+    public static function listarQRCodesComImagem()
+    {
+        return self::listarQRCodes(); // Usa a função atual que já tem tipoDeImagem=PNG
+    }
+
+    /**
+     * [ listarQRCodesSemImagem ] - Lista QR Codes com códigos e links (sem imagem)
+     */
+    public static function listarQRCodesSemImagem()
+    {
+        $token = self::getToken();
+        if (!$token) {
+            return ['status' => 401, 'error' => 'Erro ao obter token: ' . self::$lastError];
+        }
+
+        $url = self::$baseUrl . '/client/' . self::$phoneNumberId . '/v2/qrcode'; // SEM tipoDeImagem=PNG
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $token
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            self::$lastError = "Erro cURL: " . $error;
+            return ['status' => 500, 'error' => self::$lastError];
+        }
+
+        $responseData = json_decode($response, true);
+
+        return [
+            'status' => $httpCode,
+            'response' => $responseData,
+            'error' => $httpCode >= 400 ? $response : null
+        ];
+    }
+
+    /**
+     * [ listarQRCodesCombinados ] - Lista QR Codes combinando dados e imagens
+     */
+    public static function listarQRCodesCombinados()
+    {
+        // Buscar dados (código, link, mensagem)
+        $dadosQR = self::listarQRCodesSemImagem();
+        
+        if ($dadosQR['status'] !== 200 || empty($dadosQR['response'])) {
+            return $dadosQR; // Retorna erro ou lista vazia
+        }
+
+        // Buscar imagens
+        $imagensQR = self::listarQRCodesComImagem();
+        
+        if ($imagensQR['status'] !== 200 || empty($imagensQR['response'])) {
+            // Se não conseguir buscar imagens, retorna só os dados
+            return $dadosQR;
+        }
+
+        // Combinar dados e imagens
+        $qrCombinados = [];
+        
+        foreach ($dadosQR['response'] as $index => $qrDados) {
+            $qrCompleto = $qrDados; // Começa com os dados
+            
+            // Adiciona imagem se existir na mesma posição
+            if (isset($imagensQR['response'][$index]['qrImageUrl'])) {
+                $qrCompleto['qrImageUrl'] = $imagensQR['response'][$index]['qrImageUrl'];
+            }
+            
+            $qrCombinados[] = $qrCompleto;
+        }
+
+        return [
+            'status' => 200,
+            'response' => $qrCombinados,
+            'error' => null,
+            'combinado' => true // Flag para indicar que foi combinado
         ];
     }
 
@@ -1243,9 +1339,6 @@ class SerproHelper
         if ($messageId) {
             $payload['message_id'] = $messageId;
         }
-
-        // Log do payload para debug
-        error_log("MÍDIA: Tipo='$tipoMidia', Payload enviado - " . json_encode($payload));
 
         return self::executarRequisicaoMidia($url, $token, $payload);
     }

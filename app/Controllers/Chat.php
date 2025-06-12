@@ -962,8 +962,13 @@ class Chat extends Controllers
         
         try {
             $resultado = SerproHelper::listarWebhooks();
-            if ($resultado['status'] == 200 && isset($resultado['response']['data'])) {
-                $webhooks = $resultado['response']['data'];
+            if ($resultado['status'] == 200 && isset($resultado['response'])) {
+                // A resposta da API SERPRO para webhooks vem diretamente como array
+                if (is_array($resultado['response'])) {
+                    $webhooks = $resultado['response'];
+                } elseif (isset($resultado['response']['data'])) {
+                    $webhooks = $resultado['response']['data'];
+                }
             } else {
                 $webhookError = 'Erro ao carregar webhooks: ' . ($resultado['error'] ?? 'Erro desconhecido');
             }
@@ -1163,39 +1168,20 @@ class Chat extends Controllers
      */
     public function qrCode()
     {
-        // Detectar se é uma requisição AJAX
-        $isAjax = $_SERVER['REQUEST_METHOD'] == 'POST' || 
-                 isset($_SERVER['HTTP_X_REQUESTED_WITH']) && 
-                 strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
-
         // Verifica se o usuário está logado
         if (!isset($_SESSION['usuario_id'])) {
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['status' => 401, 'error' => 'Usuário não autenticado. Faça login novamente.']);
-                return;
-            }
             Helper::redirecionar('usuarios/login');
             return;
         }
 
         // Verifica permissão
         if (!isset($_SESSION['usuario_perfil']) || !in_array($_SESSION['usuario_perfil'], ['admin'])) {
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['status' => 403, 'error' => 'Acesso negado. Apenas administradores podem gerenciar QR codes.']);
-                return;
-            }
-            
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
             Helper::redirecionar('chat');
             return;
         }
 
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-            // Definir cabeçalho JSON para todas as respostas AJAX
-            header('Content-Type: application/json');
-            
             $acao = $_POST['acao'] ?? '';
             
             try {
@@ -1206,26 +1192,46 @@ class Chat extends Controllers
                             'codigo' => $_POST['codigo'] ?? ''
                         ];
                         $resultado = SerproHelper::gerarQRCode($dados);
-                        echo json_encode($resultado);
-                        break;
                         
-                    case 'listar':
-                        $resultado = SerproHelper::listarQRCodes();
-                        echo json_encode($resultado);
+                        if ($resultado['status'] == 200 || $resultado['status'] == 201) {
+                            Helper::mensagem('chat', '<i class="fas fa-check"></i> QR Code gerado com sucesso!', 'alert alert-success');
+                        } else {
+                            $erro = $resultado['error'] ?? 'Erro desconhecido';
+                            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro ao gerar QR code: ' . $erro, 'alert alert-danger');
+                        }
+                        
+                        Helper::redirecionar('chat/qrCode');
                         break;
                         
                     case 'excluir':
                         $qrId = $_POST['qr_id'];
+                        
+                        if (empty($qrId)) {
+                            Helper::mensagem('chat', '<i class="fas fa-ban"></i> ID do QR code não informado', 'alert alert-danger');
+                            Helper::redirecionar('chat/qrCode');
+                            return;
+                        }
+                        
                         $resultado = SerproHelper::excluirQRCode($qrId);
-                        echo json_encode($resultado);
+                        
+                        if ($resultado['status'] == 200) {
+                            Helper::mensagem('chat', '<i class="fas fa-check"></i> QR Code excluído com sucesso!', 'alert alert-success');
+                        } else {
+                            $erro = $resultado['error'] ?? 'Erro desconhecido';
+                            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro ao excluir QR code: ' . $erro, 'alert alert-danger');
+                        }
+                        
+                        Helper::redirecionar('chat/qrCode');
                         break;
                         
                     default:
-                        echo json_encode(['status' => 400, 'error' => 'Ação não reconhecida']);
+                        Helper::mensagem('chat', '<i class="fas fa-ban"></i> Ação não reconhecida', 'alert alert-danger');
+                        Helper::redirecionar('chat/qrCode');
                         break;
                 }
             } catch (Exception $e) {
-                echo json_encode(['status' => 500, 'error' => 'Erro interno: ' . $e->getMessage()]);
+                Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro interno: ' . $e->getMessage(), 'alert alert-danger');
+                Helper::redirecionar('chat/qrCode');
             }
             
             return;
@@ -1234,11 +1240,31 @@ class Chat extends Controllers
         // Para requisições GET, carregar QR codes diretamente no PHP
         $qrCodes = [];
         $qrCodeError = null;
+        $modo = $_GET['modo'] ?? 'combinado'; // 'combinado', 'imagem', 'dados'
         
         try {
-            $resultado = SerproHelper::listarQRCodes();
+            switch ($modo) {
+                case 'imagem':
+                    $resultado = SerproHelper::listarQRCodesComImagem();
+                    break;
+                case 'dados':
+                    $resultado = SerproHelper::listarQRCodesSemImagem();
+                    break;
+                case 'combinado':
+                default:
+                    $resultado = SerproHelper::listarQRCodesCombinados();
+                    break;
+            }
+            
             if ($resultado['status'] == 200 && isset($resultado['response'])) {
-                $qrCodes = $resultado['response'];
+                // A resposta da API SERPRO para QR codes vem diretamente como array
+                if (is_array($resultado['response'])) {
+                    $qrCodes = $resultado['response'];
+                } elseif (isset($resultado['response']['data'])) {
+                    $qrCodes = $resultado['response']['data'];
+                } else {
+                    $qrCodes = [];
+                }
             } else {
                 $qrCodeError = 'Erro ao carregar QR codes: ' . ($resultado['error'] ?? 'Erro desconhecido');
             }
@@ -1249,10 +1275,70 @@ class Chat extends Controllers
         $dados = [
             'tituloPagina' => 'QR Codes',
             'qrCodes' => $qrCodes,
-            'qrCodeError' => $qrCodeError
+            'qrCodeError' => $qrCodeError,
+            'modo' => $modo
         ];
         
         $this->view('chat/qr_codes', $dados);
+    }
+
+    /**
+     * [ baixarQRCode ] - Faz download de QR Code via backend (contorna CORS)
+     */
+    public function baixarQRCode()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            Helper::redirecionar('chat/configuracoes');
+            return;
+        }
+
+        $qr_url = $_POST['qr_url'] ?? '';
+        $nome_arquivo = $_POST['nome_arquivo'] ?? 'qrcode.png';
+
+        if (empty($qr_url)) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> URL da imagem não fornecida', 'alert alert-danger');
+            Helper::redirecionar('chat/qrCode');
+            return;
+        }
+
+        try {
+            // Fazer download da imagem usando cURL
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $qr_url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+            
+            $imageData = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+
+            if ($error) {
+                throw new Exception("Erro cURL: " . $error);
+            }
+
+            if ($httpCode !== 200 || empty($imageData)) {
+                throw new Exception("Erro ao baixar imagem. Código HTTP: " . $httpCode);
+            }
+
+            // Definir headers para download
+            header('Content-Type: image/png');
+            header('Content-Disposition: attachment; filename="' . $nome_arquivo . '"');
+            header('Content-Length: ' . strlen($imageData));
+            header('Cache-Control: no-cache, must-revalidate');
+            header('Expires: Thu, 01 Jan 1970 00:00:00 GMT');
+
+            // Enviar a imagem
+            echo $imageData;
+            exit;
+
+        } catch (Exception $e) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Erro ao baixar QR Code: ' . $e->getMessage(), 'alert alert-danger');
+            Helper::redirecionar('chat/qrCode');
+        }
     }
 
     /**

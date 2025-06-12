@@ -39,24 +39,39 @@
                                 </div>
                             <?php endif; ?>
 
+                            <!-- DEBUG: Mostrar dados dos webhooks -->
+                            <?php if (isset($_GET['debug'])): ?>
+                                <div class="alert alert-info">
+                                    <h6>Debug - Dados dos Webhooks:</h6>
+                                    <pre><?= htmlspecialchars(print_r($dados['webhooks'] ?? 'Não definido', true)) ?></pre>
+                                    <p><strong>Tipo:</strong> <?= gettype($dados['webhooks'] ?? null) ?></p>
+                                    <p><strong>Erro:</strong> <?= $dados['webhookError'] ?? 'Nenhum' ?></p>
+                                </div>
+                            <?php endif; ?>
+
                             <div id="webhooksList" class="table-responsive">
-                                <?php if (!empty($dados['webhooks'])): ?>
+                                <!-- Webhooks carregados via PHP -->
+                                <?php if (!empty($dados['webhooks']) && is_array($dados['webhooks'])): ?>
                                     <table class="table table-hover" id="webhooksTable">
                                         <thead>
                                             <tr>
                                                 <th>ID</th>
                                                 <th>URL</th>
                                                 <th>Token JWT</th>
-                                                <th>Status</th>
+                                                <th>Phone Number ID</th>
                                                 <th>Ações</th>
                                             </tr>
                                         </thead>
                                         <tbody id="webhooksTableBody">
                                             <?php foreach ($dados['webhooks'] as $webhook): ?>
                                                 <tr>
-                                                    <td><?= htmlspecialchars($webhook['id'] ?? 'N/A') ?></td>
+                                                    <td class="text-truncate" style="max-width: 150px;" title="<?= htmlspecialchars($webhook['id'] ?? 'N/A') ?>">
+                                                        <code><?= htmlspecialchars($webhook['id'] ?? 'N/A') ?></code>
+                                                    </td>
                                                     <td class="text-truncate" style="max-width: 300px;" title="<?= htmlspecialchars($webhook['uri'] ?? '') ?>">
-                                                        <?= htmlspecialchars($webhook['uri'] ?? '') ?>
+                                                        <a href="<?= htmlspecialchars($webhook['uri'] ?? '') ?>" target="_blank" class="text-decoration-none">
+                                                            <?= htmlspecialchars($webhook['uri'] ?? '') ?>
+                                                        </a>
                                                     </td>
                                                     <td>
                                                         <?php if (!empty($webhook['jwtToken'])): ?>
@@ -66,11 +81,7 @@
                                                         <?php endif; ?>
                                                     </td>
                                                     <td>
-                                                        <?php if (isset($webhook['ativo']) && $webhook['ativo']): ?>
-                                                            <span class="badge bg-success">Ativo</span>
-                                                        <?php else: ?>
-                                                            <span class="badge bg-danger">Inativo</span>
-                                                        <?php endif; ?>
+                                                        <code><?= htmlspecialchars($webhook['fromPhoneNumberId'] ?? 'N/A') ?></code>
                                                     </td>
                                                     <td>
                                                         <button type="button" class="btn btn-primary btn-sm" 
@@ -86,15 +97,22 @@
                                             <?php endforeach; ?>
                                         </tbody>
                                     </table>
+                                    
+                                    <div class="mt-3">
+                                        <p class="text-muted">
+                                            <i class="fas fa-info-circle"></i> 
+                                            Total de webhooks: <strong><?= count($dados['webhooks']) ?></strong>
+                                        </p>
+                                    </div>
+                                    
                                 <?php else: ?>
                                     <div id="noWebhooks" class="text-center py-4">
                                         <i class="fas fa-link fa-3x text-muted mb-3"></i>
-                                        <p class="text-muted">Nenhum webhook encontrado</p>
-                                        <p class="text-muted">
-                                            <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#modalNovoWebhook">
-                                                <i class="fas fa-plus me-1"></i> Cadastrar Primeiro Webhook
-                                            </button>
-                                        </p>
+                                        <h5 class="text-muted">Nenhum webhook encontrado</h5>
+                                        <p class="text-muted">Configure um webhook para receber notificações de mensagens</p>
+                                        <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#modalNovoWebhook">
+                                            <i class="fas fa-plus me-1"></i> Cadastrar Primeiro Webhook
+                                        </button>
                                     </div>
                                 <?php endif; ?>
                             </div>
@@ -221,6 +239,9 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Webhooks carregados via PHP:', <?= json_encode($dados['webhooks'] ?? []) ?>);
+    console.log('Erro webhooks:', <?= json_encode($dados['webhookError'] ?? null) ?>);
+    
     let webhookToDelete = '';
 
     // Event listeners

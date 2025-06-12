@@ -3,8 +3,8 @@
 require_once __DIR__ . '/../vendor/autoload.php';
 
 // Carrega variáveis de ambiente
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
-$dotenv->load();
+// $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
+// $dotenv->load();
 
 define('APP', dirname(__FILE__));
 define('APPROOT', dirname(__FILE__));
@@ -12,22 +12,36 @@ define('APPROOT', dirname(__FILE__));
 /**
  * Configurações do Banco de Dados
  */
-define('HOST', $_ENV['DEV_DB_HOST'] ?: getenv('PROD_DB_HOST') ?: 'localhost');
-define('PORTA', $_ENV['DEV_DB_PORT'] ? intval($_ENV['DEV_DB_PORT']) : (getenv('PROD_DB_PORT') ? intval(getenv('PROD_DB_PORT')) : 3306));
-define('BANCO', $_ENV['DEV_DB_NAME'] ?: getenv('PROD_DB_NAME') ?: 'dir_judiciaria');
-define('USUARIO', $_ENV['DEV_DB_USERNAME'] ?: getenv('PROD_DB_USERNAME') ?: 'root');
-define('SENHA', $_ENV['DEV_DB_PASSWORD'] ?: getenv('PROD_DB_PASSWORD') ?: '');
+// define('HOST', 'localhost');
+// define('PORTA',  '3306');
+// define('BANCO', 'dir_judiciaria');
+// define('USUARIO', 'root');
+// define('SENHA', '');
+
+
+define('HOST', 'localhost');
+define('PORTA', '3306');
+define('BANCO', 'copare52_dir_judiciaria');
+define('USUARIO', 'copare52_dir_judiciaria');
+define('SENHA', 'parente1010');
+
+
+// define('HOST', $_ENV['DEV_DB_HOST'] ?: getenv('PROD_DB_HOST') ?: 'localhost');
+// define('PORTA', $_ENV['DEV_DB_PORT'] ? intval($_ENV['DEV_DB_PORT']) : (getenv('PROD_DB_PORT') ? intval(getenv('PROD_DB_PORT')) : 3306));
+// define('BANCO', $_ENV['DEV_DB_NAME'] ?: getenv('PROD_DB_NAME') ?: 'dir_judiciaria');
+// define('USUARIO', $_ENV['DEV_DB_USERNAME'] ?: getenv('PROD_DB_USERNAME') ?: 'root');
+// define('SENHA', $_ENV['DEV_DB_PASSWORD'] ?: getenv('PROD_DB_PASSWORD') ?: '');
 
 
 /**
  * Configurações da Aplicação
  */
 define('APP_NOME', 'Dir Judiciária');
-define('APP_VERSAO', '1.0.0');
-define('URL', 'http://10.90.18.141/intranet-judiciaria');
-// define('URL', 'http://localhost/intranet-judiciaria');
-// define('URL', 'http://192.168.2.122/intranet-judiciaria');
-// define('URL', 'http://localhost/SICUC');
+define('APP_VERSAO', '1.2.0');
+define('URL', 'http://sistemas.coparente.top/intranet/');
+// define('URL', 'http://10.90.18.141/intranet-judiciaria');
+
+
 
 /**
  * Configurações da API do Google AI

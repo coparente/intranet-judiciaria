@@ -31,29 +31,29 @@ class ModuloModel {
      */
     public function getModulosComSubmodulos($usuario_id = null) {
         $sql = "
-            WITH modulos_ordenados AS (
-                SELECT DISTINCT m.*,
-                       CASE WHEN m.pai_id IS NULL THEN 1 ELSE 0 END as is_pai
-                FROM modulos m
-                WHERE (
-                    EXISTS (
-                        SELECT 1 
-                        FROM permissoes_usuario pu 
-                        WHERE pu.modulo_id = m.id 
-                        AND pu.usuario_id = :usuario_id1
-                    )
-                    OR EXISTS (
-                        SELECT 1 
-                        FROM usuarios u 
-                        WHERE u.id = :usuario_id2 
-                        AND u.perfil = 'admin'
-                    )
-                    OR :usuario_id3 IS NULL
-                )
-            )
             SELECT *
-            FROM modulos_ordenados
-            ORDER BY is_pai DESC, nome
+                    FROM (
+                        SELECT DISTINCT m.*,
+                               CASE WHEN m.pai_id IS NULL THEN 1 ELSE 0 END AS is_pai
+                        FROM modulos m
+                        WHERE (
+                            EXISTS (
+                                SELECT 1 
+                                FROM permissoes_usuario pu 
+                                WHERE pu.modulo_id = m.id 
+                                  AND pu.usuario_id = :usuario_id1
+                            )
+                            OR EXISTS (
+                                SELECT 1 
+                                FROM usuarios u 
+                                WHERE u.id = :usuario_id2 
+                                  AND u.perfil = 'admin'
+                            )
+                            OR :usuario_id3 IS NULL
+                        )
+                    ) AS modulos_ordenados
+                    ORDER BY is_pai DESC, nome;
+
         ";
         
         $this->db->query($sql);

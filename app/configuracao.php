@@ -38,7 +38,7 @@ define('SENHA', 'parente1010');
  */
 define('APP_NOME', 'Dir Judiciária');
 define('APP_VERSAO', '1.2.0');
-define('URL', 'http://sistemas.coparente.top/intranet/');
+define('URL', 'http://sistemas.coparente.top/intranet');
 // define('URL', 'http://10.90.18.141/intranet-judiciaria');
 
 

@@ -1,1 +1,21 @@
-options indexes
+Options -Indexes
+
+RewriteEngine On
+RewriteBase /intranet-judiciaria/
+
+# Se o arquivo ou diretório não existir, redireciona para o index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]
+
+# Proteção de arquivos sensíveis
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Configurações de PHP
+php_value upload_max_filesize 40M
+php_value post_max_size 40M
+php_value max_execution_time 300
+php_value max_input_time 300

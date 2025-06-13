@@ -9,9 +9,11 @@ require_once __DIR__ . '/../vendor/autoload.php';
 define('APP', dirname(__FILE__));
 define('APPROOT', dirname(__FILE__));
 
-
-$ambiente = 'producao';
+// $ambiente = 'producao';
 // $ambiente = 'local';
+// Detecção automática do ambiente
+$host = $_SERVER['HTTP_HOST'] ?? '';
+$ambiente = (strpos($host, 'sistemas.coparente.top') !== false) ? 'producao' : 'local';
 
 /**
  * Configurações do Banco de Dados
@@ -41,9 +43,6 @@ if ($ambiente === 'local') {
  */
 define('APP_NOME', 'Dir Judiciária');
 define('APP_VERSAO', '1.2.0');
-
-
-
 
 /**
  * Configurações da API do Google AI

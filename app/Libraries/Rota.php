@@ -16,6 +16,22 @@ class Rota
     private $metodo = METODO;
     private $parametros = [];
 
+    /**
+     * Mapeamento de URLs para nomes de Controllers
+     * Para resolver problemas de case sensitivity entre desenvolvimento e produção
+     */
+    private $mapeamentoControllers = [
+        'consultaprocessos' => 'ConsultaProcessos',
+        'ciri' => 'CIRI',
+        'projudi' => 'Projudi',
+        'chat' => 'Chat',
+        'dashboard' => 'Dashboard',
+        'usuarios' => 'Usuarios',
+        'perfis' => 'Perfis',
+        'relatorios' => 'Relatorios',
+        'configuracoes' => 'Configuracoes'
+    ];
+
     public function __construct()
     {
         // Obtém a URL e define o controlador padrão se estiver vazia
@@ -24,8 +40,10 @@ class Rota
             $this->controlador = CONTROLLER;
         else:
             // Se houver URL, usa o primeiro segmento como controlador
-            if (file_exists('./app/Controllers/' . ucwords($url[0]) . '.php')):
-                $this->controlador = ucwords($url[0]);
+            $controllerName = $this->obterNomeController($url[0]);
+            
+            if (file_exists('./app/Controllers/' . $controllerName . '.php')):
+                $this->controlador = $controllerName;
                 unset($url[0]);
             else:
                 $this->redirecionarParaErro();
@@ -51,6 +69,25 @@ class Rota
 
         $this->parametros = $url ? array_values($url) : [];
         call_user_func_array([$this->controlador, $this->metodo], $this->parametros);
+    }
+
+    /**
+     * Obtém o nome correto do controller baseado no mapeamento
+     * 
+     * @param string $urlController Nome do controller da URL
+     * @return string Nome correto do controller
+     */
+    private function obterNomeController($urlController) 
+    {
+        $urlLowerCase = strtolower($urlController);
+        
+        // Verifica se existe mapeamento específico
+        if (isset($this->mapeamentoControllers[$urlLowerCase])) {
+            return $this->mapeamentoControllers[$urlLowerCase];
+        }
+        
+        // Fallback para o comportamento original
+        return ucwords($urlController);
     }
 
     /**

@@ -159,7 +159,7 @@ class CIRI extends Controllers
                 'tipo_intimacao_ciri_id' => isset($_POST['tipo_intimacao_ciri_id']) ? $_POST['tipo_intimacao_ciri_id'] : null,
                 'observacao_atividade' => trim($_POST['observacao_atividade']),
                 'status_processo' => $_POST['status_processo'],
-                'usuario_id' => null, // Não atribuir a nenhum usuário inicialmente
+                'usuario_id' => $_SESSION['usuario_id'], // Usar o ID do usuário logado
                 'tipos_ato' => $this->ciriModel->listarTiposAto(),
                 'tipos_intimacao' => $this->ciriModel->listarTiposIntimacao(),
                 'confirmar_duplicado' => isset($_POST['confirmar_duplicado']) ? $_POST['confirmar_duplicado'] : 0

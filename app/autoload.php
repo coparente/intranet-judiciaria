@@ -9,7 +9,8 @@ spl_autoload_register(function ($classe) {
     $diretorios = [
         'Libraries',             // Diretório 'Core'
         'Helpers',
-        'Models'    // Adicione esta linha
+        'Models',    // Adicione esta linha
+        'Controllers' // Adicionando diretório de Controllers
     ];
 
     // Itera pelos diretórios especificados

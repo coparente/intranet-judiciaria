@@ -1,7 +1,7 @@
 /* Skin Blue Light - Template para AdminTJGO */
 
 /* Main Header */
-.skin-blue-light .main-header {
+/* .skin-blue-light .main-header {
   background: linear-gradient(to bottom, #004a80 0%, #003a66 100%);
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
 }
@@ -22,10 +22,10 @@
 .skin-blue-light .main-header .navbar .nav .open > a:focus {
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
-}
+} */
 
 /* Logo */
-.skin-blue-light .main-header .logo {
+/* .skin-blue-light .main-header .logo {
   background: #004a80;
   color: #fff;
   border-bottom: 0 solid transparent;
@@ -33,10 +33,10 @@
 
 .skin-blue-light .main-header .logo:hover {
   background: #003a66;
-}
+} */
 
 /* Sidebar */
-.skin-blue-light .main-sidebar {
+/* .skin-blue-light .main-sidebar {
   background: #fff;
   border-right: 1px solid #d2d6de;
 }
@@ -74,7 +74,7 @@
 .skin-blue-light .sidebar-menu > li > .treeview-menu > li.active > a,
 .skin-blue-light .sidebar-menu > li > .treeview-menu > li > a:hover {
   color: #004a80;
-}
+} */
 
 /* Content */
 .skin-blue-light .content-header {

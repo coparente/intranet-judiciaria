@@ -34,7 +34,7 @@ class Rota
         'estatisticas' => 'Estatisticas',
         'csf' => 'CSF',
         'estatisticasciri' => 'EstatisticasCIRI',
-        'ia' => 'IA'
+        'inteligenciaartificial' => 'InteligenciaArtificial'
     ];
 
     public function __construct()

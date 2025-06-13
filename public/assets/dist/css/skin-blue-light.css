@@ -1,0 +1,116 @@
+/* Skin Blue Light - Template para AdminTJGO */
+
+/* Main Header */
+.skin-blue-light .main-header {
+  background: linear-gradient(to bottom, #004a80 0%, #003a66 100%);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+}
+
+.skin-blue-light .main-header .navbar {
+  background: transparent;
+}
+
+.skin-blue-light .main-header .navbar .nav > li > a {
+  color: #fff;
+}
+
+.skin-blue-light .main-header .navbar .nav > li > a:hover,
+.skin-blue-light .main-header .navbar .nav > li > a:active,
+.skin-blue-light .main-header .navbar .nav > li > a:focus,
+.skin-blue-light .main-header .navbar .nav .open > a,
+.skin-blue-light .main-header .navbar .nav .open > a:hover,
+.skin-blue-light .main-header .navbar .nav .open > a:focus {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+/* Logo */
+.skin-blue-light .main-header .logo {
+  background: #004a80;
+  color: #fff;
+  border-bottom: 0 solid transparent;
+}
+
+.skin-blue-light .main-header .logo:hover {
+  background: #003a66;
+}
+
+/* Sidebar */
+.skin-blue-light .main-sidebar {
+  background: #fff;
+  border-right: 1px solid #d2d6de;
+}
+
+.skin-blue-light .user-panel > .info,
+.skin-blue-light .user-panel > .info > a {
+  color: #333;
+}
+
+.skin-blue-light .sidebar-menu > li.header {
+  color: #848484;
+  background: #f4f4f4;
+}
+
+.skin-blue-light .sidebar-menu > li > a {
+  color: #333;
+  border-left: 3px solid transparent;
+}
+
+.skin-blue-light .sidebar-menu > li:hover > a,
+.skin-blue-light .sidebar-menu > li.active > a {
+  color: #333;
+  background: #f4f4f4;
+  border-left-color: #004a80;
+}
+
+.skin-blue-light .sidebar-menu > li > .treeview-menu {
+  background: #f4f4f4;
+}
+
+.skin-blue-light .sidebar-menu > li > .treeview-menu > li > a {
+  color: #333;
+}
+
+.skin-blue-light .sidebar-menu > li > .treeview-menu > li.active > a,
+.skin-blue-light .sidebar-menu > li > .treeview-menu > li > a:hover {
+  color: #004a80;
+}
+
+/* Content */
+.skin-blue-light .content-header {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Footer */
+.skin-blue-light .main-footer {
+  border-top: 1px solid #d2d6de;
+  background: #fff;
+  color: #333;
+}
+
+/* Control Sidebar */
+.skin-blue-light .control-sidebar {
+  background: #004a80;
+}
+
+.skin-blue-light .control-sidebar-bg {
+  background: #004a80;
+}
+
+/* Navbar Custom Menu */
+.skin-blue-light .navbar-custom-menu > .nav > li > .dropdown-menu {
+  border-top: 1px solid #004a80;
+}
+
+/* Responsivo */
+@media (max-width: 767px) {
+  .skin-blue-light .main-header .logo {
+    background: #004a80;
+    color: #fff;
+  }
+  
+  .skin-blue-light .main-header .navbar {
+    background: #004a80;
+  }
+}

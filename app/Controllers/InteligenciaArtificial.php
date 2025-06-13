@@ -12,7 +12,7 @@
  * @version 1.0.0
  * @access public
  */
-class InteligenciaArtificial extends Controllers
+class IA extends Controllers
 {
     private $usuarioModel;
 

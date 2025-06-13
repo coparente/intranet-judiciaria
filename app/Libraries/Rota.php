@@ -29,7 +29,11 @@ class Rota
         'usuarios' => 'Usuarios',
         'perfis' => 'Perfis',
         'relatorios' => 'Relatorios',
-        'configuracoes' => 'Configuracoes'
+        'configuracoes' => 'Configuracoes',
+        'uploadtxt' => 'UploadTxt',
+        'estatisticas' => 'Estatisticas',
+        'csf' => 'CSF',
+        'Estatisticasciri' => 'EstatisticasCIRI'
     ];
 
     public function __construct()

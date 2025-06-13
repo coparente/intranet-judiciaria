@@ -33,7 +33,7 @@ class Rota
         'uploadtxt' => 'UploadTxt',
         'estatisticas' => 'Estatisticas',
         'csf' => 'CSF',
-        'Estatisticasciri' => 'EstatisticasCIRI'
+        'estatisticasciri' => 'EstatisticasCIRI'
     ];
 
     public function __construct()

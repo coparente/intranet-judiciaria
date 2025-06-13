@@ -14,7 +14,7 @@
  * @version 1.0.0
  * @access protected    
  */
-class Ciri extends Controllers
+class CIRI extends Controllers
 {
     private $processosPorPagina = ITENS_POR_PAGINA;
     private $ciriModel;

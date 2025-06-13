@@ -23,12 +23,16 @@ if ($ambiente === 'local') {
     define('BANCO', 'dir_judiciaria');
     define('USUARIO', 'root');
     define('SENHA', '');
+    //URL do Intranet Judiciária local
+    define('URL', 'http://10.90.18.141/intranet-judiciaria');
 } else {
     define('HOST', 'localhost');
     define('PORTA', 3306);
     define('BANCO', 'copare52_dir_judiciaria');
     define('USUARIO', 'copare52_dir_judiciaria');
     define('SENHA', 'parente1010');
+    //URL do Intranet Judiciária produção
+    define('URL', 'http://sistemas.coparente.top/intranet');
 }
 
 
@@ -38,11 +42,6 @@ if ($ambiente === 'local') {
 define('APP_NOME', 'Dir Judiciária');
 define('APP_VERSAO', '1.2.0');
 
-if ($ambiente === 'local') {
-    define('URL', 'http://10.90.18.141/intranet-judiciaria');
-} else {
-    define('URL', 'http://sistemas.coparente.top/intranet');
-}
 
 
 

@@ -72,7 +72,8 @@ class CIRI extends Controllers
             Helper::redirecionar('dashboard/inicial');
         }
         // Verifica permissão para o módulo de listagem de processos
-        // Middleware::verificarPermissao(10); // ID do módulo 'Listar Processos CIRI'
+        Middleware::verificarPermissao(10); // ID do módulo 'Listar Processos CIRI'
+
         // Filtros de busca
         $filtros = [
             'numero_processo' => filter_input(INPUT_GET, 'numero_processo', FILTER_SANITIZE_STRING),
@@ -1291,6 +1292,7 @@ class CIRI extends Controllers
      */
     public function meusProcessos($pagina = 1)
     {
+        Middleware::verificarPermissao(13); // ID do módulo 'Meus Processos'
         // Obter filtros da URL
         $filtros = [
             'numero_processo' => filter_input(INPUT_GET, 'numero_processo', FILTER_SANITIZE_STRING),

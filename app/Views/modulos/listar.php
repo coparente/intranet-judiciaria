@@ -92,6 +92,7 @@
                                                     <?php foreach ($modulo['submodulos'] as $submodulo): ?>
                                                         <tr>
                                                             <td class="ps-4">
+                                                                ID: <?= $submodulo['id'] ?> -
                                                                 <i class="<?= $submodulo['icone'] ?> me-2"></i>
                                                                 <?= $submodulo['nome'] ?>
                                                             </td>

@@ -44,6 +44,7 @@ class EstatisticasCIRI extends Controllers
      */
     public function index()
     {
+        Middleware::verificarPermissao(16); // ID do módulo 'Estatísticas CIRI'
         // Obter filtros da URL
         $filtros = [
             'data_inicio' => filter_input(INPUT_GET, 'data_inicio', FILTER_SANITIZE_STRING) ?: date('Y-m-01'), // Primeiro dia do mês atual
@@ -112,6 +113,7 @@ class EstatisticasCIRI extends Controllers
      */
     public function porUsuario()
     {
+        Middleware::verificarPermissao(17); // ID do módulo 'Estatísticas por Usuário'
         // Obter filtros da URL
         $filtros = [
             'data_inicio' => filter_input(INPUT_GET, 'data_inicio', FILTER_SANITIZE_STRING) ?: date('Y-m-01'),

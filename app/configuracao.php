@@ -34,7 +34,7 @@ if ($ambiente === 'local') {
     define('USUARIO', 'copare52_dir_judiciaria');
     define('SENHA', 'parente1010');
     //URL do Intranet Judiciária produção
-    define('URL', 'https://coparente.top/sistemas/judiciaria');
+    define('URL', 'https://coparente.top/intranet');
 }
 
 

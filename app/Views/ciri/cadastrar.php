@@ -74,16 +74,16 @@
 
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
-                                            <label for="gratuidade_justica" class="form-label">Gratuidade de Justiça: <span class="text-danger">*</span></label>
-                                            <select name="gratuidade_justica" id="gratuidade_justica" class="form-control" required>
+                                            <label for="gratuidade_justica" class="form-label">Gratuidade de Justiça: </label>
+                                            <select name="gratuidade_justica" id="gratuidade_justica" class="form-control">
                                                 <option value="">Selecione</option>
                                                 <option value="sim" <?= isset($dados['gratuidade_justica']) && $dados['gratuidade_justica'] == 'sim' ? 'selected' : '' ?>>Sim</option>
                                                 <option value="nao" <?= isset($dados['gratuidade_justica']) && $dados['gratuidade_justica'] == 'nao' ? 'selected' : '' ?>>Não</option>
                                             </select>
                                         </div>
                                         <div class="col-md-6 mb-3">
-                                            <label for="tipo_ato_ciri_id" class="form-label">Tipo de Ato: <span class="text-danger">*</span></label>
-                                            <select name="tipo_ato_ciri_id" id="tipo_ato_ciri_id" class="form-control" required>
+                                            <label for="tipo_ato_ciri_id" class="form-label">Tipo de Ato: </label>
+                                            <select name="tipo_ato_ciri_id" id="tipo_ato_ciri_id" class="form-control">
                                                 <option value="">Selecione</option>
                                                 <?php foreach ($dados['tipos_ato'] as $tipo): ?>
                                                     <option value="<?= $tipo->id ?>" <?= isset($dados['tipo_ato_ciri_id']) && $dados['tipo_ato_ciri_id'] == $tipo->id ? 'selected' : '' ?>>
@@ -96,8 +96,8 @@
 
                                     <div class="row">
                                         <div class="col-md-6 mb-3">
-                                            <label for="tipo_intimacao_ciri_id" class="form-label">Tipo de Intimação: <span class="text-danger">*</span></label>
-                                            <select name="tipo_intimacao_ciri_id" id="tipo_intimacao_ciri_id" class="form-control" required>
+                                            <label for="tipo_intimacao_ciri_id" class="form-label">Tipo de Intimação: </label>
+                                            <select name="tipo_intimacao_ciri_id" id="tipo_intimacao_ciri_id" class="form-control">
                                                 <option value="">Selecione</option>
                                                 <?php foreach ($dados['tipos_intimacao'] as $tipo): ?>
                                                     <option value="<?= $tipo->id ?>" <?= isset($dados['tipo_intimacao_ciri_id']) && $dados['tipo_intimacao_ciri_id'] == $tipo->id ? 'selected' : '' ?>>

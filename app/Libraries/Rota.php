@@ -35,7 +35,8 @@ class Rota
         'csf' => 'CSF',
         'estatisticasciri' => 'EstatisticasCIRI',
         'inteligenciaartificial' => 'InteligenciaArtificial',
-        'dashboardsbi' => 'DashboardsBi'
+        'dashboardsbi' => 'DashboardsBi',
+        'chat' => 'Chat'
     ];
 
     public function __construct()

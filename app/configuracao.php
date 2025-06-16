@@ -13,7 +13,7 @@ define('APPROOT', dirname(__FILE__));
 // $ambiente = 'local';
 // Detecção automática do ambiente
 $host = $_SERVER['HTTP_HOST'] ?? '';
-$ambiente = (strpos($host, 'sistemas.coparente.top') !== false) ? 'producao' : 'local';
+$ambiente = (strpos($host, 'coparente.top') !== false) ? 'producao' : 'local';
 
 /**
  * Configurações do Banco de Dados

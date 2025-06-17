@@ -658,40 +658,80 @@ class Chat extends Controllers
     /**
      * Webhook para receber mensagens do SERPRO
      */
-    public function webhook()
-    {
-        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-            // Verificação do webhook
-            $verify_token = $_GET['hub_verify_token'] ?? '';
-            $challenge = $_GET['hub_challenge'] ?? '';
+    // public function webhook()
+    // {
+    //     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    //         // Verificação do webhook
+    //         $verify_token = $_GET['hub_verify_token'] ?? '';
+    //         $challenge = $_GET['hub_challenge'] ?? '';
             
-            if ($verify_token === WEBHOOK_VERIFY_TOKEN) {
-                echo $challenge;
-                exit;
-            } else {
-                http_response_code(403);
-                exit;
-            }
-        }
+    //         if ($verify_token === WEBHOOK_VERIFY_TOKEN) {
+    //             echo $challenge;
+    //             exit;
+    //         } else {
+    //             http_response_code(403);
+    //             exit;
+    //         }
+    //     }
 
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $input = file_get_contents('php://input');
-            $payload = json_decode($input, true);
+    //     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    //         $input = file_get_contents('php://input');
+    //         $payload = json_decode($input, true);
             
-            if ($payload) {
-                $mensagem = SerproHelper::processarWebhook($payload);
+    //         if ($payload) {
+    //             $mensagem = SerproHelper::processarWebhook($payload);
                 
-                if ($mensagem && $mensagem['type'] !== 'status') {
-                    // Processar mensagem recebida
-                    $this->processarMensagemRecebida($mensagem);
-                }
-            }
+    //             if ($mensagem && $mensagem['type'] !== 'status') {
+    //                 // Processar mensagem recebida
+    //                 $this->processarMensagemRecebida($mensagem);
+    //             }
+    //         }
             
-            http_response_code(200);
-            echo 'OK';
+    //         http_response_code(200);
+    //         echo 'OK';
+    //         exit;
+    //     }
+    // }
+
+
+    public function webhook()
+{
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        $verify_token = $_GET['hub_verify_token'] ?? '';
+        $challenge = $_GET['hub_challenge'] ?? '';
+
+        if ($verify_token === WEBHOOK_VERIFY_TOKEN) {
+            echo $challenge;
+            exit;
+        } else {
+            http_response_code(403);
             exit;
         }
     }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $payloadRaw = file_get_contents("php://input");
+        file_put_contents("log.txt", "RAW: $payloadRaw\n", FILE_APPEND);
+
+        $payload = json_decode($payloadRaw, true);
+
+        if (!$payload) {
+            http_response_code(400);
+            echo json_encode(['error' => 'JSON inválido']);
+            exit;
+        }
+
+        $mensagem = SerproHelper::processarWebhook($payload);
+
+        if ($mensagem && $mensagem['type'] !== 'status') {
+            $this->processarMensagemRecebida($mensagem);
+        }
+
+        file_put_contents("log.txt", "Mensagem: {$mensagem['text']} | De: {$mensagem['from']}\n", FILE_APPEND);
+        echo json_encode(['data' => 'OK']);
+    }
+}
+
 
     /**
      * Processa mensagem recebida via webhook

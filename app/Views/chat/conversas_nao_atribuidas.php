@@ -152,7 +152,7 @@
                                                     <td>
                                                         <strong><?= htmlspecialchars($conversa->contato_nome) ?></strong>
                                                         <?php if ($conversa->nao_lidas > 0): ?>
-                                                            <span class="badge bg-danger ms-1"><?= $conversa->nao_lidas ?></span>
+                                                            <span class="badge bg-warning ms-1"><?= $conversa->nao_lidas ?></span>
                                                         <?php endif; ?>
                                                     </td>
                                                     <td>

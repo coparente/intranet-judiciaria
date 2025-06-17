@@ -697,15 +697,30 @@ class ChatModel
      */
     public function atribuirConversa($conversa_id, $usuario_id)
     {
-        $sql = "UPDATE conversas SET 
-                usuario_id = :usuario_id, 
-                atualizado_em = NOW() 
-                WHERE id = :conversa_id AND (usuario_id IS NULL OR usuario_id = 0)";
+        try {
+            error_log("DEBUG ATRIBUIR: Iniciando atribuição - conversa_id: $conversa_id, usuario_id: $usuario_id");
+            
+            $sql = "UPDATE conversas SET 
+                    usuario_id = :usuario_id, 
+                    atualizado_em = NOW() 
+                    WHERE id = :conversa_id AND (usuario_id IS NULL OR usuario_id = 0)";
 
-        $this->db->query($sql);
-        $this->db->bind(':usuario_id', $usuario_id);
-        $this->db->bind(':conversa_id', $conversa_id);
+            $this->db->query($sql);
+            $this->db->bind(':usuario_id', $usuario_id);
+            $this->db->bind(':conversa_id', $conversa_id);
 
-        return $this->db->executa();
+            $resultado = $this->db->executa();
+            error_log("DEBUG ATRIBUIR: Resultado da execução: " . ($resultado ? 'true' : 'false'));
+            
+            // Verificar quantas linhas foram afetadas
+            $linhasAfetadas = $this->db->totalResultados();
+            error_log("DEBUG ATRIBUIR: Linhas afetadas: $linhasAfetadas");
+            
+            return $resultado;
+            
+        } catch (Exception $e) {
+            error_log("DEBUG ATRIBUIR: Erro na execução: " . $e->getMessage());
+            return false;
+        }
     }
 }

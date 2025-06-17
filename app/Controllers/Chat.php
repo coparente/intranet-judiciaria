@@ -21,7 +21,7 @@ class Chat extends Controllers
     public function __construct()
     {
         parent::__construct();
-        $this->chatModel = $this->model('ChatModel');
+        $this->chatModel = new ChatModel();
         $this->usuarioModel = $this->model('UsuarioModel');
 
         // Métodos que não exigem autenticação
@@ -239,27 +239,38 @@ class Chat extends Controllers
     public function conversa($conversa_id = null)
     {
         if (!$conversa_id) {
-            Helper::redirecionar('chat');
+            Helper::redirecionar('chat/conversasNaoAtribuidas');
             return;
         }
 
         
         $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
         
-        // var_dump($conversa);
-        // exit;
-
-        if (!$conversa || $conversa->usuario_id) {
+        if (!$conversa) {
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Conversa não encontrada', 'alert alert-danger');
-            Helper::redirecionar('chat');
+            Helper::redirecionar('chat/conversasNaoAtribuidas');
             return;
         }
-        //logica original
-        // if (!$conversa || $conversa->usuario_id != $_SESSION['usuario_id']) {
-        //     Helper::mensagem('chat', '<i class="fas fa-ban"></i> Conversa não encontrada', 'alert alert-danger');
-        //     Helper::redirecionar('chat');
-        //     return;
-        // }
+
+        // Verificar permissão de acesso à conversa
+        $temPermissao = false;
+        
+        // 1. Se a conversa pertence ao usuário logado
+        if ($conversa->usuario_id == $_SESSION['usuario_id']) {
+            $temPermissao = true;
+        }
+        
+        // 2. Se é admin/analista e a conversa não está atribuída (para visualização de conversas não atribuídas)
+        if (in_array($_SESSION['usuario_perfil'], ['admin', 'analista']) && 
+            ($conversa->usuario_id === null || $conversa->usuario_id == 0)) {
+            $temPermissao = true;
+        }
+        
+        if (!$temPermissao) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado a esta conversa', 'alert alert-danger');
+            Helper::redirecionar('chat/conversasNaoAtribuidas');
+            return;
+        }
 
         // Processar ações POST
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -347,7 +358,7 @@ class Chat extends Controllers
 
         if (!$conversa || $conversa->usuario_id != $_SESSION['usuario_id']) {
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Conversa não encontrada', 'alert alert-danger');
-            Helper::redirecionar('chat');
+            Helper::redirecionar('chat/index');
             return;
         }
 
@@ -2116,3 +2127,4 @@ class Chat extends Controllers
         }
     }
 }
+

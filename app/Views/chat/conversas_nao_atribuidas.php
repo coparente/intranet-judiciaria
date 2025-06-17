@@ -172,7 +172,7 @@
                                                     </td>
                                                     <td>
                                                         <?php if ($conversa->nao_lidas > 0): ?>
-                                                            <span class="badge bg-danger"><?= $conversa->nao_lidas ?></span>
+                                                            <span class="badge bg-warning"><?= $conversa->nao_lidas ?></span>
                                                         <?php else: ?>
                                                             <span class="badge bg-secondary">0</span>
                                                         <?php endif; ?>

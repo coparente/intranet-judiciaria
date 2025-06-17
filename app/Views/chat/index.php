@@ -30,6 +30,11 @@
                                     <i class="fas fa-plus me-1"></i> Nova Conversa
                                 </a>
                             </div>
+                            <div>
+                                <a href="<?= URL ?>/chat/conversasNaoAtribuidas" class="btn btn-light btn-sm">
+                                    <i class="fas fa-plus me-1"></i> Não Atribuídas
+                                </a>
+                            </div>
                         </div>
                         
                         <!-- Filtros -->

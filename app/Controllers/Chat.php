@@ -206,6 +206,8 @@ class Chat extends Controllers
             return;
         }
 
+        
+        
         // Verificar se a conversa existe e está não atribuída
         $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
         if (!$conversa) {
@@ -241,13 +243,23 @@ class Chat extends Controllers
             return;
         }
 
+        
         $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
+        
+        // var_dump($conversa);
+        // exit;
 
-        if (!$conversa || $conversa->usuario_id != $_SESSION['usuario_id']) {
+        if (!$conversa || $conversa->usuario_id) {
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Conversa não encontrada', 'alert alert-danger');
             Helper::redirecionar('chat');
             return;
         }
+        //logica original
+        // if (!$conversa || $conversa->usuario_id != $_SESSION['usuario_id']) {
+        //     Helper::mensagem('chat', '<i class="fas fa-ban"></i> Conversa não encontrada', 'alert alert-danger');
+        //     Helper::redirecionar('chat');
+        //     return;
+        // }
 
         // Processar ações POST
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {

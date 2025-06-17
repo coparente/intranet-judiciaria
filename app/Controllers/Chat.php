@@ -670,80 +670,6 @@ class Chat extends Controllers
     /**
      * Webhook para receber mensagens do SERPRO
      */
-    // public function webhook()
-    // {
-    //     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    //         // Verificação do webhook
-    //         $verify_token = $_GET['hub_verify_token'] ?? '';
-    //         $challenge = $_GET['hub_challenge'] ?? '';
-
-    //         if ($verify_token === WEBHOOK_VERIFY_TOKEN) {
-    //             echo $challenge;
-    //             exit;
-    //         } else {
-    //             http_response_code(403);
-    //             exit;
-    //         }
-    //     }
-
-    //     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    //         $input = file_get_contents('php://input');
-    //         $payload = json_decode($input, true);
-
-    //         if ($payload) {
-    //             $mensagem = SerproHelper::processarWebhook($payload);
-
-    //             if ($mensagem && $mensagem['type'] !== 'status') {
-    //                 // Processar mensagem recebida
-    //                 $this->processarMensagemRecebida($mensagem);
-    //             }
-    //         }
-
-    //         http_response_code(200);
-    //         echo 'OK';
-    //         exit;
-    //     }
-    // }
-
-
-    //     public function webhook()
-    // {
-    //     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    //         $verify_token = $_GET['hub_verify_token'] ?? '';
-    //         $challenge = $_GET['hub_challenge'] ?? '';
-
-    //         if ($verify_token === WEBHOOK_VERIFY_TOKEN) {
-    //             echo $challenge;
-    //             exit;
-    //         } else {
-    //             http_response_code(403);
-    //             exit;
-    //         }
-    //     }
-
-    //     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    //         $payloadRaw = file_get_contents("php://input");
-    //         file_put_contents("log.txt", "RAW: $payloadRaw\n", FILE_APPEND);
-
-    //         $payload = json_decode($payloadRaw, true);
-
-    //         if (!$payload) {
-    //             http_response_code(400);
-    //             echo json_encode(['error' => 'JSON inválido']);
-    //             exit;
-    //         }
-
-    //         $mensagem = SerproHelper::processarWebhook($payload);
-
-    //         if ($mensagem && $mensagem['type'] !== 'status') {
-    //             $this->processarMensagemRecebida($mensagem);
-    //         }
-
-    //         file_put_contents("log.txt", "Mensagem: {$mensagem['text']} | De: {$mensagem['from']}\n", FILE_APPEND);
-    //         echo json_encode(['data' => 'OK']);
-    //     }
-    // }
-
     public function webhook()
     {
         if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -767,17 +693,22 @@ class Chat extends Controllers
 
             $mensagemTexto = '';
             $numero = '';
+            $messageId = '';
+            $timestamp = '';
 
             // 1. Detectar mensagem vinda do WhatsApp SERPRO
             if (isset($payload['entry'][0]['changes'][0]['value']['messages'][0]['text']['body'])) {
                 $mensagemTexto = $payload['entry'][0]['changes'][0]['value']['messages'][0]['text']['body'];
                 $numero = $payload['entry'][0]['changes'][0]['value']['messages'][0]['from'];
+                $messageId = $payload['entry'][0]['changes'][0]['value']['messages'][0]['id'];
+                $timestamp = $payload['entry'][0]['changes'][0]['value']['messages'][0]['timestamp'];
             }
-
             // 2. Detectar mensagem vinda do n8n
             elseif (isset($payload['messages'][0]['text']['body'])) {
                 $mensagemTexto = $payload['messages'][0]['text']['body'];
                 $numero = $payload['messages'][0]['from'];
+                $messageId = $payload['messages'][0]['id'] ?? uniqid('n8n_');
+                $timestamp = $payload['messages'][0]['timestamp'] ?? time();
             } else {
                 http_response_code(400);
                 echo json_encode(['error' => 'Formato de mensagem não reconhecido']);
@@ -787,11 +718,16 @@ class Chat extends Controllers
             // Registrar a mensagem simples no log
             file_put_contents("log.txt", "Mensagem: $mensagemTexto | De: $numero\n", FILE_APPEND);
 
-            // 3. Processar estrutura padronizada
-            $mensagem = SerproHelper::processarWebhook($payload);
-
-            if ($mensagem && $mensagem['type'] !== 'status') {
-                $this->processarMensagemRecebida($mensagem);
+            // 3. Processar mensagem do n8n diretamente
+            if (isset($payload['messages'][0])) {
+                $this->processarMensagemN8n($payload['messages'][0]);
+            }
+            // 4. Processar estrutura SERPRO padrão
+            else {
+                $mensagem = SerproHelper::processarWebhook($payload);
+                if ($mensagem && $mensagem['type'] !== 'status') {
+                    $this->processarMensagemRecebida($mensagem);
+                }
             }
 
             echo json_encode(['data' => 'OK']);
@@ -799,42 +735,88 @@ class Chat extends Controllers
     }
 
     /**
-     * Processa mensagem recebida via webhook
+     * Processa mensagem recebida do n8n
      */
-    private function processarMensagemRecebida($mensagem)
+    private function processarMensagemN8n($mensagemData)
     {
-        $numero = $mensagem['from'];
-
-        // Buscar ou criar conversa
-        $conversa = $this->chatModel->buscarOuCriarConversaPorNumero($numero);
-
-        if ($conversa) {
-            // Salvar mensagem recebida
+        try {
+            $numero = $mensagemData['from'];
+            $messageId = $mensagemData['id'] ?? uniqid('n8n_');
+            $timestamp = $mensagemData['timestamp'] ?? time();
+            $tipo = $mensagemData['type'] ?? 'text';
+            
+            // Extrair conteúdo baseado no tipo
             $conteudo = '';
-            switch ($mensagem['type']) {
+            switch ($tipo) {
                 case 'text':
-                    $conteudo = $mensagem['text'];
+                    $conteudo = $mensagemData['text']['body'] ?? '';
                     break;
                 case 'image':
                 case 'audio':
                 case 'video':
                 case 'document':
-                    $conteudo = json_encode($mensagem[$mensagem['type']]);
+                    $conteudo = json_encode($mensagemData[$tipo] ?? []);
                     break;
+                default:
+                    $conteudo = json_encode($mensagemData);
             }
 
-            $this->chatModel->salvarMensagem([
-                'conversa_id' => $conversa->id,
-                'remetente_id' => null, // Mensagem recebida
-                'tipo' => $mensagem['type'],
-                'conteudo' => $conteudo,
-                'message_id' => $mensagem['id'],
-                'status' => 'recebido',
-                'enviado_em' => date('Y-m-d H:i:s', $mensagem['timestamp'])
-            ]);
+            // Buscar ou criar conversa
+            $conversa = $this->chatModel->buscarOuCriarConversaPorNumero($numero);
 
-            // Atualizar conversa
-            $this->chatModel->atualizarConversa($conversa->id);
+            if ($conversa) {
+                // Verificar se a mensagem já existe (evitar duplicatas)
+                $mensagemExistente = $this->verificarMensagemExistente($messageId);
+                
+                if (!$mensagemExistente) {
+                    // Salvar mensagem recebida
+                    $dadosMensagem = [
+                        'conversa_id' => $conversa->id,
+                        'remetente_id' => null, // Mensagem recebida (não enviada pelo sistema)
+                        'tipo' => $tipo,
+                        'conteudo' => $conteudo,
+                        'message_id' => $messageId,
+                        'status' => 'recebido',
+                        'enviado_em' => date('Y-m-d H:i:s', is_numeric($timestamp) ? $timestamp : strtotime($timestamp))
+                    ];
+
+                    $resultado = $this->chatModel->salvarMensagem($dadosMensagem);
+                    
+                    if ($resultado) {
+                        // Atualizar conversa
+                        $this->chatModel->atualizarConversa($conversa->id);
+                        
+                        // Log de sucesso
+                        error_log("✅ Mensagem n8n salva com sucesso: ID={$messageId}, Conversa={$conversa->id}");
+                    } else {
+                        error_log("❌ Erro ao salvar mensagem n8n no banco: " . print_r($dadosMensagem, true));
+                    }
+                } else {
+                    error_log("⚠️ Mensagem n8n duplicada ignorada: ID={$messageId}");
+                }
+            } else {
+                error_log("❌ Erro ao criar/buscar conversa para número: {$numero}");
+            }
+            
+        } catch (Exception $e) {
+            error_log("❌ ERRO ao processar mensagem n8n: " . $e->getMessage());
+            error_log("Dados da mensagem: " . print_r($mensagemData, true));
+        }
+    }
+
+    /**
+     * Verifica se uma mensagem já existe no banco
+     */
+    private function verificarMensagemExistente($messageId)
+    {
+        try {
+            $sql = "SELECT id FROM mensagens_chat WHERE message_id = :message_id LIMIT 1";
+            $this->chatModel->db->query($sql);
+            $this->chatModel->db->bind(':message_id', $messageId);
+            return $this->chatModel->db->resultado();
+        } catch (Exception $e) {
+            error_log("Erro ao verificar mensagem existente: " . $e->getMessage());
+            return false;
         }
     }
 
@@ -1957,6 +1939,46 @@ class Chat extends Controllers
                 'error' => 'Exceção: ' . $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
+        }
+    }
+
+    /**
+     * Processa mensagem recebida via webhook SERPRO
+     */
+    private function processarMensagemRecebida($mensagem)
+    {
+        $numero = $mensagem['from'];
+
+        // Buscar ou criar conversa
+        $conversa = $this->chatModel->buscarOuCriarConversaPorNumero($numero);
+
+        if ($conversa) {
+            // Salvar mensagem recebida
+            $conteudo = '';
+            switch ($mensagem['type']) {
+                case 'text':
+                    $conteudo = $mensagem['text'];
+                    break;
+                case 'image':
+                case 'audio':
+                case 'video':
+                case 'document':
+                    $conteudo = json_encode($mensagem[$mensagem['type']]);
+                    break;
+            }
+
+            $this->chatModel->salvarMensagem([
+                'conversa_id' => $conversa->id,
+                'remetente_id' => null, // Mensagem recebida
+                'tipo' => $mensagem['type'],
+                'conteudo' => $conteudo,
+                'message_id' => $mensagem['id'],
+                'status' => 'recebido',
+                'enviado_em' => date('Y-m-d H:i:s', $mensagem['timestamp'])
+            ]);
+
+            // Atualizar conversa
+            $this->chatModel->atualizarConversa($conversa->id);
         }
     }
 }

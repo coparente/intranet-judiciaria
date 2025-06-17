@@ -107,6 +107,123 @@ class Chat extends Controllers
     }
 
     /**
+     * [ conversasNaoAtribuidas ] - Lista conversas não atribuídas a nenhum usuário
+     */
+    public function conversasNaoAtribuidas()
+    {
+        // Verificar permissão - apenas admins e analistas
+        if (!isset($_SESSION['usuario_perfil']) || !in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado: Apenas administradores e analistas podem acessar essa página', 'alert alert-danger');
+            Helper::redirecionar('chat');
+            return;
+        }
+
+        // Parâmetros de filtro
+        $filtroContato = $_GET['filtro_contato'] ?? '';
+        $filtroNumero = $_GET['filtro_numero'] ?? '';
+
+        // Parâmetros de paginação
+        $registrosPorPagina = 10;
+        $paginaAtual = isset($_GET['pagina']) && is_numeric($_GET['pagina']) ? (int)$_GET['pagina'] : 1;
+        $paginaAtual = max(1, $paginaAtual);
+
+        // Calcular offset
+        $offset = ($paginaAtual - 1) * $registrosPorPagina;
+
+        // Buscar conversas não atribuídas com filtros e paginação
+        $conversas = $this->chatModel->buscarConversasNaoAtribuidas(
+            $filtroContato,
+            $filtroNumero,
+            $registrosPorPagina,
+            $offset
+        );
+
+        // Contar total de registros para paginação
+        $totalRegistros = $this->chatModel->contarConversasNaoAtribuidas(
+            $filtroContato,
+            $filtroNumero
+        );
+
+        // Calcular informações de paginação
+        $totalPaginas = ceil($totalRegistros / $registrosPorPagina);
+        $registroInicio = $totalRegistros > 0 ? $offset + 1 : 0;
+        $registroFim = min($offset + $registrosPorPagina, $totalRegistros);
+
+        // Construir query string para manter filtros na paginação
+        $queryParams = [];
+        if (!empty($filtroContato)) {
+            $queryParams[] = 'filtro_contato=' . urlencode($filtroContato);
+        }
+        if (!empty($filtroNumero)) {
+            $queryParams[] = 'filtro_numero=' . urlencode($filtroNumero);
+        }
+        $queryString = !empty($queryParams) ? '&' . implode('&', $queryParams) : '';
+
+        // Buscar lista de usuários para atribuição
+        $usuarios = $this->chatModel->buscarUsuariosParaAtribuicao();
+
+        $dados = [
+            'tituloPagina' => 'Conversas Não Atribuídas',
+            'conversas' => $conversas,
+            'total_registros' => $totalRegistros,
+            'total_paginas' => $totalPaginas,
+            'pagina_atual' => $paginaAtual,
+            'registro_inicio' => $registroInicio,
+            'registro_fim' => $registroFim,
+            'query_string' => $queryString,
+            'filtro_contato' => $filtroContato,
+            'filtro_numero' => $filtroNumero,
+            'usuarios' => $usuarios
+        ];
+
+        $this->view('chat/conversas_nao_atribuidas', $dados);
+    }
+
+    /**
+     * [ atribuirConversa ] - Atribui uma conversa a um usuário
+     */
+    public function atribuirConversa()
+    {
+        // Verificar permissão
+        if (!isset($_SESSION['usuario_perfil']) || !in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat/conversasNaoAtribuidas');
+            return;
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            Helper::redirecionar('chat/conversasNaoAtribuidas');
+            return;
+        }
+
+        $conversa_id = $_POST['conversa_id'] ?? null;
+        $usuario_id = $_POST['usuario_id'] ?? null;
+
+        if (!$conversa_id || !$usuario_id) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Dados incompletos para atribuição', 'alert alert-danger');
+            Helper::redirecionar('chat/conversasNaoAtribuidas');
+            return;
+        }
+
+        // Verificar se a conversa existe e está não atribuída
+        $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
+        if (!$conversa || $conversa->usuario_id !== null) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Conversa não encontrada ou já atribuída', 'alert alert-danger');
+            Helper::redirecionar('chat/conversasNaoAtribuidas');
+            return;
+        }
+
+        // Atribuir a conversa
+        if ($this->chatModel->atribuirConversa($conversa_id, $usuario_id)) {
+            Helper::mensagem('chat', '<i class="fas fa-check"></i> Conversa atribuída com sucesso', 'alert alert-success');
+        } else {
+            Helper::mensagem('chat', '<i class="fas fa-times"></i> Erro ao atribuir conversa', 'alert alert-danger');
+        }
+
+        Helper::redirecionar('chat/conversasNaoAtribuidas');
+    }
+
+    /**
      * Exibe conversa específica
      */
     public function conversa($conversa_id = null)

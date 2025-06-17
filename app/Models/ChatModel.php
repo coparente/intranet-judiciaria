@@ -598,4 +598,114 @@ class ChatModel
             return false;
         }
     }
+
+    /**
+     * Busca conversas não atribuídas a nenhum usuário
+     */
+    public function buscarConversasNaoAtribuidas($filtroContato = '', $filtroNumero = '', $limite = 10, $offset = 0)
+    {
+        $sql = "SELECT c.*, 
+                (SELECT COUNT(*) FROM mensagens_chat m 
+                 WHERE m.conversa_id = c.id AND m.lido = 0 AND m.remetente_id IS NULL) as nao_lidas,
+                (SELECT m2.conteudo FROM mensagens_chat m2 
+                 WHERE m2.conversa_id = c.id 
+                 ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_mensagem,
+                (SELECT m2.enviado_em FROM mensagens_chat m2 
+                 WHERE m2.conversa_id = c.id 
+                 ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_atividade,
+                (SELECT COUNT(*) FROM mensagens_chat m3 
+                 WHERE m3.conversa_id = c.id) as total_mensagens
+                FROM conversas c 
+                WHERE c.usuario_id IS NULL";
+
+        // Aplicar filtros
+        $params = [];
+        
+        if (!empty($filtroContato)) {
+            $sql .= " AND c.contato_nome LIKE :filtro_contato";
+            $params[':filtro_contato'] = '%' . $filtroContato . '%';
+        }
+        
+        if (!empty($filtroNumero)) {
+            $sql .= " AND c.contato_numero LIKE :filtro_numero";
+            $params[':filtro_numero'] = '%' . $filtroNumero . '%';
+        }
+        
+        $sql .= " ORDER BY c.atualizado_em DESC LIMIT :limite OFFSET :offset";
+
+        $this->db->query($sql);
+        
+        // Bind dos parâmetros
+        foreach ($params as $param => $valor) {
+            $this->db->bind($param, $valor);
+        }
+        
+        $this->db->bind(':limite', $limite, PDO::PARAM_INT);
+        $this->db->bind(':offset', $offset, PDO::PARAM_INT);
+        
+        return $this->db->resultados();
+    }
+
+    /**
+     * Conta conversas não atribuídas
+     */
+    public function contarConversasNaoAtribuidas($filtroContato = '', $filtroNumero = '')
+    {
+        $sql = "SELECT COUNT(*) as total FROM conversas c WHERE c.usuario_id IS NULL";
+
+        // Aplicar filtros
+        $params = [];
+        
+        if (!empty($filtroContato)) {
+            $sql .= " AND c.contato_nome LIKE :filtro_contato";
+            $params[':filtro_contato'] = '%' . $filtroContato . '%';
+        }
+        
+        if (!empty($filtroNumero)) {
+            $sql .= " AND c.contato_numero LIKE :filtro_numero";
+            $params[':filtro_numero'] = '%' . $filtroNumero . '%';
+        }
+
+        $this->db->query($sql);
+        
+        // Bind dos parâmetros
+        foreach ($params as $param => $valor) {
+            $this->db->bind($param, $valor);
+        }
+        
+        $resultado = $this->db->resultado();
+        return $resultado ? $resultado->total : 0;
+    }
+
+    /**
+     * Busca usuários disponíveis para atribuição de conversas
+     */
+    public function buscarUsuariosParaAtribuicao()
+    {
+        $sql = "SELECT id, nome, email, perfil 
+                FROM usuarios 
+                WHERE status = 'ativo' 
+                AND perfil IN ('admin', 'analista', 'usuario')
+                ORDER BY nome ASC";
+        
+        $this->db->query($sql);
+        return $this->db->resultados();
+    }
+
+    /**
+     * Atribui uma conversa a um usuário
+     */
+    public function atribuirConversa($conversa_id, $usuario_id)
+    {
+        $sql = "UPDATE conversas SET 
+                usuario_id = :usuario_id, 
+                atualizado_em = NOW() 
+                WHERE id = :conversa_id AND usuario_id IS NULL";
+
+        $this->db->query($sql);
+        $this->db->bind(':usuario_id', $usuario_id);
+        $this->db->bind(':conversa_id', $conversa_id);
+
+        return $this->db->executa();
+    }
 }

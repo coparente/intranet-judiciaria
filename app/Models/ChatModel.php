@@ -582,4 +582,20 @@ class ChatModel
             return [];
         }
     }
+
+    /**
+     * Verifica se uma mensagem já existe no banco
+     */
+    public function verificarMensagemExistente($messageId)
+    {
+        try {
+            $sql = "SELECT id FROM mensagens_chat WHERE message_id = :message_id LIMIT 1";
+            $this->db->query($sql);
+            $this->db->bind(':message_id', $messageId);
+            return $this->db->resultado();
+        } catch (Exception $e) {
+            error_log("Erro ao verificar mensagem existente no ChatModel: " . $e->getMessage());
+            return false;
+        }
+    }
 }

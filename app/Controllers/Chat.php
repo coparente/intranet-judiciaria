@@ -810,10 +810,7 @@ class Chat extends Controllers
     private function verificarMensagemExistente($messageId)
     {
         try {
-            $sql = "SELECT id FROM mensagens_chat WHERE message_id = :message_id LIMIT 1";
-            $this->chatModel->db->query($sql);
-            $this->chatModel->db->bind(':message_id', $messageId);
-            return $this->chatModel->db->resultado();
+            return $this->chatModel->verificarMensagemExistente($messageId);
         } catch (Exception $e) {
             error_log("Erro ao verificar mensagem existente: " . $e->getMessage());
             return false;

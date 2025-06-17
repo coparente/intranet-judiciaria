@@ -1,0 +1,8 @@
+RAW: {"messages":[{"from":"556296185892","id":"wamid.HBgMNTU2Mjk2MTg1ODkyFQIAEhggRUY5ODJBRDMzQjUzM0M1MEY4MTMwQ0QxQ0QzMEVCNDgA","timestamp":"1750165034","text":{"body":"Ol\u00e1! Teste de mensagem do n8n"},"type":"text"}]}
+Mensagem: Olá! Teste de mensagem do n8n | De: 556296185892
+RAW: {"messages":[{"from":"556296185892","id":"msg_001_1750171012","timestamp":1750171012,"text":{"body":"Primeira mensagem"},"type":"text"}]}
+Mensagem: Primeira mensagem | De: 556296185892
+RAW: {"messages":[{"from":"556296185892","id":"msg_002_1750171012","timestamp":1750171012,"text":{"body":"Segunda mensagem"},"type":"text"}]}
+Mensagem: Segunda mensagem | De: 556296185892
+RAW: {"messages":[{"from":"5511999887766","id":"msg_003_1750171012","timestamp":1750171012,"text":{"body":"Mensagem de outro n\u00famero"},"type":"text"}]}
+Mensagem: Mensagem de outro número | De: 5511999887766

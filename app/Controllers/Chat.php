@@ -23,13 +23,13 @@ class Chat extends Controllers
         parent::__construct();
         $this->chatModel = $this->model('ChatModel');
         $this->usuarioModel = $this->model('UsuarioModel');
-        
+
         // Métodos que não exigem autenticação
         $metodosPublicos = ['webhook'];
         $metodoAtual = $_GET['url'] ?? '';
         $partesUrl = explode('/', trim($metodoAtual, '/'));
         $metodo = isset($partesUrl[1]) ? $partesUrl[1] : '';
-        
+
         // Verifica se o usuário está logado (exceto para métodos públicos)
         if (!in_array($metodo, $metodosPublicos) && !isset($_SESSION['usuario_id'])) {
             Helper::redirecionar('usuarios/login');
@@ -37,7 +37,7 @@ class Chat extends Controllers
 
         // Carrega o helper do SERPRO
         require_once APPROOT . '/Libraries/SerproHelper.php';
-        
+
         // Inicializa o SerproHelper com as configurações
         SerproHelper::init();
     }
@@ -50,15 +50,15 @@ class Chat extends Controllers
         // Parâmetros de filtro
         $filtroContato = $_GET['filtro_contato'] ?? '';
         $filtroNumero = $_GET['filtro_numero'] ?? '';
-        
+
         // Parâmetros de paginação
         $registrosPorPagina = 10;
         $paginaAtual = isset($_GET['pagina']) && is_numeric($_GET['pagina']) ? (int)$_GET['pagina'] : 1;
         $paginaAtual = max(1, $paginaAtual); // Garantir que não seja menor que 1
-        
+
         // Calcular offset
         $offset = ($paginaAtual - 1) * $registrosPorPagina;
-        
+
         // Buscar conversas com filtros e paginação
         $conversas = $this->chatModel->buscarConversasComFiltros(
             $_SESSION['usuario_id'],
@@ -67,19 +67,19 @@ class Chat extends Controllers
             $registrosPorPagina,
             $offset
         );
-        
+
         // Contar total de registros para paginação
         $totalRegistros = $this->chatModel->contarConversasComFiltros(
             $_SESSION['usuario_id'],
             $filtroContato,
             $filtroNumero
         );
-        
+
         // Calcular informações de paginação
         $totalPaginas = ceil($totalRegistros / $registrosPorPagina);
         $registroInicio = $totalRegistros > 0 ? $offset + 1 : 0;
         $registroFim = min($offset + $registrosPorPagina, $totalRegistros);
-        
+
         // Construir query string para manter filtros na paginação
         $queryParams = [];
         if (!empty($filtroContato)) {
@@ -89,7 +89,7 @@ class Chat extends Controllers
             $queryParams[] = 'filtro_numero=' . urlencode($filtroNumero);
         }
         $queryString = !empty($queryParams) ? '&' . implode('&', $queryParams) : '';
-        
+
         $dados = [
             'tituloPagina' => 'Chat',
             'conversas' => $conversas,
@@ -117,7 +117,7 @@ class Chat extends Controllers
         }
 
         $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
-        
+
         if (!$conversa || $conversa->usuario_id != $_SESSION['usuario_id']) {
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Conversa não encontrada', 'alert alert-danger');
             Helper::redirecionar('chat');
@@ -127,7 +127,7 @@ class Chat extends Controllers
         // Processar ações POST
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $acao = $_POST['acao'] ?? '';
-            
+
             switch ($acao) {
                 case 'verificar_status':
                     $this->processarVerificacaoStatusManual($conversa_id, $conversa);
@@ -136,7 +136,7 @@ class Chat extends Controllers
         }
 
         $mensagens = $this->chatModel->buscarMensagens($conversa_id);
-        
+
         $dados = [
             'tituloPagina' => 'Conversa - ' . $conversa->contato_nome,
             'conversa' => $conversa,
@@ -153,26 +153,26 @@ class Chat extends Controllers
     {
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $formulario = filter_input_array(INPUT_POST, FILTER_SANITIZE_STRING);
-            
+
             // Formata o número de telefone (remove caracteres não numéricos)
             $numero = preg_replace('/[^0-9]/', '', $formulario['numero']);
-            
+
             // Verifica se já existe uma conversa com este número
             $conversaExistente = $this->chatModel->buscarConversaPorNumero($numero, $_SESSION['usuario_id']);
-            
+
             if ($conversaExistente) {
                 Helper::mensagem('chat', '<i class="fas fa-info-circle"></i> Já existe uma conversa com este contato', 'alert alert-info');
                 Helper::redirecionar("chat/conversa/{$conversaExistente->id}");
                 return;
             }
-            
+
             // Criar nova conversa
             $conversa = $this->chatModel->buscarOuCriarConversa(
                 $_SESSION['usuario_id'],
                 $numero,
                 $formulario['nome'] ?? 'Contato ' . $numero
             );
-            
+
             if ($conversa) {
                 Helper::mensagem('chat', '<i class="fas fa-check"></i> Conversa criada com sucesso', 'alert alert-success');
                 Helper::redirecionar("chat/conversa/{$conversa->id}");
@@ -207,7 +207,7 @@ class Chat extends Controllers
 
         // Buscar conversa
         $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
-        
+
         if (!$conversa || $conversa->usuario_id != $_SESSION['usuario_id']) {
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Conversa não encontrada', 'alert alert-danger');
             Helper::redirecionar('chat');
@@ -216,7 +216,7 @@ class Chat extends Controllers
 
         $mensagem = trim($_POST['mensagem'] ?? '');
         $temArquivo = isset($_FILES['midia']) && $_FILES['midia']['error'] === UPLOAD_ERR_OK;
-        
+
         // Verificar se há mensagem ou arquivo
         if (empty($mensagem) && !$temArquivo) {
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> É necessário informar uma mensagem ou anexar um arquivo', 'alert alert-danger');
@@ -228,13 +228,13 @@ class Chat extends Controllers
         if (isset($_FILES['midia']) && $_FILES['midia']['error'] !== UPLOAD_ERR_OK && $_FILES['midia']['error'] !== UPLOAD_ERR_NO_FILE) {
             $errosUpload = [
                 UPLOAD_ERR_INI_SIZE => 'Arquivo muito grande (limite do servidor)',
-                UPLOAD_ERR_FORM_SIZE => 'Arquivo muito grande (limite do formulário)', 
+                UPLOAD_ERR_FORM_SIZE => 'Arquivo muito grande (limite do formulário)',
                 UPLOAD_ERR_PARTIAL => 'Upload parcial',
                 UPLOAD_ERR_NO_TMP_DIR => 'Pasta temporária não encontrada',
                 UPLOAD_ERR_CANT_WRITE => 'Erro ao escrever arquivo',
                 UPLOAD_ERR_EXTENSION => 'Upload bloqueado por extensão'
             ];
-            
+
             $erroMsg = $errosUpload[$_FILES['midia']['error']] ?? 'Erro desconhecido no upload';
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro no upload: ' . $erroMsg, 'alert alert-danger');
             Helper::redirecionar("chat/conversa/{$conversa_id}");
@@ -254,11 +254,11 @@ class Chat extends Controllers
             } else {
                 // Processar envio de texto
                 error_log("DEBUG: Enviando mensagem de texto");
-                
+
                 if ($precisaTemplate) {
                     // Primeira mensagem - tentar template, se falhar usar mensagem normal
                     $resultado = $this->enviarPrimeiraMensagem($conversa->contato_numero, $mensagem);
-                    
+
                     // Se o template falhar, tentar mensagem normal
                     if (!$resultado || ($resultado['status'] !== 200 && $resultado['status'] !== 201)) {
                         error_log("DEBUG: Template falhou, tentando mensagem normal");
@@ -273,7 +273,7 @@ class Chat extends Controllers
             if ($resultado && ($resultado['status'] == 200 || $resultado['status'] == 201)) {
                 // Salvar no banco
                 $messageId = $resultado['response']['id'] ?? uniqid();
-                
+
                 $dadosMensagem = [
                     'conversa_id' => $conversa_id,
                     'remetente_id' => $_SESSION['usuario_id'],
@@ -285,7 +285,7 @@ class Chat extends Controllers
                 if ($temArquivo) {
                     // Determinar tipo de mídia
                     $tipoMidia = $this->determinarTipoMidia($_FILES['midia']['type']);
-                    
+
                     $dadosMensagem['tipo'] = $tipoMidia;
                     $dadosMensagem['conteudo'] = $mensagem; // Caption se houver
                     $dadosMensagem['midia_nome'] = $_FILES['midia']['name'];
@@ -327,7 +327,7 @@ class Chat extends Controllers
 
         // Fazer upload da mídia primeiro
         $resultadoUpload = SerproHelper::uploadMidia($arquivo, $arquivo['type']);
-        
+
         // CORREÇÃO: Aceitar tanto 200 quanto 201 como sucesso
         if ($resultadoUpload['status'] !== 200 && $resultadoUpload['status'] !== 201) {
             throw new Exception('Erro no upload da mídia: ' . ($resultadoUpload['error'] ?? 'Erro desconhecido'));
@@ -335,19 +335,19 @@ class Chat extends Controllers
 
         $mediaId = $resultadoUpload['response']['id'];
         error_log("MÍDIA: Upload bem-sucedido - Media ID: $mediaId");
-        
+
         // Determinar tipo de mídia
         $tipoMidia = $this->mapearTipoMidiaParaAPI($arquivo['type']);
-        
+
         // Preparar parâmetros conforme tipo de mídia
         $filename = null;
         $captionParaEnvio = null;
-        
+
         if ($tipoMidia === 'document') {
             // Para documentos: filename obrigatório, caption não permitido
             $filename = $arquivo['name'];
             error_log("MÍDIA: Enviando documento com filename: $filename");
-            
+
             // Se há caption, enviar como mensagem de texto separada APÓS o documento
             if (!empty($caption)) {
                 // Não enviar caption junto com documento, será enviado depois
@@ -362,37 +362,39 @@ class Chat extends Controllers
             $captionParaEnvio = $caption;
             error_log("MÍDIA: Enviando $tipoMidia" . ($caption ? " com caption" : " sem caption"));
         }
-        
+
         if ($precisaTemplate && !empty($caption) && $tipoMidia !== 'document') {
             // Se é primeira mensagem e tem caption (exceto documentos), enviar template primeiro
             $resultadoTemplate = $this->enviarPrimeiraMensagem($conversa->contato_numero, $caption);
-            
+
             if ($resultadoTemplate['status'] !== 200 && $resultadoTemplate['status'] !== 201) {
                 throw new Exception('Erro ao enviar template: ' . ($resultadoTemplate['error'] ?? 'Erro desconhecido'));
             }
-            
+
             // Aguardar um pouco antes de enviar a mídia
             sleep(1);
             // Não enviar caption novamente na mídia
             $captionParaEnvio = null;
         }
-        
+
         $resultadoEnvio = SerproHelper::enviarMidia($conversa->contato_numero, $tipoMidia, $mediaId, $captionParaEnvio, null, $filename);
         error_log("MÍDIA: Resultado envio - Status: " . $resultadoEnvio['status']);
-        
+
         // Se documento foi enviado com sucesso e há caption, enviar como mensagem separada
-        if ($tipoMidia === 'document' && 
-            ($resultadoEnvio['status'] === 200 || $resultadoEnvio['status'] === 201) && 
-            !empty($caption)) {
-            
+        if (
+            $tipoMidia === 'document' &&
+            ($resultadoEnvio['status'] === 200 || $resultadoEnvio['status'] === 201) &&
+            !empty($caption)
+        ) {
+
             error_log("MÍDIA: Enviando caption como mensagem separada...");
             sleep(1); // Aguardar um pouco
-            
+
             // Enviar caption como mensagem de texto normal
             $resultadoCaption = SerproHelper::enviarMensagemTexto($conversa->contato_numero, $caption);
             error_log("MÍDIA: Caption enviado - Status: " . ($resultadoCaption['status'] ?? 'erro'));
         }
-        
+
         return $resultadoEnvio;
     }
 
@@ -402,11 +404,21 @@ class Chat extends Controllers
     private function validarArquivoMidia($arquivo)
     {
         $tiposPermitidos = [
-            'image/jpeg', 'image/png', 'image/gif',
-            'video/mp4', 'video/3gpp',
-            'audio/aac', 'audio/amr', 'audio/mpeg', 'audio/mp4', 'audio/ogg',
-            'application/pdf', 'application/msword', 'text/plain',
-            'application/vnd.ms-powerpoint', 'application/vnd.ms-excel',
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'video/mp4',
+            'video/3gpp',
+            'audio/aac',
+            'audio/amr',
+            'audio/mpeg',
+            'audio/mp4',
+            'audio/ogg',
+            'application/pdf',
+            'application/msword',
+            'text/plain',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.ms-excel',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'application/vnd.openxmlformats-officedocument.presentationml.presentation',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -475,7 +487,7 @@ class Chat extends Controllers
         }
 
         $input = json_decode(file_get_contents('php://input'), true);
-        
+
         if (!$input || !isset($input['numero']) || !isset($input['mensagem'])) {
             echo json_encode(['success' => false, 'error' => 'Dados incompletos']);
             return;
@@ -538,7 +550,7 @@ class Chat extends Controllers
             echo json_encode(['success' => true, 'precisou_template' => $precisaTemplate]);
         } else {
             echo json_encode([
-                'success' => false, 
+                'success' => false,
                 'error' => $resultado['error'] ?? 'Erro ao enviar mensagem',
                 'details' => $resultado
             ]);
@@ -552,7 +564,7 @@ class Chat extends Controllers
     {
         // Nome do template que deve estar aprovado na Meta
         $nomeTemplate = 'simple_greeting'; // Substitua pelo nome do seu template aprovado
-        
+
         // Parâmetros do template (se o template tiver variáveis)
         $parametros = [
             [
@@ -584,21 +596,21 @@ class Chat extends Controllers
     {
         // Limpa qualquer saída anterior
         ob_clean();
-        
+
         // Define o cabeçalho para JSON
         header('Content-Type: application/json');
-        
+
         try {
             $status = SerproHelper::verificarStatusAPI();
             $response = [
                 'online' => $status,
             ];
-            
+
             // Adiciona mensagem de erro se houver
             if (!$status) {
                 $response['error'] = SerproHelper::getLastError();
             }
-            
+
             echo json_encode($response);
         } catch (Exception $e) {
             echo json_encode([
@@ -606,7 +618,7 @@ class Chat extends Controllers
                 'error' => $e->getMessage()
             ]);
         }
-        
+
         // Garante que nenhum HTML seja adicionado à resposta
         exit;
     }
@@ -645,7 +657,7 @@ class Chat extends Controllers
         }
 
         $input = json_decode(file_get_contents('php://input'), true);
-        
+
         if (!$input || !isset($input['conversa_id'])) {
             echo json_encode(['success' => false]);
             return;
@@ -664,7 +676,7 @@ class Chat extends Controllers
     //         // Verificação do webhook
     //         $verify_token = $_GET['hub_verify_token'] ?? '';
     //         $challenge = $_GET['hub_challenge'] ?? '';
-            
+
     //         if ($verify_token === WEBHOOK_VERIFY_TOKEN) {
     //             echo $challenge;
     //             exit;
@@ -677,16 +689,16 @@ class Chat extends Controllers
     //     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     //         $input = file_get_contents('php://input');
     //         $payload = json_decode($input, true);
-            
+
     //         if ($payload) {
     //             $mensagem = SerproHelper::processarWebhook($payload);
-                
+
     //             if ($mensagem && $mensagem['type'] !== 'status') {
     //                 // Processar mensagem recebida
     //                 $this->processarMensagemRecebida($mensagem);
     //             }
     //         }
-            
+
     //         http_response_code(200);
     //         echo 'OK';
     //         exit;
@@ -694,44 +706,97 @@ class Chat extends Controllers
     // }
 
 
+    //     public function webhook()
+    // {
+    //     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    //         $verify_token = $_GET['hub_verify_token'] ?? '';
+    //         $challenge = $_GET['hub_challenge'] ?? '';
+
+    //         if ($verify_token === WEBHOOK_VERIFY_TOKEN) {
+    //             echo $challenge;
+    //             exit;
+    //         } else {
+    //             http_response_code(403);
+    //             exit;
+    //         }
+    //     }
+
+    //     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    //         $payloadRaw = file_get_contents("php://input");
+    //         file_put_contents("log.txt", "RAW: $payloadRaw\n", FILE_APPEND);
+
+    //         $payload = json_decode($payloadRaw, true);
+
+    //         if (!$payload) {
+    //             http_response_code(400);
+    //             echo json_encode(['error' => 'JSON inválido']);
+    //             exit;
+    //         }
+
+    //         $mensagem = SerproHelper::processarWebhook($payload);
+
+    //         if ($mensagem && $mensagem['type'] !== 'status') {
+    //             $this->processarMensagemRecebida($mensagem);
+    //         }
+
+    //         file_put_contents("log.txt", "Mensagem: {$mensagem['text']} | De: {$mensagem['from']}\n", FILE_APPEND);
+    //         echo json_encode(['data' => 'OK']);
+    //     }
+    // }
+
     public function webhook()
-{
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        $verify_token = $_GET['hub_verify_token'] ?? '';
-        $challenge = $_GET['hub_challenge'] ?? '';
+    {
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            $verify_token = $_GET['hub_verify_token'] ?? '';
+            $challenge = $_GET['hub_challenge'] ?? '';
 
-        if ($verify_token === WEBHOOK_VERIFY_TOKEN) {
-            echo $challenge;
-            exit;
-        } else {
-            http_response_code(403);
-            exit;
+            if ($verify_token === WEBHOOK_VERIFY_TOKEN) {
+                echo $challenge;
+                exit;
+            } else {
+                http_response_code(403);
+                exit;
+            }
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $payload = json_decode(file_get_contents("php://input"), true);
+
+            // Registrar o payload bruto no log
+            file_put_contents("log.txt", "RAW: " . json_encode($payload) . "\n", FILE_APPEND);
+
+            $mensagemTexto = '';
+            $numero = '';
+
+            // 1. Detectar mensagem vinda do WhatsApp SERPRO
+            if (isset($payload['entry'][0]['changes'][0]['value']['messages'][0]['text']['body'])) {
+                $mensagemTexto = $payload['entry'][0]['changes'][0]['value']['messages'][0]['text']['body'];
+                $numero = $payload['entry'][0]['changes'][0]['value']['messages'][0]['from'];
+            }
+
+            // 2. Detectar mensagem vinda do n8n
+            elseif (isset($payload['messages'][0]['text']['body'])) {
+                $mensagemTexto = $payload['messages'][0]['text']['body'];
+                $numero = $payload['messages'][0]['from'];
+            } else {
+                http_response_code(400);
+                echo json_encode(['error' => 'Formato de mensagem não reconhecido']);
+                exit;
+            }
+
+            // Registrar a mensagem simples no log
+            file_put_contents("log.txt", "Mensagem: $mensagemTexto | De: $numero\n", FILE_APPEND);
+
+            // 3. Processar estrutura padronizada
+            $mensagem = SerproHelper::processarWebhook($payload);
+
+            if ($mensagem && $mensagem['type'] !== 'status') {
+                $this->processarMensagemRecebida($mensagem);
+            }
+
+            echo json_encode(['data' => 'OK']);
         }
     }
-
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $payloadRaw = file_get_contents("php://input");
-        file_put_contents("log.txt", "RAW: $payloadRaw\n", FILE_APPEND);
-
-        $payload = json_decode($payloadRaw, true);
-
-        if (!$payload) {
-            http_response_code(400);
-            echo json_encode(['error' => 'JSON inválido']);
-            exit;
-        }
-
-        $mensagem = SerproHelper::processarWebhook($payload);
-
-        if ($mensagem && $mensagem['type'] !== 'status') {
-            $this->processarMensagemRecebida($mensagem);
-        }
-
-        file_put_contents("log.txt", "Mensagem: {$mensagem['text']} | De: {$mensagem['from']}\n", FILE_APPEND);
-        echo json_encode(['data' => 'OK']);
-    }
-}
-
 
     /**
      * Processa mensagem recebida via webhook
@@ -739,10 +804,10 @@ class Chat extends Controllers
     private function processarMensagemRecebida($mensagem)
     {
         $numero = $mensagem['from'];
-        
+
         // Buscar ou criar conversa
         $conversa = $this->chatModel->buscarOuCriarConversaPorNumero($numero);
-        
+
         if ($conversa) {
             // Salvar mensagem recebida
             $conteudo = '';
@@ -757,7 +822,7 @@ class Chat extends Controllers
                     $conteudo = json_encode($mensagem[$mensagem['type']]);
                     break;
             }
-            
+
             $this->chatModel->salvarMensagem([
                 'conversa_id' => $conversa->id,
                 'remetente_id' => null, // Mensagem recebida
@@ -767,7 +832,7 @@ class Chat extends Controllers
                 'status' => 'recebido',
                 'enviado_em' => date('Y-m-d H:i:s', $mensagem['timestamp'])
             ]);
-            
+
             // Atualizar conversa
             $this->chatModel->atualizarConversa($conversa->id);
         }
@@ -804,7 +869,7 @@ class Chat extends Controllers
 
         // Excluir a conversa
         $resultado = $this->chatModel->excluirConversa($id);
-        
+
         if ($resultado) {
             Helper::mensagem('chat', '<i class="fas fa-check-circle"></i> Conversa excluída com sucesso', 'alert alert-success');
             Helper::redirecionar('chat/index');
@@ -820,9 +885,9 @@ class Chat extends Controllers
     public function gerenciarTemplates()
     {
         // Detectar se é uma requisição AJAX
-        $isAjax = $_SERVER['REQUEST_METHOD'] == 'POST' || 
-                 isset($_SERVER['HTTP_X_REQUESTED_WITH']) && 
-                 strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+        $isAjax = $_SERVER['REQUEST_METHOD'] == 'POST' ||
+            isset($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
 
         // Verifica se o usuário está logado
         if (!isset($_SESSION['usuario_id'])) {
@@ -842,7 +907,7 @@ class Chat extends Controllers
                 echo json_encode(['status' => 403, 'error' => 'Acesso negado. Apenas administradores podem gerenciar templates.']);
                 return;
             }
-            
+
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
             Helper::redirecionar('chat');
             return;
@@ -851,16 +916,16 @@ class Chat extends Controllers
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             // Definir cabeçalho JSON para todas as respostas AJAX
             header('Content-Type: application/json');
-            
+
             $acao = $_POST['acao'] ?? '';
-            
+
             try {
                 switch ($acao) {
                     case 'listar':
                         $templates = SerproHelper::listarTemplates();
                         echo json_encode($templates);
                         break;
-                        
+
                     case 'criar':
                         $dadosTemplate = [
                             'name' => $_POST['name'],
@@ -871,13 +936,13 @@ class Chat extends Controllers
                         $resultado = SerproHelper::criarTemplate($dadosTemplate);
                         echo json_encode($resultado);
                         break;
-                        
+
                     case 'excluir':
                         $nomeTemplate = $_POST['nome_template'];
                         $resultado = SerproHelper::excluirTemplate($nomeTemplate);
                         echo json_encode($resultado);
                         break;
-                        
+
                     default:
                         echo json_encode(['status' => 400, 'error' => 'Ação não reconhecida']);
                         break;
@@ -885,14 +950,14 @@ class Chat extends Controllers
             } catch (Exception $e) {
                 echo json_encode(['status' => 500, 'error' => 'Erro interno: ' . $e->getMessage()]);
             }
-            
+
             return;
         }
 
         // Para requisições GET, carregar templates diretamente no PHP
         $templates = [];
         $templateError = null;
-        
+
         try {
             $resultado = SerproHelper::listarTemplates();
             if ($resultado['status'] == 200 && isset($resultado['response'])) {
@@ -909,7 +974,7 @@ class Chat extends Controllers
             'templates' => $templates,
             'templateError' => $templateError
         ];
-        
+
         $this->view('chat/templates', $dados);
     }
 
@@ -919,9 +984,9 @@ class Chat extends Controllers
     public function gerenciarWebhooks()
     {
         // Detectar se é uma requisição AJAX
-        $isAjax = $_SERVER['REQUEST_METHOD'] == 'POST' || 
-                 isset($_SERVER['HTTP_X_REQUESTED_WITH']) && 
-                 strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+        $isAjax = $_SERVER['REQUEST_METHOD'] == 'POST' ||
+            isset($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
 
         // Verifica se o usuário está logado
         if (!isset($_SESSION['usuario_id'])) {
@@ -941,7 +1006,7 @@ class Chat extends Controllers
                 echo json_encode(['status' => 403, 'error' => 'Acesso negado. Apenas administradores podem gerenciar webhooks.']);
                 return;
             }
-            
+
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
             Helper::redirecionar('chat');
             return;
@@ -950,16 +1015,16 @@ class Chat extends Controllers
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             // Definir cabeçalho JSON para todas as respostas AJAX
             header('Content-Type: application/json');
-            
+
             $acao = $_POST['acao'] ?? '';
-            
+
             try {
                 switch ($acao) {
                     case 'listar':
                         $resultado = SerproHelper::listarWebhooks();
                         echo json_encode($resultado);
                         break;
-                        
+
                     case 'cadastrar':
                         $webhook = [
                             'uri' => $_POST['uri'],
@@ -968,7 +1033,7 @@ class Chat extends Controllers
                         $resultado = SerproHelper::cadastrarWebhook($webhook);
                         echo json_encode($resultado);
                         break;
-                        
+
                     case 'atualizar':
                         $webhook = [
                             'id' => $_POST['webhook_id'],
@@ -978,13 +1043,13 @@ class Chat extends Controllers
                         $resultado = SerproHelper::atualizarWebhook($webhook);
                         echo json_encode($resultado);
                         break;
-                        
+
                     case 'excluir':
                         $webhookId = $_POST['webhook_id'];
                         $resultado = SerproHelper::excluirWebhook($webhookId);
                         echo json_encode($resultado);
                         break;
-                        
+
                     default:
                         echo json_encode(['status' => 400, 'error' => 'Ação não reconhecida']);
                         break;
@@ -992,14 +1057,14 @@ class Chat extends Controllers
             } catch (Exception $e) {
                 echo json_encode(['status' => 500, 'error' => 'Erro interno: ' . $e->getMessage()]);
             }
-            
+
             return;
         }
 
         // Para requisições GET, carregar webhooks diretamente no PHP
         $webhooks = [];
         $webhookError = null;
-        
+
         try {
             $resultado = SerproHelper::listarWebhooks();
             if ($resultado['status'] == 200 && isset($resultado['response'])) {
@@ -1021,7 +1086,7 @@ class Chat extends Controllers
             'webhooks' => $webhooks,
             'webhookError' => $webhookError
         ];
-        
+
         $this->view('chat/webhooks', $dados);
     }
 
@@ -1045,11 +1110,21 @@ class Chat extends Controllers
 
         // Validar tipo de arquivo
         $tiposPermitidos = [
-            'image/jpeg', 'image/png', 'image/gif',
-            'video/mp4', 'video/3gpp',
-            'audio/aac', 'audio/amr', 'audio/mpeg', 'audio/mp4', 'audio/ogg',
-            'application/pdf', 'application/msword', 'text/plain',
-            'application/vnd.ms-powerpoint', 'application/vnd.ms-excel',
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'video/mp4',
+            'video/3gpp',
+            'audio/aac',
+            'audio/amr',
+            'audio/mpeg',
+            'audio/mp4',
+            'audio/ogg',
+            'application/pdf',
+            'application/msword',
+            'text/plain',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.ms-excel',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'application/vnd.openxmlformats-officedocument.presentationml.presentation',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -1074,7 +1149,7 @@ class Chat extends Controllers
         }
 
         $resultado = SerproHelper::uploadMidia($arquivo, $tipoMidia);
-        
+
         if ($resultado['status'] == 200) {
             echo json_encode([
                 'success' => true,
@@ -1100,7 +1175,7 @@ class Chat extends Controllers
         }
 
         $resultado = SerproHelper::downloadMidia($media_id);
-        
+
         if ($resultado['status'] == 200) {
             // Definir headers apropriados
             header('Content-Type: ' . $resultado['content_type']);
@@ -1122,21 +1197,21 @@ class Chat extends Controllers
         }
 
         $input = json_decode(file_get_contents('php://input'), true);
-        
+
         if (!$input || !isset($input['conversa_id']) || !isset($input['tipo'])) {
             echo json_encode(['success' => false, 'error' => 'Dados incompletos']);
             return;
         }
 
         $conversa = $this->chatModel->buscarConversaPorId($input['conversa_id']);
-        
+
         if (!$conversa || $conversa->usuario_id != $_SESSION['usuario_id']) {
             echo json_encode(['success' => false, 'error' => 'Conversa não encontrada']);
             return;
         }
 
         $resultado = false;
-        
+
         switch ($input['tipo']) {
             case 'botoes':
                 $resultado = SerproHelper::enviarMensagemBotoes(
@@ -1146,7 +1221,7 @@ class Chat extends Controllers
                     $input['message_id'] ?? null
                 );
                 break;
-                
+
             case 'lista':
                 $resultado = SerproHelper::enviarMensagemLista(
                     $conversa->contato_numero,
@@ -1156,7 +1231,7 @@ class Chat extends Controllers
                     $input['message_id'] ?? null
                 );
                 break;
-                
+
             case 'localizacao':
                 $resultado = SerproHelper::enviarSolicitacaoLocalizacao(
                     $conversa->contato_numero,
@@ -1179,7 +1254,7 @@ class Chat extends Controllers
             ]);
 
             $this->chatModel->atualizarConversa($input['conversa_id']);
-            
+
             echo json_encode(['success' => true]);
         } else {
             echo json_encode([
@@ -1223,7 +1298,7 @@ class Chat extends Controllers
 
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $acao = $_POST['acao'] ?? '';
-            
+
             try {
                 switch ($acao) {
                     case 'gerar':
@@ -1232,38 +1307,38 @@ class Chat extends Controllers
                             'codigo' => $_POST['codigo'] ?? ''
                         ];
                         $resultado = SerproHelper::gerarQRCode($dados);
-                        
+
                         if ($resultado['status'] == 200 || $resultado['status'] == 201) {
                             Helper::mensagem('chat', '<i class="fas fa-check"></i> QR Code gerado com sucesso!', 'alert alert-success');
                         } else {
                             $erro = $resultado['error'] ?? 'Erro desconhecido';
                             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro ao gerar QR code: ' . $erro, 'alert alert-danger');
                         }
-                        
+
                         Helper::redirecionar('chat/qrCode');
                         break;
-                        
+
                     case 'excluir':
                         $qrId = $_POST['qr_id'];
-                        
+
                         if (empty($qrId)) {
                             Helper::mensagem('chat', '<i class="fas fa-ban"></i> ID do QR code não informado', 'alert alert-danger');
                             Helper::redirecionar('chat/qrCode');
                             return;
                         }
-                        
+
                         $resultado = SerproHelper::excluirQRCode($qrId);
-                        
+
                         if ($resultado['status'] == 200) {
                             Helper::mensagem('chat', '<i class="fas fa-check"></i> QR Code excluído com sucesso!', 'alert alert-success');
                         } else {
                             $erro = $resultado['error'] ?? 'Erro desconhecido';
                             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro ao excluir QR code: ' . $erro, 'alert alert-danger');
                         }
-                        
+
                         Helper::redirecionar('chat/qrCode');
                         break;
-                        
+
                     default:
                         Helper::mensagem('chat', '<i class="fas fa-ban"></i> Ação não reconhecida', 'alert alert-danger');
                         Helper::redirecionar('chat/qrCode');
@@ -1273,7 +1348,7 @@ class Chat extends Controllers
                 Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro interno: ' . $e->getMessage(), 'alert alert-danger');
                 Helper::redirecionar('chat/qrCode');
             }
-            
+
             return;
         }
 
@@ -1281,7 +1356,7 @@ class Chat extends Controllers
         $qrCodes = [];
         $qrCodeError = null;
         $modo = $_GET['modo'] ?? 'combinado'; // 'combinado', 'imagem', 'dados'
-        
+
         try {
             switch ($modo) {
                 case 'imagem':
@@ -1295,7 +1370,7 @@ class Chat extends Controllers
                     $resultado = SerproHelper::listarQRCodesCombinados();
                     break;
             }
-            
+
             if ($resultado['status'] == 200 && isset($resultado['response'])) {
                 // A resposta da API SERPRO para QR codes vem diretamente como array
                 if (is_array($resultado['response'])) {
@@ -1318,7 +1393,7 @@ class Chat extends Controllers
             'qrCodeError' => $qrCodeError,
             'modo' => $modo
         ];
-        
+
         $this->view('chat/qr_codes', $dados);
     }
 
@@ -1350,7 +1425,7 @@ class Chat extends Controllers
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($ch, CURLOPT_TIMEOUT, 30);
             curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
-            
+
             $imageData = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $error = curl_error($ch);
@@ -1374,7 +1449,6 @@ class Chat extends Controllers
             // Enviar a imagem
             echo $imageData;
             exit;
-
         } catch (Exception $e) {
             Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Erro ao baixar QR Code: ' . $e->getMessage(), 'alert alert-danger');
             Helper::redirecionar('chat/qrCode');
@@ -1398,7 +1472,7 @@ class Chat extends Controllers
 
         // Métricas da API SERPRO
         $metricas = SerproHelper::obterMetricas($inicio, $fim);
-        
+
         // Métricas locais do banco de dados
         $metricasLocais = [
             'total_conversas' => $this->chatModel->contarConversas($_SESSION['usuario_id']),
@@ -1437,17 +1511,17 @@ class Chat extends Controllers
                 'auto_resposta' => isset($_POST['auto_resposta']) ? 1 : 0,
                 'horario_atendimento' => $_POST['horario_atendimento'] ?? ''
             ];
-            
+
             // Salvar no banco ou arquivo de configuração
             foreach ($configuracoes as $chave => $valor) {
                 $this->chatModel->salvarConfiguracao($chave, $valor);
             }
-            
+
             Helper::mensagem('chat', '<i class="fas fa-check"></i> Configurações salvas com sucesso', 'alert alert-success');
         }
 
         $configuracoes = $this->chatModel->obterConfiguracoes();
-        
+
         $dados = [
             'tituloPagina' => 'Configurações do Chat',
             'configuracoes' => $configuracoes
@@ -1474,7 +1548,7 @@ class Chat extends Controllers
         }
 
         $novasMensagens = $this->chatModel->buscarNovasMensagens($conversa_id, $ultima_mensagem_id);
-        
+
         echo json_encode([
             'success' => true,
             'mensagens' => $novasMensagens
@@ -1500,15 +1574,15 @@ class Chat extends Controllers
 
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             header('Content-Type: application/json');
-            
+
             try {
                 // Testa obtenção de token
                 $token = SerproHelper::getToken();
-                
+
                 if ($token) {
                     // Testa listagem de templates
                     $templates = SerproHelper::listarTemplates();
-                    
+
                     echo json_encode([
                         'status' => 200,
                         'token_obtido' => true,
@@ -1534,14 +1608,13 @@ class Chat extends Controllers
                         ]
                     ]);
                 }
-                
             } catch (Exception $e) {
                 echo json_encode([
                     'status' => 500,
                     'error' => 'Erro interno: ' . $e->getMessage()
                 ]);
             }
-            
+
             return;
         }
 
@@ -1554,7 +1627,7 @@ class Chat extends Controllers
     public function atualizarStatusMensagens($conversa_id = null)
     {
         header('Content-Type: application/json');
-        
+
         try {
             if (!$conversa_id) {
                 echo json_encode(['success' => false, 'error' => 'ID da conversa não informado']);
@@ -1570,7 +1643,7 @@ class Chat extends Controllers
 
             // Buscar mensagens enviadas pendentes de atualização de status
             $mensagensParaVerificar = $this->chatModel->buscarMensagensComStatus($conversa_id, ['enviado', 'entregue']);
-            
+
             if (empty($mensagensParaVerificar)) {
                 echo json_encode([
                     'success' => true,
@@ -1580,24 +1653,24 @@ class Chat extends Controllers
                 ]);
                 return;
             }
-            
+
             $mensagensAtualizadas = [];
             $errosVerificacao = [];
-            
+
             foreach ($mensagensParaVerificar as $mensagem) {
                 if (!empty($mensagem->message_id)) {
                     try {
                         $resultado = SerproHelper::consultarStatus($mensagem->message_id);
-                        
+
                         if ($resultado['status'] == 200 && isset($resultado['response']['requisicoesEnvio'])) {
                             foreach ($resultado['response']['requisicoesEnvio'] as $requisicao) {
                                 if ($requisicao['destinatario'] == $conversa->contato_numero) {
                                     $novoStatus = $this->determinarStatusMensagem($requisicao);
-                                    
+
                                     if ($novoStatus && $novoStatus != $mensagem->status) {
                                         // Atualizar status no banco
                                         $updateResult = $this->chatModel->atualizarStatusMensagem($mensagem->message_id, $novoStatus);
-                                        
+
                                         if ($updateResult) {
                                             $mensagensAtualizadas[] = [
                                                 'id' => $mensagem->id,
@@ -1620,20 +1693,19 @@ class Chat extends Controllers
                     }
                 }
             }
-            
+
             $response = [
                 'success' => true,
                 'mensagens_atualizadas' => $mensagensAtualizadas,
                 'total_verificadas' => count($mensagensParaVerificar),
                 'total_atualizadas' => count($mensagensAtualizadas)
             ];
-            
+
             if (!empty($errosVerificacao)) {
                 $response['warnings'] = $errosVerificacao;
             }
-            
+
             echo json_encode($response);
-            
         } catch (Exception $e) {
             echo json_encode([
                 'success' => false,
@@ -1658,7 +1730,7 @@ class Chat extends Controllers
         } elseif (!empty($requisicao['failed'])) {
             return 'falhou';
         }
-        
+
         return null; // Não mudou
     }
 
@@ -1673,7 +1745,7 @@ class Chat extends Controllers
         }
 
         $resultado = SerproHelper::consultarStatus($message_id);
-        
+
         if ($resultado['status'] == 200) {
             echo json_encode([
                 'success' => true,
@@ -1695,7 +1767,7 @@ class Chat extends Controllers
     public function debugAPI()
     {
         header('Content-Type: application/json');
-        
+
         try {
             $debug = [
                 'configuracao' => [
@@ -1710,7 +1782,7 @@ class Chat extends Controllers
                     'usuario_perfil' => $_SESSION['usuario_perfil'] ?? null
                 ]
             ];
-            
+
             // Testar obtenção de token
             try {
                 $token = SerproHelper::getToken();
@@ -1725,7 +1797,7 @@ class Chat extends Controllers
                     'erro' => $e->getMessage()
                 ];
             }
-            
+
             // Testar verificação de status da API
             try {
                 $statusAPI = SerproHelper::verificarStatusAPI();
@@ -1739,12 +1811,11 @@ class Chat extends Controllers
                     'erro' => $e->getMessage()
                 ];
             }
-            
+
             echo json_encode([
                 'success' => true,
                 'debug_info' => $debug
             ]);
-            
         } catch (Exception $e) {
             echo json_encode([
                 'success' => false,
@@ -1762,25 +1833,25 @@ class Chat extends Controllers
         try {
             // Buscar mensagens enviadas pendentes de atualização de status
             $mensagensParaVerificar = $this->chatModel->buscarMensagensComStatus($conversa_id, ['enviado', 'entregue']);
-            
+
             if (empty($mensagensParaVerificar)) {
                 Helper::mensagem('chat', '<i class="fas fa-info-circle"></i> Nenhuma mensagem pendente de verificação', 'alert alert-info');
                 return;
             }
-            
+
             $mensagensAtualizadas = 0;
             $erros = [];
-            
+
             foreach ($mensagensParaVerificar as $mensagem) {
                 if (!empty($mensagem->message_id)) {
                     try {
                         $resultado = SerproHelper::consultarStatus($mensagem->message_id);
-                        
+
                         if ($resultado['status'] == 200 && isset($resultado['response']['requisicoesEnvio'])) {
                             foreach ($resultado['response']['requisicoesEnvio'] as $requisicao) {
                                 if ($requisicao['destinatario'] == $conversa->contato_numero) {
                                     $novoStatus = $this->determinarStatusMensagem($requisicao);
-                                    
+
                                     if ($novoStatus && $novoStatus != $mensagem->status) {
                                         // Atualizar status no banco
                                         if ($this->chatModel->atualizarStatusMensagem($mensagem->message_id, $novoStatus)) {
@@ -1798,20 +1869,19 @@ class Chat extends Controllers
                     }
                 }
             }
-            
+
             // Mostrar resultado
             if ($mensagensAtualizadas > 0) {
                 Helper::mensagem('chat', "<i class='fas fa-check-circle'></i> {$mensagensAtualizadas} mensagem(ns) tiveram status atualizado", 'alert alert-success');
             } else {
                 Helper::mensagem('chat', '<i class="fas fa-info-circle"></i> Nenhuma atualização de status encontrada', 'alert alert-info');
             }
-            
+
             if (!empty($erros)) {
                 foreach ($erros as $erro) {
                     Helper::mensagem('chat', "<i class='fas fa-exclamation-triangle'></i> {$erro}", 'alert alert-warning');
                 }
             }
-            
         } catch (Exception $e) {
             Helper::mensagem('chat', "<i class='fas fa-ban'></i> Erro na verificação: " . $e->getMessage(), 'alert alert-danger');
         }
@@ -1858,7 +1928,7 @@ class Chat extends Controllers
 
             // Passo 1: Upload da mídia
             $resultadoUpload = SerproHelper::uploadMidia($arquivo, $arquivo['type']);
-            
+
             if ($resultadoUpload['status'] !== 200) {
                 echo json_encode([
                     'success' => false,
@@ -1881,7 +1951,6 @@ class Chat extends Controllers
                 'media_id' => $mediaId,
                 'tipo_midia' => $tipoMidia
             ]);
-
         } catch (Exception $e) {
             echo json_encode([
                 'success' => false,

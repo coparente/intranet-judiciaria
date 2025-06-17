@@ -616,7 +616,7 @@ class ChatModel
                 (SELECT COUNT(*) FROM mensagens_chat m3 
                  WHERE m3.conversa_id = c.id) as total_mensagens
                 FROM conversas c 
-                WHERE c.usuario_id IS NULL";
+                WHERE c.usuario_id IS NULL OR c.usuario_id = 0";
 
         // Aplicar filtros
         $params = [];
@@ -651,7 +651,7 @@ class ChatModel
      */
     public function contarConversasNaoAtribuidas($filtroContato = '', $filtroNumero = '')
     {
-        $sql = "SELECT COUNT(*) as total FROM conversas c WHERE c.usuario_id IS NULL";
+        $sql = "SELECT COUNT(*) as total FROM conversas c WHERE c.usuario_id IS NULL OR c.usuario_id = 0";
 
         // Aplicar filtros
         $params = [];

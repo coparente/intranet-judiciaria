@@ -27,15 +27,14 @@
                             </h5>
                             <div>
                                 <a href="<?= URL ?>/chat/novaConversa" class="btn btn-light btn-sm">
-                                    <i class="fas fa-plus me-1"></i> Nova Conversa
+                                    <i class="fas fa-plus "></i> Nova Conversa
                                 </a>
-                            </div>
-                            <div>
                                 <a href="<?= URL ?>/chat/conversasNaoAtribuidas" class="btn btn-light btn-sm">
-                                    <i class="fas fa-plus me-1"></i> Não Atribuídas
-                                </a>
+                                <i class="fas fa-comments"></i> Não Atribuídas
+                            </a>
                             </div>
                         </div>
+
                         
                         <!-- Filtros -->
                         <div class="card-body border-bottom">

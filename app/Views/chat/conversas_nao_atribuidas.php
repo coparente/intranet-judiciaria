@@ -196,15 +196,50 @@
                                                         <button type="button" 
                                                                 class="btn btn-success btn-sm" 
                                                                 data-toggle="modal" 
-                                                                data-target="#modalAtribuir"
-                                                                data-conversa-id="<?= $conversa->id ?>"
-                                                                data-contato-nome="<?= htmlspecialchars($conversa->contato_nome) ?>"
-                                                                data-contato-numero="<?= htmlspecialchars($conversa->contato_numero) ?>"
+                                                                data-target="#modalAtribuir<?= $conversa->id ?>"
                                                                 title="Atribuir a um usuário">
                                                             <i class="fas fa-user-plus me-1"></i> Atribuir
                                                         </button>
                                                     </td>
                                                 </tr>
+
+                                                <!-- Modal para Atribuir Conversa Individual -->
+                                                <div class="modal fade" id="modalAtribuir<?= $conversa->id ?>" tabindex="-1" role="dialog" aria-labelledby="modalAtribuirLabel<?= $conversa->id ?>" aria-hidden="true">
+                                                    <div class="modal-dialog" role="document">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header">
+                                                                <h5 class="modal-title" id="modalAtribuirLabel<?= $conversa->id ?>">Atribuir Conversa</h5>
+                                                                <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
+                                                                    <span aria-hidden="true">&times;</span>
+                                                                </button>
+                                                            </div>
+                                                            <form action="<?= URL ?>/chat/atribuirConversa" method="POST">
+                                                                <div class="modal-body">
+                                                                    <input type="hidden" name="conversa_id" value="<?= $conversa->id ?>">
+                                                                    
+                                                                    <p>Contato: <strong><?= htmlspecialchars($conversa->contato_nome) ?></strong></p>
+                                                                    <p>Número: <strong><?= htmlspecialchars($conversa->contato_numero) ?></strong></p>
+                                                                    
+                                                                    <div class="form-group">
+                                                                        <label for="usuario_id<?= $conversa->id ?>">Selecione o Usuário:</label>
+                                                                        <select name="usuario_id" id="usuario_id<?= $conversa->id ?>" class="form-control" required>
+                                                                            <option value="">Selecione...</option>
+                                                                            <?php foreach ($dados['usuarios'] as $usuario): ?>
+                                                                                <option value="<?= $usuario->id ?>">
+                                                                                    <?= htmlspecialchars($usuario->nome) ?> (<?= ucfirst($usuario->perfil) ?>)
+                                                                                </option>
+                                                                            <?php endforeach; ?>
+                                                                        </select>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="modal-footer">
+                                                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                                                                    <button type="submit" class="btn btn-success">Atribuir</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             <?php endforeach; ?>
                                         <?php endif; ?>
                                     </tbody>
@@ -253,87 +288,5 @@
         </section>
     </div>
 </main>
-
-<!-- Modal para Atribuir Conversa -->
-<div class="modal fade" id="modalAtribuir" tabindex="-1" aria-labelledby="modalAtribuirLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form method="POST" action="<?= URL ?>/chat/atribuirConversa">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="modalAtribuirLabel">
-                        <i class="fas fa-user-plus me-2"></i> Atribuir Conversa
-                    </h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="conversa_id" name="conversa_id">
-                    
-                    <div class="alert alert-info" id="contato_info">
-                        <!-- Preenchido via JavaScript -->
-                    </div>
-
-                    <div class="form-group">
-                        <label for="usuario_id">
-                            <i class="fas fa-user me-1"></i> Atribuir para o usuário:
-                        </label>
-                        <select class="form-control" id="usuario_id" name="usuario_id" required>
-                            <option value="">Selecione um usuário...</option>
-                            <?php foreach ($dados['usuarios'] as $usuario): ?>
-                                <option value="<?= $usuario->id ?>">
-                                    <?= htmlspecialchars($usuario->nome) ?> 
-                                    <span class="text-muted">(<?= ucfirst($usuario->perfil) ?>)</span>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <small class="form-text text-muted">
-                            A conversa será transferida para o usuário selecionado e aparecerá na lista de conversas dele.
-                        </small>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">
-                        <i class="fas fa-times me-1"></i> Cancelar
-                    </button>
-                    <button type="submit" class="btn btn-success">
-                        <i class="fas fa-check me-1"></i> Atribuir Conversa
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<script>
-$(document).ready(function() {
-    // Configurar modal de atribuição
-    $('#modalAtribuir').on('show.bs.modal', function (event) {
-        var button = $(event.relatedTarget);
-        var conversaId = button.data('conversa-id');
-        var contatoNome = button.data('contato-nome');
-        var contatoNumero = button.data('contato-numero');
-        
-        var modal = $(this);
-        modal.find('#conversa_id').val(conversaId);
-        modal.find('#contato_info').html(
-            '<div class="d-flex align-items-center">' +
-            '<i class="fas fa-user fa-2x text-primary me-3"></i>' +
-            '<div>' +
-            '<h6 class="mb-1">' + contatoNome + '</h6>' +
-            '<small class="text-muted"><i class="fas fa-phone me-1"></i>' + contatoNumero + '</small>' +
-            '</div>' +
-            '</div>'
-        );
-    });
-
-    // Limpar modal ao fechar
-    $('#modalAtribuir').on('hidden.bs.modal', function () {
-        $(this).find('#conversa_id').val('');
-        $(this).find('#usuario_id').val('');
-        $(this).find('#contato_info').html('');
-    });
-});
-</script>
 
 <?php include 'app/Views/include/footer.php' ?> 

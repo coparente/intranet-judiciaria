@@ -199,7 +199,8 @@ class Chat extends Controllers
         $conversa_id = $_POST['conversa_id'] ?? null;
         $usuario_id = $_POST['usuario_id'] ?? null;
 
-        if (!$conversa_id || !$usuario_id) {
+        // Validação básica
+        if (empty($conversa_id) || empty($usuario_id)) {
             Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Dados incompletos para atribuição', 'alert alert-danger');
             Helper::redirecionar('chat/conversasNaoAtribuidas');
             return;
@@ -207,8 +208,14 @@ class Chat extends Controllers
 
         // Verificar se a conversa existe e está não atribuída
         $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
-        if (!$conversa || $conversa->usuario_id !== null) {
-            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Conversa não encontrada ou já atribuída', 'alert alert-danger');
+        if (!$conversa) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Conversa não encontrada', 'alert alert-danger');
+            Helper::redirecionar('chat/conversasNaoAtribuidas');
+            return;
+        }
+
+        if ($conversa->usuario_id !== null) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Conversa já está atribuída a outro usuário', 'alert alert-warning');
             Helper::redirecionar('chat/conversasNaoAtribuidas');
             return;
         }

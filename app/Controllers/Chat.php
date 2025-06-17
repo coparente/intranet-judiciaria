@@ -214,7 +214,7 @@ class Chat extends Controllers
             return;
         }
 
-        if ($conversa->usuario_id !== null) {
+        if ($conversa->usuario_id !== null && $conversa->usuario_id !== 0) {
             Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Conversa já está atribuída a outro usuário', 'alert alert-warning');
             Helper::redirecionar('chat/conversasNaoAtribuidas');
             return;
@@ -223,6 +223,7 @@ class Chat extends Controllers
         // Atribuir a conversa
         if ($this->chatModel->atribuirConversa($conversa_id, $usuario_id)) {
             Helper::mensagem('chat', '<i class="fas fa-check"></i> Conversa atribuída com sucesso', 'alert alert-success');
+            Helper::mensagemSweetAlert('chat', 'Conversa atribuída com sucesso', 'success');    
         } else {
             Helper::mensagem('chat', '<i class="fas fa-times"></i> Erro ao atribuir conversa', 'alert alert-danger');
         }

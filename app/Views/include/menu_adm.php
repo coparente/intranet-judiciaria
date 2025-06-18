@@ -45,6 +45,11 @@
                                     <i class="fas fa-list me-2"></i> Atividades
                                 </a>
                             </li>
+                            <li role="navigation">
+                                <a class="nav-link d-flex justify-content-between <?= strpos($_SERVER['REQUEST_URI'], '/agenda/index') !== false ? 'active' : '' ?>" href="<?= URL ?>/agenda/index">
+                                    <i class="fas fa-calendar-alt me-2"></i> Agenda
+                                </a>
+                            </li>
                         </ul>
                     </li>
                 <?php endif; ?>

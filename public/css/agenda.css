@@ -1,0 +1,490 @@
+/* ==================================================
+   AGENDA - Estilos CSS para o módulo de Agenda
+   ================================================== */
+
+/* Container principal da agenda */
+.agenda-container {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+    overflow: hidden;
+}
+
+/* Cabeçalho da agenda */
+.agenda-header {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
+    padding: 20px;
+}
+
+.agenda-header h3 {
+    margin: 0;
+    font-weight: 600;
+    font-size: 1.5rem;
+}
+
+/* Legendas das categorias */
+.categorias-legendas {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 1px solid #e9ecef;
+}
+
+.categorias-legendas .card-header {
+    background: transparent;
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 10px;
+}
+
+.categoria-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 5px;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+}
+
+.categoria-item:hover {
+    background-color: rgba(0, 123, 255, 0.1);
+}
+
+.categoria-cor {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    margin-right: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.categoria-nome {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #495057;
+}
+
+/* Filtros da agenda */
+.agenda-filtros {
+    background: #ffffff;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #e9ecef;
+}
+
+.filtro-categoria {
+    margin-bottom: 15px;
+}
+
+.btn-view-group {
+    display: flex;
+    gap: 5px;
+}
+
+.btn-view {
+    padding: 8px 12px;
+    font-size: 0.875rem;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.btn-view:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Container do calendário */
+.calendar-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    padding: 25px;
+    margin-top: 10px;
+}
+
+/* Estilos customizados do FullCalendar */
+.fc {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.fc-toolbar {
+    margin-bottom: 20px !important;
+    padding: 10px 0;
+}
+
+.fc-toolbar-title {
+    font-size: 1.4rem !important;
+    font-weight: 700 !important;
+    color: #2c3e50 !important;
+    margin: 0 !important;
+}
+
+.fc-button {
+    border-radius: 6px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s !important;
+    padding: 6px 12px !important;
+}
+
+.fc-button-primary {
+    background-color: #007bff !important;
+    border-color: #007bff !important;
+    color: white !important;
+}
+
+.fc-button-primary:hover {
+    background-color: #0056b3 !important;
+    border-color: #0056b3 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3) !important;
+}
+
+.fc-button-primary:focus {
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
+}
+
+.fc-button-primary:disabled {
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+    opacity: 0.6 !important;
+}
+
+/* Eventos no calendário */
+.fc-event {
+    border: none !important;
+    border-radius: 6px !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    padding: 2px 6px !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+.fc-event:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+}
+
+.fc-event-title {
+    font-weight: 600 !important;
+    font-size: 0.85rem !important;
+}
+
+.fc-event-time {
+    font-weight: 500 !important;
+    font-size: 0.8rem !important;
+    opacity: 0.9 !important;
+}
+
+/* Eventos no grid de dias */
+.fc-daygrid-event {
+    padding: 3px 6px !important;
+    margin: 1px 0 !important;
+}
+
+.fc-daygrid-event-dot {
+    display: none !important;
+}
+
+/* Eventos na grade de tempo */
+.fc-timegrid-event {
+    padding: 2px 4px !important;
+    border-radius: 4px !important;
+}
+
+/* Hoje destacado */
+.fc-today {
+    background-color: rgba(0, 123, 255, 0.08) !important;
+}
+
+.fc-day-today .fc-daygrid-day-number {
+    background-color: #007bff !important;
+    color: white !important;
+    border-radius: 50% !important;
+    width: 26px !important;
+    height: 26px !important;
+    line-height: 26px !important;
+    text-align: center !important;
+    font-weight: 600 !important;
+}
+
+/* Cabeçalhos dos dias */
+.fc-col-header-cell {
+    background-color: #f8f9fa !important;
+    border-color: #e9ecef !important;
+    padding: 10px 5px !important;
+}
+
+.fc-col-header-cell-cushion {
+    color: #495057 !important;
+    font-weight: 600 !important;
+    font-size: 0.875rem !important;
+}
+
+/* Números dos dias */
+.fc-daygrid-day-number {
+    color: #495057 !important;
+    font-weight: 500 !important;
+    padding: 4px !important;
+}
+
+/* Bordas das células */
+.fc-scrollgrid {
+    border-color: #e9ecef !important;
+}
+
+.fc-scrollgrid td,
+.fc-scrollgrid th {
+    border-color: #e9ecef !important;
+}
+
+/* Modal de detalhes do evento */
+.modal-header {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
+    border-bottom: none;
+}
+
+.modal-header .btn-close {
+    filter: invert(1);
+}
+
+.modal-body {
+    padding: 25px;
+}
+
+.evento-detalhe {
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.evento-detalhe:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.evento-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+}
+
+.evento-valor {
+    color: #6c757d;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+/* Badges de status */
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-agendado {
+    background-color: #e3f2fd;
+    color: #1976d2;
+}
+
+.status-confirmado {
+    background-color: #e8f5e8;
+    color: #2e7d32;
+}
+
+.status-cancelado {
+    background-color: #ffebee;
+    color: #c62828;
+}
+
+.status-concluido {
+    background-color: #e0f2f1;
+    color: #00695c;
+}
+
+/* Formulário de evento */
+.form-evento {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 25px;
+}
+
+.form-evento .form-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.form-evento .form-control,
+.form-evento .form-select {
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.form-evento .form-control:focus,
+.form-evento .form-select:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    outline: none;
+}
+
+.form-evento .form-control::placeholder {
+    color: #adb5bd;
+    font-style: italic;
+}
+
+/* Preview da cor da categoria */
+.categoria-preview {
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+    margin-top: 8px;
+}
+
+.categoria-preview-cor {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Botões customizados */
+.btn-custom {
+    border-radius: 6px;
+    font-weight: 500;
+    padding: 10px 20px;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+}
+
+.btn-custom:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary-custom {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    border: none;
+    color: white;
+}
+
+.btn-primary-custom:hover {
+    background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .calendar-container {
+        padding: 15px;
+    }
+    
+    .fc-toolbar {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .fc-toolbar-title {
+        font-size: 1.2rem !important;
+    }
+    
+    .fc-button {
+        padding: 4px 8px !important;
+        font-size: 0.8rem !important;
+    }
+    
+    .categorias-legendas {
+        padding: 10px;
+    }
+    
+    .categoria-item {
+        margin-bottom: 6px;
+    }
+    
+    .categoria-nome {
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .agenda-filtros {
+        padding: 10px;
+    }
+    
+    .btn-view-group {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .form-evento {
+        padding: 15px;
+    }
+    
+    .modal-body {
+        padding: 15px;
+    }
+}
+
+/* Animações */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Loading spinner personalizado */
+.agenda-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+}
+
+.agenda-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #e9ecef;
+    border-top: 4px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Tooltip customizado */
+.agenda-tooltip {
+    background: #343a40;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    max-width: 200px;
+    z-index: 1060;
+} 

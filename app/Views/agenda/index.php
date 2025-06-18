@@ -29,14 +29,16 @@
                                     <a href="<?= URL ?>/agenda/gerenciarCategorias" class="btn btn-info btn-sm">
                                         <i class="fas fa-tags"></i> Gerenciar Categorias
                                     </a>
-                                    <a href="<?= URL ?>/agenda/teste" class="btn btn-info btn-sm" target="_blank">
-                                        <i class="fas fa-bug"></i> Teste API
-                                    </a>
+                                    <?php if ($_SESSION['usuario_perfil'] == 'admin'): ?>
+                                        <a href="<?= URL ?>/agenda/teste" class="btn btn-info btn-sm" target="_blank">
+                                            <i class="fas fa-bug"></i> Teste API
+                                        </a>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             <fieldset aria-labelledby="tituloMenu">
                                 <div class="card-body">
-                                    
+
                                     <!-- Legendas das Categorias -->
                                     <div class="row mb-4">
                                         <div class="col-12">
@@ -50,8 +52,8 @@
                                                     <div class="row">
                                                         <?php foreach ($dados['categorias'] as $categoria): ?>
                                                             <div class="col-6 col-md-3 mb-2">
-                                                                <span class="badge me-2" 
-                                                                      style="background-color: <?= $categoria->cor ?>; color: white; padding: 8px 12px;">
+                                                                <span class="badge me-2"
+                                                                    style="background-color: <?= $categoria->cor ?>; color: white; padding: 8px 12px;">
                                                                     <?= htmlspecialchars($categoria->nome) ?>
                                                                 </span>
                                                             </div>
@@ -90,7 +92,9 @@
                 <h5 class="modal-title">
                     <i class="fas fa-calendar-alt"></i> Detalhes do Evento
                 </h5>
-                <button type="button" class="btn-close" data-dismiss="modal"></button>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
             <div class="modal-body">
                 <div id="detalhesEventoContent">
@@ -118,152 +122,152 @@
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/locales/pt-br.global.min.js'></script>
 
 <style>
-.calendar-container {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    padding: 20px;
-    margin-top: 20px;
-}
+    .calendar-container {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+        margin-top: 20px;
+    }
 
-.fc-toolbar-title {
-    font-size: 1.2rem !important;
-    font-weight: 600 !important;
-    color: #495057 !important;
-}
+    .fc-toolbar-title {
+        font-size: 1.2rem !important;
+        font-weight: 600 !important;
+        color: #495057 !important;
+    }
 
-.fc-button-primary {
-    background-color: #007bff !important;
-    border-color: #007bff !important;
-}
+    .fc-button-primary {
+        background-color: #007bff !important;
+        border-color: #007bff !important;
+    }
 
-.fc-event {
-    border-radius: 4px !important;
-    font-size: 0.85rem !important;
-    border: none !important;
-}
+    .fc-event {
+        border-radius: 4px !important;
+        font-size: 0.85rem !important;
+        border: none !important;
+    }
 
-#calendar-loading {
-    display: block;
-}
+    #calendar-loading {
+        display: block;
+    }
 
-#calendar {
-    display: none;
-}
+    #calendar {
+        display: none;
+    }
 </style>
 
 <script>
-let calendar = null;
+    let calendar = null;
 
-// Função para mostrar/esconder loading
-function mostrarLoading(mostrar) {
-    const loading = document.getElementById('calendar-loading');
-    const calendar = document.getElementById('calendar');
-    
-    if (mostrar) {
-        loading.style.display = 'block';
-        calendar.style.display = 'none';
-    } else {
-        loading.style.display = 'none'; 
-        calendar.style.display = 'block';
+    // Função para mostrar/esconder loading
+    function mostrarLoading(mostrar) {
+        const loading = document.getElementById('calendar-loading');
+        const calendar = document.getElementById('calendar');
+
+        if (mostrar) {
+            loading.style.display = 'block';
+            calendar.style.display = 'none';
+        } else {
+            loading.style.display = 'none';
+            calendar.style.display = 'block';
+        }
     }
-}
 
-document.addEventListener('DOMContentLoaded', function() {
-    try {
-        const calendarEl = document.getElementById('calendar');
-        if (!calendarEl) {
+    document.addEventListener('DOMContentLoaded', function() {
+        try {
+            const calendarEl = document.getElementById('calendar');
+            if (!calendarEl) {
+                return;
+            }
+
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                locale: 'pt-br',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                buttonText: {
+                    today: 'Hoje',
+                    month: 'Mês',
+                    week: 'Semana',
+                    day: 'Dia'
+                },
+                height: 'auto',
+                navLinks: true,
+                editable: true,
+                selectable: true,
+                selectMirror: true,
+                dayMaxEvents: true,
+                weekends: true,
+
+                events: {
+                    url: '<?= URL ?>/agenda/eventos',
+                    method: 'GET',
+                    failure: function(error) {
+                        alert('Erro ao carregar eventos da agenda.');
+                    }
+                },
+
+                // Criar novo evento ao selecionar período
+                select: function(info) {
+                    const dataInicio = info.startStr;
+                    const dataFim = info.endStr;
+                    window.location.href = `<?= URL ?>/agenda/novoEvento?data_inicio=${dataInicio}&data_fim=${dataFim}`;
+                },
+
+                // Clique em evento
+                eventClick: function(info) {
+                    mostrarDetalhesEvento(info.event.id);
+                },
+
+                // Loading callback
+                loading: function(isLoading) {
+                    if (!isLoading) {
+                        mostrarLoading(false);
+                    }
+                }
+            });
+
+            calendar.render();
+
+        } catch (error) {
+            mostrarLoading(false);
+            document.getElementById('calendar').innerHTML = '<div class="alert alert-danger">Erro ao inicializar calendário: ' + error.message + '</div>';
+        }
+    });
+
+    function mostrarDetalhesEvento(eventoId) {
+        if (!eventoId) {
+            alert('Erro: ID do evento não fornecido');
             return;
         }
-        
-        calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth',
-            locale: 'pt-br',
-            headerToolbar: {
-                left: 'prev,next today',
-                center: 'title', 
-                right: 'dayGridMonth,timeGridWeek,timeGridDay'
-            },
-            buttonText: {
-                today: 'Hoje',
-                month: 'Mês',
-                week: 'Semana',
-                day: 'Dia'
-            },
-            height: 'auto',
-            navLinks: true,
-            editable: true,
-            selectable: true,
-            selectMirror: true,
-            dayMaxEvents: true,
-            weekends: true,
-            
-            events: {
-                url: '<?= URL ?>/agenda/eventos',
-                method: 'GET',
-                failure: function(error) {
-                    alert('Erro ao carregar eventos da agenda.');
-                }
-            },
-            
-            // Criar novo evento ao selecionar período
-            select: function(info) {
-                const dataInicio = info.startStr;
-                const dataFim = info.endStr;
-                window.location.href = `<?= URL ?>/agenda/novoEvento?data_inicio=${dataInicio}&data_fim=${dataFim}`;
-            },
-            
-            // Clique em evento
-            eventClick: function(info) {
-                mostrarDetalhesEvento(info.event.id);
-            },
-            
-            // Loading callback
-            loading: function(isLoading) {
-                if (!isLoading) {
-                    mostrarLoading(false);
-                }
-            }
-        });
-        
-        calendar.render();
-        
-    } catch (error) {
-        mostrarLoading(false);
-        document.getElementById('calendar').innerHTML = '<div class="alert alert-danger">Erro ao inicializar calendário: ' + error.message + '</div>';
-    }
-});
 
-function mostrarDetalhesEvento(eventoId) {
-    if (!eventoId) {
-        alert('Erro: ID do evento não fornecido');
-        return;
-    }
-    
-    const url = `<?= URL ?>/agenda/detalhesEvento/${eventoId}`;
-    
-    fetch(url)
-        .then(response => {
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                throw new Error('Resposta não é JSON válido');
-            }
-            
-            return response.text();
-        })
-        .then(text => {
-            try {
-                const evento = JSON.parse(text);
-                
-                if (evento.erro) {
-                    throw new Error(evento.erro);
+        const url = `<?= URL ?>/agenda/detalhesEvento/${eventoId}`;
+
+        fetch(url)
+            .then(response => {
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    throw new Error('Resposta não é JSON válido');
                 }
-                
-                if (!evento.titulo) {
-                    throw new Error('Evento não tem título');
-                }
-                
-                const conteudo = `
+
+                return response.text();
+            })
+            .then(text => {
+                try {
+                    const evento = JSON.parse(text);
+
+                    if (evento.erro) {
+                        throw new Error(evento.erro);
+                    }
+
+                    if (!evento.titulo) {
+                        throw new Error('Evento não tem título');
+                    }
+
+                    const conteudo = `
                     <div class="row">
                         <div class="col-12">
                             <h5>${evento.titulo}</h5>
@@ -276,30 +280,30 @@ function mostrarDetalhesEvento(eventoId) {
                         </div>
                     </div>
                 `;
-                
-                document.getElementById('detalhesEventoContent').innerHTML = conteudo;
-                
-                // Configurar botões
-                document.getElementById('btnEditarEvento').onclick = function() {
-                    window.location.href = `<?= URL ?>/agenda/editarEvento/${evento.id}`;
-                };
-                
-                document.getElementById('btnExcluirEvento').onclick = function() {
-                    if (confirm(`Deseja realmente excluir o evento "${evento.titulo}"?`)) {
-                        window.location.href = `<?= URL ?>/agenda/excluirEvento/${evento.id}`;
-                    }
-                };
-                
-                // Mostrar modal
-                const modal = new bootstrap.Modal(document.getElementById('modalDetalhesEvento'));
-                modal.show();
-                
-            } catch (parseError) {
-                throw new Error('Erro ao processar dados do evento');
-            }
-        })
-        .catch(error => {
-            alert('Erro ao carregar detalhes do evento: ' + error.message);
-        });
-}
-</script> 
+
+                    document.getElementById('detalhesEventoContent').innerHTML = conteudo;
+
+                    // Configurar botões
+                    document.getElementById('btnEditarEvento').onclick = function() {
+                        window.location.href = `<?= URL ?>/agenda/editarEvento/${evento.id}`;
+                    };
+
+                    document.getElementById('btnExcluirEvento').onclick = function() {
+                        if (confirm(`Deseja realmente excluir o evento "${evento.titulo}"?`)) {
+                            window.location.href = `<?= URL ?>/agenda/excluirEvento/${evento.id}`;
+                        }
+                    };
+
+                    // Mostrar modal
+                    const modal = new bootstrap.Modal(document.getElementById('modalDetalhesEvento'));
+                    modal.show();
+
+                } catch (parseError) {
+                    throw new Error('Erro ao processar dados do evento');
+                }
+            })
+            .catch(error => {
+                alert('Erro ao carregar detalhes do evento: ' + error.message);
+            });
+    }
+</script>

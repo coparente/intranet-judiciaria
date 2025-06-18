@@ -20,7 +20,7 @@
                                 <h3 id="tabelas" class="box-title">
                                     <i class="fas fa-calendar-plus me-2"></i> <?= $dados['tituloPagina'] ?>
                                 </h3>
-                                <div class="box-tools pull-right">
+                                <div class="pull-right">
                                     <a href="<?= URL ?>/agenda/index" class="btn btn-secondary btn-sm">
                                         <i class="fas fa-arrow-left"></i> Voltar à Agenda
                                     </a>

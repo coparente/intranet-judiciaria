@@ -119,6 +119,10 @@
                                             <div class="message-content">
                                                 <?= nl2br(htmlspecialchars($mensagem->conteudo)) ?>
                                             </div>
+                                        <?php elseif ($mensagem->tipo == 'button'): ?>
+                                            <div class="message-content">
+                                                <?= nl2br(htmlspecialchars($mensagem->conteudo)) ?>
+                                            </div>
                                         <?php elseif ($mensagem->tipo == 'image'): ?>
                                             <div class="message-media">
                                                 <img src="<?= URL ?>/<?= $mensagem->midia_url ?>" alt="Imagem" class="img-fluid">

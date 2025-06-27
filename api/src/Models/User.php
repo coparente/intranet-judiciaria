@@ -38,12 +38,12 @@ class User extends Database
     {
         $pdo = self::getConnection();
 
-        $stmt = $pdo->prepare("INSERT INTO usuarios (nome, email, senha_hash, criado_em) VALUES (?, ?, ?, NOW())");
+        $stmt = $pdo->prepare("INSERT INTO usuarios (nome, email, senha, criado_em) VALUES (?, ?, ?, NOW())");
 
         $stmt->execute([
             $data['nome'],
             $data['email'],
-            $data['senha_hash'],
+            $data['senha'],
         ]);
 
         return $pdo->lastInsertId() > 0 ? true : false;
@@ -71,7 +71,7 @@ class User extends Database
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         // Verifica se a senha está correta
-        if (!password_verify($data['senha'], $user['senha_hash'])) {
+        if (!password_verify($data['senha'], $user['senha'])) {
             return false; // Senha incorreta
         }
 
@@ -126,9 +126,9 @@ class User extends Database
             $values[] = $data['email'];
         }
         
-        if (isset($data['senha_hash'])) {
-            $fields[] = 'senha_hash = ?';
-            $values[] = $data['senha_hash'];
+        if (isset($data['senha'])) {
+            $fields[] = 'senha = ?';
+            $values[] = $data['senha'];
         }
         
         // Adiciona campo de atualização

@@ -12,9 +12,10 @@ class App
      */
     const DB_CONFIG = [
         'host' => 'localhost',
-        'dbname' => 'chat_api',
-        'username' => 'root',
-        'password' => '',
+        'port' => 3306,
+        'dbname' => 'copare52_dir_judiciaria',
+        'username' => 'copare52_dir_judiciaria',
+        'password' => 'parente1010',
         'charset' => 'utf8mb4'
     ];
 

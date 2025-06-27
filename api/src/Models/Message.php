@@ -20,7 +20,7 @@ class Message extends Database
         $pdo = self::getConnection();
 
         $stmt = $pdo->prepare("
-            INSERT INTO mensagens (usuario_id, numero, mensagem, direcao, status, data_hora) 
+            INSERT INTO mensagens_api (usuario_id, numero, mensagem, direcao, status, data_hora) 
             VALUES (?, ?, ?, ?, ?, NOW())
         ");
 
@@ -48,7 +48,7 @@ class Message extends Database
         $pdo = self::getConnection();
 
         $stmt = $pdo->prepare("
-            SELECT * FROM mensagens 
+            SELECT * FROM mensagens_api 
             WHERE usuario_id = ? 
             ORDER BY data_hora DESC 
             LIMIT ? OFFSET ?
@@ -73,7 +73,7 @@ class Message extends Database
         $pdo = self::getConnection();
 
         $stmt = $pdo->prepare("
-            SELECT * FROM mensagens 
+            SELECT * FROM mensagens_api 
             WHERE usuario_id = ? AND numero = ? 
             ORDER BY data_hora ASC 
             LIMIT ? OFFSET ?
@@ -100,7 +100,7 @@ class Message extends Database
                    COUNT(*) as total_mensagens,
                    SUM(CASE WHEN direcao = 'recebida' THEN 1 ELSE 0 END) as mensagens_recebidas,
                    SUM(CASE WHEN direcao = 'enviada' THEN 1 ELSE 0 END) as mensagens_enviadas
-            FROM mensagens 
+            FROM mensagens_api 
             WHERE usuario_id = ? 
             GROUP BY numero 
             ORDER BY ultima_mensagem DESC 
@@ -157,7 +157,7 @@ class Message extends Database
         $params[] = $offset;
 
         $stmt = $pdo->prepare("
-            SELECT * FROM mensagens 
+            SELECT * FROM mensagens_api 
             $where
             ORDER BY data_hora DESC 
             LIMIT ? OFFSET ?
@@ -179,7 +179,7 @@ class Message extends Database
     {
         $pdo = self::getConnection();
 
-        $stmt = $pdo->prepare("UPDATE mensagens SET status = ? WHERE id = ?");
+        $stmt = $pdo->prepare("UPDATE mensagens_api SET status = ? WHERE id = ?");
 
         $stmt->execute([$status, $id]);
 
@@ -196,7 +196,7 @@ class Message extends Database
     {
         $pdo = self::getConnection();
 
-        $stmt = $pdo->prepare("SELECT * FROM mensagens WHERE id = ?");
+        $stmt = $pdo->prepare("SELECT * FROM mensagens_api WHERE id = ?");
 
         $stmt->execute([$id]);
 
@@ -226,7 +226,7 @@ class Message extends Database
         $pdo = self::getConnection();
 
         $stmt = $pdo->prepare("
-            UPDATE mensagens 
+            UPDATE mensagens_api 
             SET status = 'lida' 
             WHERE usuario_id = ? AND numero = ? AND direcao = 'recebida' AND status != 'lida'
         ");
@@ -267,7 +267,7 @@ class Message extends Database
                 COUNT(*) as total,
                 SUM(CASE WHEN direcao = 'enviada' THEN 1 ELSE 0 END) as enviadas,
                 SUM(CASE WHEN direcao = 'recebida' THEN 1 ELSE 0 END) as recebidas
-            FROM mensagens 
+            FROM mensagens_api 
             $where
             GROUP BY status
             ORDER BY total DESC
@@ -311,7 +311,7 @@ class Message extends Database
         $pdo = self::getConnection();
 
         $stmt = $pdo->prepare("
-            SELECT * FROM mensagens 
+            SELECT * FROM mensagens_api 
             WHERE usuario_id = ? AND direcao = 'recebida' AND status != 'lida'
             ORDER BY data_hora DESC 
             LIMIT ?
@@ -333,7 +333,7 @@ class Message extends Database
         $pdo = self::getConnection();
 
         $stmt = $pdo->prepare("
-            SELECT COUNT(*) as total FROM mensagens 
+            SELECT COUNT(*) as total FROM mensagens_api 
             WHERE usuario_id = ? AND direcao = 'recebida' AND status != 'lida'
         ");
 
@@ -354,7 +354,7 @@ class Message extends Database
     {
         $pdo = self::getConnection();
 
-        $stmt = $pdo->prepare("UPDATE mensagens SET message_id = ? WHERE id = ?");
+        $stmt = $pdo->prepare("UPDATE mensagens_api SET message_id = ? WHERE id = ?");
 
         $stmt->execute([$messageId, $id]);
 
@@ -371,7 +371,7 @@ class Message extends Database
     {
         $pdo = self::getConnection();
 
-        $stmt = $pdo->prepare("DELETE FROM mensagens WHERE id = ?");
+        $stmt = $pdo->prepare("DELETE FROM mensagens_api WHERE id = ?");
 
         $stmt->execute([$id]);
 

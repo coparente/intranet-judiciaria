@@ -719,19 +719,7 @@ class Chat extends Controllers
                 'tipo' => 'text',
                 'valor' => $mensagem
             ]
-            // ,
-            // [
-            //     "tipo" => "text",
-            //     "valor" => "João Pereira" // {{2}} Nome do agente
-            // ],
-            // [
-            //     "tipo" => "text",
-            //     "valor" => "3ª Vara Cível de Goiânia" // {{3}} Comarca
-            // ],
-            // [
-            //     "tipo" => "text",
-            //     "valor" => "1234567-89.2024.8.09.0001" // {{4}} Número do processo
-            // ]
+
         ];
 
         return SerproHelper::enviarTemplate($numero, $nomeTemplate, $parametros);
@@ -904,6 +892,9 @@ class Chat extends Controllers
                 case 'video':
                 case 'document':
                     $conteudo = json_encode($mensagemData[$tipo] ?? []);
+                    break;
+                case 'button':
+                    $conteudo = $mensagemData['button']['text'] ?? '';
                     break;
                 default:
                     $conteudo = json_encode($mensagemData);

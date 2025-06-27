@@ -21,7 +21,7 @@ class Database
     {
         $host = App::get('db.host', 'localhost');
         $port = App::get('db.port', 3306);
-        $dbname = App::get('db.dbname', 'chat_api');
+        $dbname = App::get('db.dbname', 'dir_judiciaria');
         $username = App::get('db.username', 'root');
         $password = App::get('db.password', '');
         $charset = App::get('db.charset', 'utf8mb4');

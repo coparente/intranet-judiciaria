@@ -711,7 +711,7 @@ class Chat extends Controllers
     private function enviarPrimeiraMensagem($numero, $mensagem)
     {
         // Nome do template que deve estar aprovado na Meta
-        $nomeTemplate = 'simple_greeting'; // Substitua pelo nome do seu template aprovado
+        $nomeTemplate = 'central_intimacao_remota'; // Substitua pelo nome do seu template aprovado
 
         // Parâmetros do template (se o template tiver variáveis)
         $parametros = [

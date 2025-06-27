@@ -4,7 +4,7 @@
 // Documentação em português
 
 // URL base da API
-const API_BASE = 'http://localhost/chat-api/'; // Ajuste conforme necessário
+const API_BASE = 'https://coparente.top/intranet/api/v1/'; // Ajuste conforme necessário
 let currentToken = localStorage.getItem('chat_api_token');
 let currentUser = JSON.parse(localStorage.getItem('chat_api_user') || 'null');
 let currentChatContact = null;

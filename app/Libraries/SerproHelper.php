@@ -103,11 +103,11 @@ class SerproHelper
         // Adiciona parâmetros se fornecidos
         if (!empty($parametros)) {
             $payload['body'] = [
-                'parametros' => $parametros,
-                'header' => [
-                    'filename' =>  "tjgo.png",
-                    'linkMedia' => "https://coparente.top/intranet/public/img/tjgo.png"
-                ]
+                'parametros' => $parametros
+            ];
+            $payload['header'] = [
+                'filename' =>  "tjgo.png",
+                'linkMedia' => "https://coparente.top/intranet/public/img/tjgo.png"
             ];
         }
 

@@ -832,8 +832,15 @@ class Chat extends Controllers
             $messageId = '';
             $timestamp = '';
 
+            // 1. Detectar mensagem vinda do WhatsApp SERPRO
+            if (isset($payload['entry'][0]['changes'][0]['value']['messages'][0]['text']['body'])) {
+                $mensagemTexto = $payload['entry'][0]['changes'][0]['value']['messages'][0]['text']['body'];
+                $numero = $payload['entry'][0]['changes'][0]['value']['messages'][0]['from'];
+                $messageId = $payload['entry'][0]['changes'][0]['value']['messages'][0]['id'];
+                $timestamp = $payload['entry'][0]['changes'][0]['value']['messages'][0]['timestamp'];
+            }
             // 2. Detectar mensagem vinda do n8n
-            if (isset($payload['messages'][0]['text']['body'])) {
+            elseif (isset($payload['messages'][0]['text']['body'])) {
                 $mensagemTexto = $payload['messages'][0]['text']['body'];
                 $numero = $payload['messages'][0]['from'];
                 $messageId = $payload['messages'][0]['id'] ?? uniqid('n8n_');
@@ -864,135 +871,6 @@ class Chat extends Controllers
     }
 
     /**
-     * Processa mensagem recebida via webhook SERPRO
-     */
-    private function processarMensagemRecebida($mensagem)
-    {
-        try {
-            $numero = $mensagem['from'];
-            $messageId = $mensagem['id'];
-            $timestamp = $mensagem['timestamp'];
-            $tipo = $mensagem['type'];
-
-            // Buscar ou criar conversa
-            $conversa = $this->chatModel->buscarOuCriarConversaPorNumero($numero);
-
-            if ($conversa) {
-                // Verificar se a mensagem já existe (evitar duplicatas)
-                $mensagemExistente = $this->verificarMensagemExistente($messageId);
-                
-                if (!$mensagemExistente) {
-                    // Extrair conteúdo e informações de mídia baseado no tipo
-                    $conteudo = '';
-                    $midiaId = null;
-                    $midiaTipo = null;
-                    $midiaFilename = null;
-                    $midiaUrl = null;
-                    
-                    switch ($tipo) {
-                        case 'text':
-                            $conteudo = $mensagem['text'];
-                            break;
-                            
-                        case 'image':
-                            if (isset($mensagem['image']['id'])) {
-                                $midiaId = $mensagem['image']['id'];
-                                $midiaTipo = $mensagem['image']['mime_type'] ?? 'image/jpeg';
-                                $conteudo = $midiaId; // Temporário
-                            } else {
-                                $conteudo = json_encode($mensagem['image']);
-                            }
-                            break;
-                            
-                        case 'audio':
-                            if (isset($mensagem['audio']['id'])) {
-                                $midiaId = $mensagem['audio']['id'];
-                                $midiaTipo = $mensagem['audio']['mime_type'] ?? 'audio/ogg';
-                                $conteudo = $midiaId; // Temporário
-                            } else {
-                                $conteudo = json_encode($mensagem['audio']);
-                            }
-                            break;
-                            
-                        case 'video':
-                            if (isset($mensagem['video']['id'])) {
-                                $midiaId = $mensagem['video']['id'];
-                                $midiaTipo = $mensagem['video']['mime_type'] ?? 'video/mp4';
-                                $conteudo = $midiaId; // Temporário
-                            } else {
-                                $conteudo = json_encode($mensagem['video']);
-                            }
-                            break;
-                            
-                        case 'document':
-                            if (isset($mensagem['document']['id'])) {
-                                $midiaId = $mensagem['document']['id'];
-                                $midiaTipo = $mensagem['document']['mime_type'] ?? 'application/octet-stream';
-                                $midiaFilename = $mensagem['document']['filename'] ?? 'documento';
-                                $conteudo = $midiaId; // Temporário
-                            } else {
-                                $conteudo = json_encode($mensagem['document']);
-                            }
-                            break;
-                            
-                        default:
-                            $conteudo = json_encode($mensagem[$tipo] ?? $mensagem);
-                    }
-
-                    // Se há mídia, fazer download antes de salvar
-                    if ($midiaId && in_array($tipo, ['image', 'audio', 'video', 'document'])) {
-                        $resultadoDownload = $this->baixarMidiaRecebida($midiaId, $tipo, $midiaTipo, $midiaFilename);
-                        
-                        if ($resultadoDownload['sucesso']) {
-                            $midiaUrl = $resultadoDownload['url_local'];
-                            $midiaFilename = $resultadoDownload['nome_arquivo'];
-                            $conteudo = $resultadoDownload['caminho_relativo']; // Usar caminho ao invés do ID
-                            
-                            error_log("✅ Mídia SERPRO baixada com sucesso: {$midiaUrl}");
-                        } else {
-                            error_log("❌ Erro ao baixar mídia SERPRO: " . $resultadoDownload['erro']);
-                            // Continua salvando com o ID da mídia mesmo se o download falhar
-                        }
-                    }
-
-                    // Salvar mensagem recebida
-                    $dadosMensagem = [
-                        'conversa_id' => $conversa->id,
-                        'remetente_id' => null, // Mensagem recebida
-                        'tipo' => $tipo,
-                        'conteudo' => $conteudo,
-                        'midia_url' => $midiaUrl,
-                        'midia_nome' => $midiaFilename,
-                        'message_id' => $messageId,
-                        'status' => 'recebido',
-                        'enviado_em' => date('Y-m-d H:i:s', $timestamp)
-                    ];
-
-                    $resultado = $this->chatModel->salvarMensagem($dadosMensagem);
-                    
-                    if ($resultado) {
-                        // Atualizar conversa
-                        $this->chatModel->atualizarConversa($conversa->id);
-                        
-                        // Log de sucesso
-                        $tipoLog = $midiaId ? "mídia ($tipo)" : "texto";
-                        error_log("✅ Mensagem SERPRO $tipoLog salva com sucesso: ID={$messageId}, Conversa={$conversa->id}");
-                    } else {
-                        error_log("❌ Erro ao salvar mensagem SERPRO no banco: " . print_r($dadosMensagem, true));
-                    }
-                } else {
-                    error_log("⚠️ Mensagem SERPRO duplicada ignorada: ID={$messageId}");
-                }
-            } else {
-                error_log("❌ Erro ao criar/buscar conversa SERPRO para número: {$numero}");
-            }
-            
-        } catch (Exception $e) {
-            error_log("❌ ERRO ao processar mensagem SERPRO: " . $e->getMessage());
-            error_log("Dados da mensagem: " . print_r($mensagem, true));
-        }
-    }
-    /**
      * Processa mensagem recebida do n8n
      */
     private function processarMensagemN8n($mensagemData)
@@ -1003,27 +881,47 @@ class Chat extends Controllers
             $timestamp = $mensagemData['timestamp'] ?? time();
             $tipo = $mensagemData['type'] ?? 'text';
             
-            // Extrair conteúdo baseado no tipo
+            // Extrair conteúdo e informações de mídia baseado no tipo
             $conteudo = '';
+            $midiaId = null;
+            $midiaTipo = null;
+            $midiaFilename = null;
+            $midiaUrl = null;
+            
             switch ($tipo) {
                 case 'text':
                     $conteudo = $mensagemData['text']['body'] ?? '';
                     break;
+                    
                 case 'image':
-                    $conteudo = $mensagemData['image']['id'] ?? '';
+                    $midiaId = $mensagemData['image']['id'] ?? '';
+                    $midiaTipo = $mensagemData['image']['mime_type'] ?? 'image/jpeg';
+                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do arquivo
                     break;
+                    
                 case 'audio':
-                    $conteudo = $mensagemData['audio']['id'] ?? '';
+                    $midiaId = $mensagemData['audio']['id'] ?? '';
+                    $midiaTipo = $mensagemData['audio']['mime_type'] ?? 'audio/ogg';
+                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do arquivo
                     break;
+                    
                 case 'video':
-                    $conteudo = $mensagemData['video']['id'] ?? '';
+                    $midiaId = $mensagemData['video']['id'] ?? '';
+                    $midiaTipo = $mensagemData['video']['mime_type'] ?? 'video/mp4';
+                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do arquivo
                     break;
+                    
                 case 'document':
-                    $conteudo = $mensagemData['document']['id'] ?? '';
+                    $midiaId = $mensagemData['document']['id'] ?? '';
+                    $midiaTipo = $mensagemData['document']['mime_type'] ?? 'application/octet-stream';
+                    $midiaFilename = $mensagemData['document']['filename'] ?? 'documento';
+                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do arquivo
                     break;
+                    
                 case 'button':
                     $conteudo = $mensagemData['button']['text'] ?? '';
                     break;
+                    
                 default:
                     $conteudo = json_encode($mensagemData);
             }
@@ -1036,22 +934,6 @@ class Chat extends Controllers
                 $mensagemExistente = $this->verificarMensagemExistente($messageId);
                 
                 if (!$mensagemExistente) {
-                    // Se há mídia, fazer download antes de salvar
-                    if ($midiaId && in_array($tipo, ['image', 'audio', 'video', 'document'])) {
-                        $resultadoDownload = $this->baixarMidiaRecebida($midiaId, $tipo, $midiaTipo, $midiaFilename);
-                        
-                        if ($resultadoDownload['sucesso']) {
-                            $midiaUrl = $resultadoDownload['url_local'];
-                            $midiaFilename = $resultadoDownload['nome_arquivo'];
-                            $conteudo = $resultadoDownload['caminho_relativo']; // Usar caminho ao invés do ID
-                            
-                            error_log("✅ Mídia baixada com sucesso: {$midiaUrl}");
-                        } else {
-                            error_log("❌ Erro ao baixar mídia: " . $resultadoDownload['erro']);
-                            // Continua salvando com o ID da mídia mesmo se o download falhar
-                        }
-                    }
-                    
                     // Salvar mensagem recebida
                     $dadosMensagem = [
                         'conversa_id' => $conversa->id,
@@ -1072,7 +954,8 @@ class Chat extends Controllers
                         $this->chatModel->atualizarConversa($conversa->id);
                         
                         // Log de sucesso
-                        error_log("✅ Mensagem n8n salva com sucesso: ID={$messageId}, Conversa={$conversa->id}");
+                        $tipoLog = $midiaId ? "mídia ($tipo)" : "texto";
+                        error_log("✅ Mensagem $tipoLog salva com sucesso: ID={$messageId}, Conversa={$conversa->id}");
                     } else {
                         error_log("❌ Erro ao salvar mensagem n8n no banco: " . print_r($dadosMensagem, true));
                     }
@@ -2227,41 +2110,41 @@ class Chat extends Controllers
     /**
      * Processa mensagem recebida via webhook SERPRO
      */
-    // private function processarMensagemRecebida($mensagem)
-    // {
-    //     $numero = $mensagem['from'];
+    private function processarMensagemRecebida($mensagem)
+    {
+        $numero = $mensagem['from'];
 
-    //     // Buscar ou criar conversa
-    //     $conversa = $this->chatModel->buscarOuCriarConversaPorNumero($numero);
+        // Buscar ou criar conversa
+        $conversa = $this->chatModel->buscarOuCriarConversaPorNumero($numero);
 
-    //     if ($conversa) {
-    //         // Salvar mensagem recebida
-    //         $conteudo = '';
-    //         switch ($mensagem['type']) {
-    //             case 'text':
-    //                 $conteudo = $mensagem['text'];
-    //                 break;
-    //             case 'image':
-    //             case 'audio':
-    //             case 'video':
-    //             case 'document':
-    //                 $conteudo = json_encode($mensagem[$mensagem['type']]);
-    //                 break;
-    //         }
+        if ($conversa) {
+            // Salvar mensagem recebida
+            $conteudo = '';
+            switch ($mensagem['type']) {
+                case 'text':
+                    $conteudo = $mensagem['text'];
+                    break;
+                case 'image':
+                case 'audio':
+                case 'video':
+                case 'document':
+                    $conteudo = json_encode($mensagem[$mensagem['type']]);
+                    break;
+            }
 
-    //         $this->chatModel->salvarMensagem([
-    //             'conversa_id' => $conversa->id,
-    //             'remetente_id' => null, // Mensagem recebida
-    //             'tipo' => $mensagem['type'],
-    //             'conteudo' => $conteudo,
-    //             'message_id' => $mensagem['id'],
-    //             'status' => 'recebido',
-    //             'enviado_em' => date('Y-m-d H:i:s', $mensagem['timestamp'])
-    //         ]);
+            $this->chatModel->salvarMensagem([
+                'conversa_id' => $conversa->id,
+                'remetente_id' => null, // Mensagem recebida
+                'tipo' => $mensagem['type'],
+                'conteudo' => $conteudo,
+                'message_id' => $mensagem['id'],
+                'status' => 'recebido',
+                'enviado_em' => date('Y-m-d H:i:s', $mensagem['timestamp'])
+            ]);
 
-    //         // Atualizar conversa
-    //         $this->chatModel->atualizarConversa($conversa->id);
-    //     }
-    // }
+            // Atualizar conversa
+            $this->chatModel->atualizarConversa($conversa->id);
+        }
+    }
 }
 

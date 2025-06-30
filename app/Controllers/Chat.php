@@ -1042,7 +1042,7 @@ class Chat extends Controllers
                     
                     switch ($tipo) {
                         case 'text':
-                            $conteudo = $mensagem['text'];
+                            $conteudo = $mensagem['text']['body'] ?? '';
                             break;
                             
                         case 'image':

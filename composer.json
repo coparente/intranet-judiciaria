@@ -6,7 +6,8 @@
         "php": ">=7.4",
         "dompdf/dompdf": "^3.1",
         "smalot/pdfparser": "^2.12",
-        "vlucas/phpdotenv": "^5.5"
+        "vlucas/phpdotenv": "^5.5",
+        "aws/aws-sdk-php": "^3.291"
     },
     "autoload": {
         "psr-4": {

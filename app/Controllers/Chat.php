@@ -832,13 +832,6 @@ class Chat extends Controllers
             $messageId = '';
             $timestamp = '';
 
-            // // 1. Detectar mensagem vinda do WhatsApp SERPRO
-            // if (isset($payload['entry'][0]['changes'][0]['value']['messages'][0]['text']['body'])) {
-            //     $mensagemTexto = $payload['entry'][0]['changes'][0]['value']['messages'][0]['text']['body'];
-            //     $numero = $payload['entry'][0]['changes'][0]['value']['messages'][0]['from'];
-            //     $messageId = $payload['entry'][0]['changes'][0]['value']['messages'][0]['id'];
-            //     $timestamp = $payload['entry'][0]['changes'][0]['value']['messages'][0]['timestamp'];
-            // }
             // 2. Detectar mensagem vinda do n8n
             if (isset($payload['messages'][0]['text']['body'])) {
                 $mensagemTexto = $payload['messages'][0]['text']['body'];
@@ -1011,84 +1004,29 @@ class Chat extends Controllers
             $tipo = $mensagemData['type'] ?? 'text';
             
             // Extrair conteúdo baseado no tipo
-            // $conteudo = '';
-            // switch ($tipo) {
-            //     case 'text':
-            //         $conteudo = $mensagemData['text']['body'] ?? '';
-            //         break;
-            //     case 'image':
-            //         $conteudo = $mensagemData['image']['id'] ?? '';
-            //         break;
-            //     case 'audio':
-            //         $conteudo = $mensagemData['audio']['id'] ?? '';
-            //         break;
-            //     case 'video':
-            //         $conteudo = $mensagemData['video']['id'] ?? '';
-            //         break;
-            //     case 'document':
-            //         $conteudo = $mensagemData['document']['id'] ?? '';
-            //         break;
-            //     case 'button':
-            //         $conteudo = $mensagemData['button']['text'] ?? '';
-            //         break;
-            //     default:
-            //         $conteudo = json_encode($mensagemData);
-            // }
             $conteudo = '';
-                    $midiaId = null;
-                    $midiaTipo = null;
-                    $midiaFilename = null;
-                    $midiaUrl = null;
-                    
-                    switch ($tipo) {
-                        case 'text':
-                            $conteudo = $mensagem['text']['body'] ?? '';
-                            break;
-                            
-                        case 'image':
-                            if (isset($mensagem['image']['id'])) {
-                                $midiaId = $mensagem['image']['id'];
-                                $midiaTipo = $mensagem['image']['mime_type'] ?? 'image/jpeg';
-                                $conteudo = $midiaId; // Temporário
-                            } else {
-                                $conteudo = json_encode($mensagem['image']);
-                            }
-                            break;
-                            
-                        case 'audio':
-                            if (isset($mensagem['audio']['id'])) {
-                                $midiaId = $mensagem['audio']['id'];
-                                $midiaTipo = $mensagem['audio']['mime_type'] ?? 'audio/ogg';
-                                $conteudo = $midiaId; // Temporário
-                            } else {
-                                $conteudo = json_encode($mensagem['audio']);
-                            }
-                            break;
-                            
-                        case 'video':
-                            if (isset($mensagem['video']['id'])) {
-                                $midiaId = $mensagem['video']['id'];
-                                $midiaTipo = $mensagem['video']['mime_type'] ?? 'video/mp4';
-                                $conteudo = $midiaId; // Temporário
-                            } else {
-                                $conteudo = json_encode($mensagem['video']);
-                            }
-                            break;
-                            
-                        case 'document':
-                            if (isset($mensagem['document']['id'])) {
-                                $midiaId = $mensagem['document']['id'];
-                                $midiaTipo = $mensagem['document']['mime_type'] ?? 'application/octet-stream';
-                                $midiaFilename = $mensagem['document']['filename'] ?? 'documento';
-                                $conteudo = $midiaId; // Temporário
-                            } else {
-                                $conteudo = json_encode($mensagem['document']);
-                            }
-                            break;
-                            
-                        default:
-                            $conteudo = json_encode($mensagem[$tipo] ?? $mensagem);
-                        }
+            switch ($tipo) {
+                case 'text':
+                    $conteudo = $mensagemData['text']['body'] ?? '';
+                    break;
+                case 'image':
+                    $conteudo = $mensagemData['image']['id'] ?? '';
+                    break;
+                case 'audio':
+                    $conteudo = $mensagemData['audio']['id'] ?? '';
+                    break;
+                case 'video':
+                    $conteudo = $mensagemData['video']['id'] ?? '';
+                    break;
+                case 'document':
+                    $conteudo = $mensagemData['document']['id'] ?? '';
+                    break;
+                case 'button':
+                    $conteudo = $mensagemData['button']['text'] ?? '';
+                    break;
+                default:
+                    $conteudo = json_encode($mensagemData);
+            }
 
             // Buscar ou criar conversa
             $conversa = $this->chatModel->buscarOuCriarConversaPorNumero($numero);

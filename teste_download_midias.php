@@ -4,7 +4,7 @@
  * Execute este script para verificar se tudo está funcionando corretamente
  */
 
-require_once 'app/config.php';
+require_once 'app/configuracao.php';
 require_once 'app/Libraries/Database.php';
 require_once 'app/Libraries/SerproHelper.php';
 require_once 'app/Models/ChatModel.php';

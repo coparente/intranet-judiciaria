@@ -832,15 +832,15 @@ class Chat extends Controllers
             $messageId = '';
             $timestamp = '';
 
-            // 1. Detectar mensagem vinda do WhatsApp SERPRO
-            if (isset($payload['entry'][0]['changes'][0]['value']['messages'][0]['text']['body'])) {
-                $mensagemTexto = $payload['entry'][0]['changes'][0]['value']['messages'][0]['text']['body'];
-                $numero = $payload['entry'][0]['changes'][0]['value']['messages'][0]['from'];
-                $messageId = $payload['entry'][0]['changes'][0]['value']['messages'][0]['id'];
-                $timestamp = $payload['entry'][0]['changes'][0]['value']['messages'][0]['timestamp'];
-            }
+            // // 1. Detectar mensagem vinda do WhatsApp SERPRO
+            // if (isset($payload['entry'][0]['changes'][0]['value']['messages'][0]['text']['body'])) {
+            //     $mensagemTexto = $payload['entry'][0]['changes'][0]['value']['messages'][0]['text']['body'];
+            //     $numero = $payload['entry'][0]['changes'][0]['value']['messages'][0]['from'];
+            //     $messageId = $payload['entry'][0]['changes'][0]['value']['messages'][0]['id'];
+            //     $timestamp = $payload['entry'][0]['changes'][0]['value']['messages'][0]['timestamp'];
+            // }
             // 2. Detectar mensagem vinda do n8n
-            elseif (isset($payload['messages'][0]['text']['body'])) {
+            if (isset($payload['messages'][0]['text']['body'])) {
                 $mensagemTexto = $payload['messages'][0]['text']['body'];
                 $numero = $payload['messages'][0]['from'];
                 $messageId = $payload['messages'][0]['id'] ?? uniqid('n8n_');
@@ -856,7 +856,7 @@ class Chat extends Controllers
 
             // 3. Processar mensagem do n8n diretamente
             if (isset($payload['messages'][0])) {
-                $this->processarMensagemN8n($payload['messages'][0]);
+                $this->processarMensagemRecebida($payload['messages'][0]);
             }
             // 4. Processar estrutura SERPRO padrão
             else {
@@ -871,6 +871,135 @@ class Chat extends Controllers
     }
 
     /**
+     * Processa mensagem recebida via webhook SERPRO
+     */
+    private function processarMensagemRecebida($mensagem)
+    {
+        try {
+            $numero = $mensagem['from'];
+            $messageId = $mensagem['id'];
+            $timestamp = $mensagem['timestamp'];
+            $tipo = $mensagem['type'];
+
+            // Buscar ou criar conversa
+            $conversa = $this->chatModel->buscarOuCriarConversaPorNumero($numero);
+
+            if ($conversa) {
+                // Verificar se a mensagem já existe (evitar duplicatas)
+                $mensagemExistente = $this->verificarMensagemExistente($messageId);
+                
+                if (!$mensagemExistente) {
+                    // Extrair conteúdo e informações de mídia baseado no tipo
+                    $conteudo = '';
+                    $midiaId = null;
+                    $midiaTipo = null;
+                    $midiaFilename = null;
+                    $midiaUrl = null;
+                    
+                    switch ($tipo) {
+                        case 'text':
+                            $conteudo = $mensagem['text'];
+                            break;
+                            
+                        case 'image':
+                            if (isset($mensagem['image']['id'])) {
+                                $midiaId = $mensagem['image']['id'];
+                                $midiaTipo = $mensagem['image']['mime_type'] ?? 'image/jpeg';
+                                $conteudo = $midiaId; // Temporário
+                            } else {
+                                $conteudo = json_encode($mensagem['image']);
+                            }
+                            break;
+                            
+                        case 'audio':
+                            if (isset($mensagem['audio']['id'])) {
+                                $midiaId = $mensagem['audio']['id'];
+                                $midiaTipo = $mensagem['audio']['mime_type'] ?? 'audio/ogg';
+                                $conteudo = $midiaId; // Temporário
+                            } else {
+                                $conteudo = json_encode($mensagem['audio']);
+                            }
+                            break;
+                            
+                        case 'video':
+                            if (isset($mensagem['video']['id'])) {
+                                $midiaId = $mensagem['video']['id'];
+                                $midiaTipo = $mensagem['video']['mime_type'] ?? 'video/mp4';
+                                $conteudo = $midiaId; // Temporário
+                            } else {
+                                $conteudo = json_encode($mensagem['video']);
+                            }
+                            break;
+                            
+                        case 'document':
+                            if (isset($mensagem['document']['id'])) {
+                                $midiaId = $mensagem['document']['id'];
+                                $midiaTipo = $mensagem['document']['mime_type'] ?? 'application/octet-stream';
+                                $midiaFilename = $mensagem['document']['filename'] ?? 'documento';
+                                $conteudo = $midiaId; // Temporário
+                            } else {
+                                $conteudo = json_encode($mensagem['document']);
+                            }
+                            break;
+                            
+                        default:
+                            $conteudo = json_encode($mensagem[$tipo] ?? $mensagem);
+                    }
+
+                    // Se há mídia, fazer download antes de salvar
+                    if ($midiaId && in_array($tipo, ['image', 'audio', 'video', 'document'])) {
+                        $resultadoDownload = $this->baixarMidiaRecebida($midiaId, $tipo, $midiaTipo, $midiaFilename);
+                        
+                        if ($resultadoDownload['sucesso']) {
+                            $midiaUrl = $resultadoDownload['url_local'];
+                            $midiaFilename = $resultadoDownload['nome_arquivo'];
+                            $conteudo = $resultadoDownload['caminho_relativo']; // Usar caminho ao invés do ID
+                            
+                            error_log("✅ Mídia SERPRO baixada com sucesso: {$midiaUrl}");
+                        } else {
+                            error_log("❌ Erro ao baixar mídia SERPRO: " . $resultadoDownload['erro']);
+                            // Continua salvando com o ID da mídia mesmo se o download falhar
+                        }
+                    }
+
+                    // Salvar mensagem recebida
+                    $dadosMensagem = [
+                        'conversa_id' => $conversa->id,
+                        'remetente_id' => null, // Mensagem recebida
+                        'tipo' => $tipo,
+                        'conteudo' => $conteudo,
+                        'midia_url' => $midiaUrl,
+                        'midia_nome' => $midiaFilename,
+                        'message_id' => $messageId,
+                        'status' => 'recebido',
+                        'enviado_em' => date('Y-m-d H:i:s', $timestamp)
+                    ];
+
+                    $resultado = $this->chatModel->salvarMensagem($dadosMensagem);
+                    
+                    if ($resultado) {
+                        // Atualizar conversa
+                        $this->chatModel->atualizarConversa($conversa->id);
+                        
+                        // Log de sucesso
+                        $tipoLog = $midiaId ? "mídia ($tipo)" : "texto";
+                        error_log("✅ Mensagem SERPRO $tipoLog salva com sucesso: ID={$messageId}, Conversa={$conversa->id}");
+                    } else {
+                        error_log("❌ Erro ao salvar mensagem SERPRO no banco: " . print_r($dadosMensagem, true));
+                    }
+                } else {
+                    error_log("⚠️ Mensagem SERPRO duplicada ignorada: ID={$messageId}");
+                }
+            } else {
+                error_log("❌ Erro ao criar/buscar conversa SERPRO para número: {$numero}");
+            }
+            
+        } catch (Exception $e) {
+            error_log("❌ ERRO ao processar mensagem SERPRO: " . $e->getMessage());
+            error_log("Dados da mensagem: " . print_r($mensagem, true));
+        }
+    }
+    /**
      * Processa mensagem recebida do n8n
      */
     private function processarMensagemN8n($mensagemData)
@@ -881,47 +1010,27 @@ class Chat extends Controllers
             $timestamp = $mensagemData['timestamp'] ?? time();
             $tipo = $mensagemData['type'] ?? 'text';
             
-            // Extrair conteúdo e informações de mídia baseado no tipo
+            // Extrair conteúdo baseado no tipo
             $conteudo = '';
-            $midiaId = null;
-            $midiaTipo = null;
-            $midiaFilename = null;
-            $midiaUrl = null;
-            
             switch ($tipo) {
                 case 'text':
                     $conteudo = $mensagemData['text']['body'] ?? '';
                     break;
-                    
                 case 'image':
-                    $midiaId = $mensagemData['image']['id'] ?? '';
-                    $midiaTipo = $mensagemData['image']['mime_type'] ?? 'image/jpeg';
-                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do arquivo
+                    $conteudo = $mensagemData['image']['id'] ?? '';
                     break;
-                    
                 case 'audio':
-                    $midiaId = $mensagemData['audio']['id'] ?? '';
-                    $midiaTipo = $mensagemData['audio']['mime_type'] ?? 'audio/ogg';
-                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do arquivo
+                    $conteudo = $mensagemData['audio']['id'] ?? '';
                     break;
-                    
                 case 'video':
-                    $midiaId = $mensagemData['video']['id'] ?? '';
-                    $midiaTipo = $mensagemData['video']['mime_type'] ?? 'video/mp4';
-                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do arquivo
+                    $conteudo = $mensagemData['video']['id'] ?? '';
                     break;
-                    
                 case 'document':
-                    $midiaId = $mensagemData['document']['id'] ?? '';
-                    $midiaTipo = $mensagemData['document']['mime_type'] ?? 'application/octet-stream';
-                    $midiaFilename = $mensagemData['document']['filename'] ?? 'documento';
-                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do arquivo
+                    $conteudo = $mensagemData['document']['id'] ?? '';
                     break;
-                    
                 case 'button':
                     $conteudo = $mensagemData['button']['text'] ?? '';
                     break;
-                    
                 default:
                     $conteudo = json_encode($mensagemData);
             }
@@ -970,8 +1079,7 @@ class Chat extends Controllers
                         $this->chatModel->atualizarConversa($conversa->id);
                         
                         // Log de sucesso
-                        $tipoLog = $midiaId ? "mídia ($tipo)" : "texto";
-                        error_log("✅ Mensagem $tipoLog salva com sucesso: ID={$messageId}, Conversa={$conversa->id}");
+                        error_log("✅ Mensagem n8n salva com sucesso: ID={$messageId}, Conversa={$conversa->id}");
                     } else {
                         error_log("❌ Erro ao salvar mensagem n8n no banco: " . print_r($dadosMensagem, true));
                     }
@@ -2126,637 +2234,41 @@ class Chat extends Controllers
     /**
      * Processa mensagem recebida via webhook SERPRO
      */
-    private function processarMensagemRecebida($mensagem)
-    {
-        try {
-            $numero = $mensagem['from'];
-            $messageId = $mensagem['id'];
-            $timestamp = $mensagem['timestamp'];
-            $tipo = $mensagem['type'];
+    // private function processarMensagemRecebida($mensagem)
+    // {
+    //     $numero = $mensagem['from'];
 
-            // Buscar ou criar conversa
-            $conversa = $this->chatModel->buscarOuCriarConversaPorNumero($numero);
+    //     // Buscar ou criar conversa
+    //     $conversa = $this->chatModel->buscarOuCriarConversaPorNumero($numero);
 
-            if ($conversa) {
-                // Verificar se a mensagem já existe (evitar duplicatas)
-                $mensagemExistente = $this->verificarMensagemExistente($messageId);
-                
-                if (!$mensagemExistente) {
-                    // Extrair conteúdo e informações de mídia baseado no tipo
-                    $conteudo = '';
-                    $midiaId = null;
-                    $midiaTipo = null;
-                    $midiaFilename = null;
-                    $midiaUrl = null;
-                    
-                    switch ($tipo) {
-                        case 'text':
-                            $conteudo = $mensagem['text'];
-                            break;
-                            
-                        case 'image':
-                            if (isset($mensagem['image']['id'])) {
-                                $midiaId = $mensagem['image']['id'];
-                                $midiaTipo = $mensagem['image']['mime_type'] ?? 'image/jpeg';
-                                $conteudo = $midiaId; // Temporário
-                            } else {
-                                $conteudo = json_encode($mensagem['image']);
-                            }
-                            break;
-                            
-                        case 'audio':
-                            if (isset($mensagem['audio']['id'])) {
-                                $midiaId = $mensagem['audio']['id'];
-                                $midiaTipo = $mensagem['audio']['mime_type'] ?? 'audio/ogg';
-                                $conteudo = $midiaId; // Temporário
-                            } else {
-                                $conteudo = json_encode($mensagem['audio']);
-                            }
-                            break;
-                            
-                        case 'video':
-                            if (isset($mensagem['video']['id'])) {
-                                $midiaId = $mensagem['video']['id'];
-                                $midiaTipo = $mensagem['video']['mime_type'] ?? 'video/mp4';
-                                $conteudo = $midiaId; // Temporário
-                            } else {
-                                $conteudo = json_encode($mensagem['video']);
-                            }
-                            break;
-                            
-                        case 'document':
-                            if (isset($mensagem['document']['id'])) {
-                                $midiaId = $mensagem['document']['id'];
-                                $midiaTipo = $mensagem['document']['mime_type'] ?? 'application/octet-stream';
-                                $midiaFilename = $mensagem['document']['filename'] ?? 'documento';
-                                $conteudo = $midiaId; // Temporário
-                            } else {
-                                $conteudo = json_encode($mensagem['document']);
-                            }
-                            break;
-                            
-                        default:
-                            $conteudo = json_encode($mensagem[$tipo] ?? $mensagem);
-                    }
+    //     if ($conversa) {
+    //         // Salvar mensagem recebida
+    //         $conteudo = '';
+    //         switch ($mensagem['type']) {
+    //             case 'text':
+    //                 $conteudo = $mensagem['text'];
+    //                 break;
+    //             case 'image':
+    //             case 'audio':
+    //             case 'video':
+    //             case 'document':
+    //                 $conteudo = json_encode($mensagem[$mensagem['type']]);
+    //                 break;
+    //         }
 
-                    // Se há mídia, fazer download antes de salvar
-                    if ($midiaId && in_array($tipo, ['image', 'audio', 'video', 'document'])) {
-                        $resultadoDownload = $this->baixarMidiaRecebida($midiaId, $tipo, $midiaTipo, $midiaFilename);
-                        
-                        if ($resultadoDownload['sucesso']) {
-                            $midiaUrl = $resultadoDownload['url_local'];
-                            $midiaFilename = $resultadoDownload['nome_arquivo'];
-                            $conteudo = $resultadoDownload['caminho_relativo']; // Usar caminho ao invés do ID
-                            
-                            error_log("✅ Mídia baixada com sucesso: {$midiaUrl}");
-                        } else {
-                            error_log("❌ Erro ao baixar mídia: " . $resultadoDownload['erro']);
-                            // Continua salvando com o ID da mídia mesmo se o download falhar
-                        }
-                    }
+    //         $this->chatModel->salvarMensagem([
+    //             'conversa_id' => $conversa->id,
+    //             'remetente_id' => null, // Mensagem recebida
+    //             'tipo' => $mensagem['type'],
+    //             'conteudo' => $conteudo,
+    //             'message_id' => $mensagem['id'],
+    //             'status' => 'recebido',
+    //             'enviado_em' => date('Y-m-d H:i:s', $mensagem['timestamp'])
+    //         ]);
 
-                    // Salvar mensagem recebida
-                    $dadosMensagem = [
-                        'conversa_id' => $conversa->id,
-                        'remetente_id' => null, // Mensagem recebida
-                        'tipo' => $tipo,
-                        'conteudo' => $conteudo,
-                        'midia_url' => $midiaUrl,
-                        'midia_nome' => $midiaFilename,
-                        'message_id' => $messageId,
-                        'status' => 'recebido',
-                        'enviado_em' => date('Y-m-d H:i:s', $timestamp)
-                    ];
-
-                    $resultado = $this->chatModel->salvarMensagem($dadosMensagem);
-                    
-                    if ($resultado) {
-                        // Atualizar conversa
-                        $this->chatModel->atualizarConversa($conversa->id);
-                        
-                        // Log de sucesso
-                        $tipoLog = $midiaId ? "mídia ($tipo)" : "texto";
-                        error_log("✅ Mensagem SERPRO $tipoLog salva com sucesso: ID={$messageId}, Conversa={$conversa->id}");
-                    } else {
-                        error_log("❌ Erro ao salvar mensagem SERPRO no banco: " . print_r($dadosMensagem, true));
-                    }
-                } else {
-                    error_log("⚠️ Mensagem SERPRO duplicada ignorada: ID={$messageId}");
-                }
-            } else {
-                error_log("❌ Erro ao criar/buscar conversa SERPRO para número: {$numero}");
-            }
-            
-        } catch (Exception $e) {
-            error_log("❌ ERRO ao processar mensagem SERPRO: " . $e->getMessage());
-            error_log("Dados da mensagem: " . print_r($mensagem, true));
-        }
-    }
-
-    /**
-     * Baixa mídia recebida via webhook e salva localmente
-     */
-    private function baixarMidiaRecebida($midiaId, $tipo, $mimeType, $filename = null)
-    {
-        try {
-            // Fazer download da mídia via API SERPRO
-            $resultado = SerproHelper::downloadMidia($midiaId);
-            
-            if ($resultado['status'] !== 200) {
-                return [
-                    'sucesso' => false,
-                    'erro' => 'Erro ao baixar mídia da API: ' . ($resultado['error'] ?? 'Status ' . $resultado['status'])
-                ];
-            }
-            
-            // Determinar extensão baseada no MIME type
-            $extensao = $this->obterExtensaoPorMimeType($mimeType);
-            
-            // Gerar nome do arquivo se não fornecido
-            if (!$filename) {
-                $filename = $midiaId . '.' . $extensao;
-            } else {
-                // Garantir que tem extensão
-                if (!pathinfo($filename, PATHINFO_EXTENSION)) {
-                    $filename .= '.' . $extensao;
-                }
-            }
-            
-            // Sanitizar nome do arquivo
-            $filename = $this->sanitizarNomeArquivo($filename);
-            
-            // Criar estrutura de diretórios
-            $diretorioBase = APPROOT . '/public/uploads/chat/midias/';
-            $diretorioAno = date('Y');
-            $diretorioMes = date('m');
-            $diretorioCompleto = $diretorioBase . $diretorioAno . '/' . $diretorioMes . '/';
-            
-            // Criar diretórios se não existirem
-            if (!is_dir($diretorioCompleto)) {
-                if (!mkdir($diretorioCompleto, 0755, true)) {
-                    return [
-                        'sucesso' => false,
-                        'erro' => 'Erro ao criar diretório: ' . $diretorioCompleto
-                    ];
-                }
-            }
-            
-            // Verificar se arquivo já existe e gerar nome único se necessário
-            $caminhoArquivo = $diretorioCompleto . $filename;
-            $contador = 1;
-            $nomeBase = pathinfo($filename, PATHINFO_FILENAME);
-            $extensaoArquivo = pathinfo($filename, PATHINFO_EXTENSION);
-            
-            while (file_exists($caminhoArquivo)) {
-                $filename = $nomeBase . '_' . $contador . '.' . $extensaoArquivo;
-                $caminhoArquivo = $diretorioCompleto . $filename;
-                $contador++;
-            }
-            
-            // Salvar arquivo
-            if (file_put_contents($caminhoArquivo, $resultado['data']) === false) {
-                return [
-                    'sucesso' => false,
-                    'erro' => 'Erro ao salvar arquivo: ' . $caminhoArquivo
-                ];
-            }
-            
-            // Gerar URLs
-            $caminhoRelativo = 'uploads/chat/midias/' . $diretorioAno . '/' . $diretorioMes . '/' . $filename;
-            $urlLocal = URL . '/public/' . $caminhoRelativo;
-            
-            // Log de sucesso
-            error_log("📁 Mídia salva: {$caminhoArquivo} (Tamanho: " . number_format(filesize($caminhoArquivo) / 1024, 2) . " KB)");
-            
-            return [
-                'sucesso' => true,
-                'caminho_absoluto' => $caminhoArquivo,
-                'caminho_relativo' => $caminhoRelativo,
-                'url_local' => $urlLocal,
-                'nome_arquivo' => $filename,
-                'tamanho' => filesize($caminhoArquivo),
-                'mime_type' => $mimeType
-            ];
-            
-        } catch (Exception $e) {
-            error_log("❌ Erro ao baixar mídia {$midiaId}: " . $e->getMessage());
-            return [
-                'sucesso' => false,
-                'erro' => 'Exceção: ' . $e->getMessage()
-            ];
-        }
-    }
-
-    /**
-     * Obtém extensão de arquivo baseada no MIME type
-     */
-    private function obterExtensaoPorMimeType($mimeType)
-    {
-        $mimeToExt = [
-            // Imagens
-            'image/jpeg' => 'jpg',
-            'image/jpg' => 'jpg',
-            'image/png' => 'png',
-            'image/gif' => 'gif',
-            'image/webp' => 'webp',
-            'image/bmp' => 'bmp',
-            
-            // Áudio
-            'audio/mpeg' => 'mp3',
-            'audio/mp3' => 'mp3',
-            'audio/mp4' => 'm4a',
-            'audio/aac' => 'aac',
-            'audio/ogg' => 'ogg',
-            'audio/wav' => 'wav',
-            'audio/amr' => 'amr',
-            'audio/ogg; codecs=opus' => 'ogg',
-            
-            // Vídeo
-            'video/mp4' => 'mp4',
-            'video/mpeg' => 'mpeg',
-            'video/quicktime' => 'mov',
-            'video/avi' => 'avi',
-            'video/3gpp' => '3gp',
-            'video/webm' => 'webm',
-            
-            // Documentos
-            'application/pdf' => 'pdf',
-            'application/msword' => 'doc',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
-            'application/vnd.ms-excel' => 'xls',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
-            'application/vnd.ms-powerpoint' => 'ppt',
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
-            'text/plain' => 'txt',
-            'text/csv' => 'csv',
-            'application/zip' => 'zip',
-            'application/x-zip-compressed' => 'zip',
-            'application/rar' => 'rar',
-            'application/x-rar-compressed' => 'rar',
-        ];
-        
-        return $mimeToExt[$mimeType] ?? 'bin';
-    }
-
-    /**
-     * Sanitiza nome de arquivo removendo caracteres problemáticos
-     */
-    private function sanitizarNomeArquivo($filename)
-    {
-        // Remover caracteres especiais perigosos
-        $filename = preg_replace('/[^a-zA-Z0-9._\-àáâãäåçèéêëìíîïñòóôõöùúûüýÿ]/', '_', $filename);
-        
-        // Limitar tamanho
-        if (strlen($filename) > 100) {
-            $extensao = pathinfo($filename, PATHINFO_EXTENSION);
-            $nome = pathinfo($filename, PATHINFO_FILENAME);
-            $nome = substr($nome, 0, 100 - strlen($extensao) - 1);
-            $filename = $nome . '.' . $extensao;
-        }
-        
-        // Remover múltiplos underscores
-        $filename = preg_replace('/_+/', '_', $filename);
-        
-        // Remover underscore no início ou fim
-        $filename = trim($filename, '_');
-        
-        return $filename;
-    }
-
-    /**
-     * Serve mídia baixada com autenticação
-     */
-    public function visualizarMidia($caminho_relativo = null)
-    {
-        // Verificar se o usuário está logado
-        if (!isset($_SESSION['usuario_id'])) {
-            http_response_code(403);
-            echo "Acesso negado";
-            return;
-        }
-
-        if (!$caminho_relativo) {
-            http_response_code(404);
-            echo "Mídia não encontrada";
-            return;
-        }
-
-        // Decodificar e sanitizar caminho
-        $caminho_relativo = urldecode($caminho_relativo);
-        
-        // Verificar se o caminho está dentro do diretório permitido
-        if (!preg_match('/^uploads\/chat\/midias\//', $caminho_relativo)) {
-            http_response_code(403);
-            echo "Caminho não permitido";
-            return;
-        }
-
-        $caminhoCompleto = APPROOT . '/public/' . $caminho_relativo;
-
-        // Verificar se o arquivo existe
-        if (!file_exists($caminhoCompleto)) {
-            http_response_code(404);
-            echo "Arquivo não encontrado";
-            return;
-        }
-
-        // Verificar se o usuário tem acesso à mídia
-        if (!$this->verificarAcessoMidia($_SESSION['usuario_id'], $caminho_relativo)) {
-            http_response_code(403);
-            echo "Acesso negado a esta mídia";
-            return;
-        }
-
-        // Obter informações do arquivo
-        $mimeType = mime_content_type($caminhoCompleto);
-        $nomeArquivo = basename($caminhoCompleto);
-        $tamanhoArquivo = filesize($caminhoCompleto);
-
-        // Definir headers apropriados
-        header('Content-Type: ' . $mimeType);
-        header('Content-Length: ' . $tamanhoArquivo);
-        header('Cache-Control: private, max-age=3600');
-        
-        // Para documentos, forçar download
-        if (strpos($mimeType, 'application/') === 0 || strpos($mimeType, 'text/') === 0) {
-            header('Content-Disposition: attachment; filename="' . $nomeArquivo . '"');
-        } else {
-            // Para imagens, áudio e vídeo, permitir visualização inline
-            header('Content-Disposition: inline; filename="' . $nomeArquivo . '"');
-        }
-
-        // Servir o arquivo
-        readfile($caminhoCompleto);
-    }
-
-    /**
-     * Verifica se o usuário tem acesso à mídia
-     */
-    private function verificarAcessoMidia($usuario_id, $caminho_relativo)
-    {
-        try {
-            // Admins têm acesso a todas as mídias
-            if (isset($_SESSION['usuario_perfil']) && $_SESSION['usuario_perfil'] === 'admin') {
-                return true;
-            }
-
-            // Usar método do model
-            return $this->chatModel->verificarAcessoMidia($usuario_id, $caminho_relativo);
-
-        } catch (Exception $e) {
-            error_log("Erro ao verificar acesso à mídia: " . $e->getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Lista mídias recebidas de uma conversa (AJAX)
-     */
-    public function listarMidias($conversa_id = null)
-    {
-        if (!$conversa_id) {
-            echo json_encode(['error' => 'ID da conversa não informado']);
-            return;
-        }
-
-        // Verificar se o usuário tem acesso à conversa
-        $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
-        if (!$conversa || ($conversa->usuario_id != $_SESSION['usuario_id'] && $_SESSION['usuario_perfil'] !== 'admin')) {
-            echo json_encode(['error' => 'Acesso negado']);
-            return;
-        }
-
-        try {
-            $midias = $this->chatModel->listarMidiasConversa($conversa_id);
-
-            echo json_encode([
-                'success' => true,
-                'midias' => $midias,
-                'total' => count($midias)
-            ]);
-
-        } catch (Exception $e) {
-            echo json_encode([
-                'success' => false, 
-                'error' => 'Erro ao buscar mídias: ' . $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Limpa mídias antigas para economizar espaço
-     */
-    public function limparMidiasAntigas()
-    {
-        // Verificar se tem permissão admin
-        if (!isset($_SESSION['usuario_perfil']) || $_SESSION['usuario_perfil'] !== 'admin') {
-            echo json_encode(['success' => false, 'error' => 'Acesso negado']);
-            return;
-        }
-
-        try {
-            $diasParaManter = 90; // Manter mídias por 90 dias
-            
-            // Buscar mídias antigas usando o model
-            $midiasAntigas = $this->chatModel->buscarMidiasAntigas($diasParaManter);
-
-            $arquivosRemovidos = 0;
-            $espacoLiberado = 0;
-            $erros = [];
-
-            foreach ($midiasAntigas as $midia) {
-                if ($midia->caminho_arquivo) {
-                    $caminhoCompleto = APPROOT . '/public/' . $midia->caminho_arquivo;
-                    
-                    if (file_exists($caminhoCompleto)) {
-                        $tamanhoArquivo = filesize($caminhoCompleto);
-                        
-                        if (unlink($caminhoCompleto)) {
-                            $arquivosRemovidos++;
-                            $espacoLiberado += $tamanhoArquivo;
-                            
-                            // Atualizar banco para remover referência do arquivo usando o model
-                            $this->chatModel->atualizarReferenciaArquivoRemovido($midia->id);
-                        } else {
-                            $erros[] = "Erro ao remover: " . $midia->caminho_arquivo;
-                        }
-                    }
-                }
-            }
-
-            // Limpar diretórios vazios
-            $this->limparDiretoriosVazios();
-
-            echo json_encode([
-                'success' => true,
-                'arquivos_removidos' => $arquivosRemovidos,
-                'espaco_liberado' => $this->formatarTamanho($espacoLiberado),
-                'espaco_liberado_bytes' => $espacoLiberado,
-                'dias_mantidos' => $diasParaManter,
-                'erros' => $erros
-            ]);
-
-        } catch (Exception $e) {
-            echo json_encode([
-                'success' => false,
-                'error' => 'Erro na limpeza: ' . $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Atualiza referência de arquivo removido no banco
-     */
-    private function atualizarReferenciaArquivoRemovido($mensagem_id)
-    {
-        // Método movido para o ChatModel
-        return $this->chatModel->atualizarReferenciaArquivoRemovido($mensagem_id);
-    }
-
-    /**
-     * Remove diretórios vazios da estrutura de mídias
-     */
-    private function limparDiretoriosVazios()
-    {
-        $diretorioBase = APPROOT . '/public/uploads/chat/midias/';
-        
-        if (!is_dir($diretorioBase)) return;
-
-        // Buscar diretórios de anos
-        $anosDir = glob($diretorioBase . '*', GLOB_ONLYDIR);
-        
-        foreach ($anosDir as $anoDir) {
-            // Buscar diretórios de meses
-            $mesesDir = glob($anoDir . '/*', GLOB_ONLYDIR);
-            
-            foreach ($mesesDir as $mesDir) {
-                // Se diretório do mês está vazio, remover
-                if ($this->diretorioVazio($mesDir)) {
-                    rmdir($mesDir);
-                }
-            }
-            
-            // Se diretório do ano está vazio, remover
-            if ($this->diretorioVazio($anoDir)) {
-                rmdir($anoDir);
-            }
-        }
-    }
-
-    /**
-     * Verifica se diretório está vazio
-     */
-    private function diretorioVazio($diretorio)
-    {
-        if (!is_dir($diretorio)) return false;
-        
-        $arquivos = scandir($diretorio);
-        return count($arquivos) <= 2; // Apenas . e ..
-    }
-
-    /**
-     * Formata tamanho em bytes para formato legível
-     */
-    private function formatarTamanho($bytes)
-    {
-        $unidades = ['B', 'KB', 'MB', 'GB', 'TB'];
-        $i = 0;
-        
-        while ($bytes >= 1024 && $i < count($unidades) - 1) {
-            $bytes /= 1024;
-            $i++;
-        }
-        
-        return round($bytes, 2) . ' ' . $unidades[$i];
-    }
-
-    /**
-     * Obtém estatísticas de uso de mídias
-     */
-    public function estatisticasMidias()
-    {
-        // Verificar se tem permissão admin
-        if (!isset($_SESSION['usuario_perfil']) || $_SESSION['usuario_perfil'] !== 'admin') {
-            echo json_encode(['success' => false, 'error' => 'Acesso negado']);
-            return;
-        }
-
-        try {
-            $diretorioBase = APPROOT . '/public/uploads/chat/midias/';
-            
-            $estatisticas = [
-                'total_arquivos' => 0,
-                'espaco_total' => 0,
-                'por_tipo' => [],
-                'por_mes' => [],
-                'diretorio_existe' => is_dir($diretorioBase),
-                'dados_banco' => []
-            ];
-
-            // Estatísticas do sistema de arquivos
-            if (is_dir($diretorioBase)) {
-                $this->calcularEstatisticasDiretorio($diretorioBase, $estatisticas);
-            }
-
-            // Estatísticas do banco de dados usando ChatModel
-            $estatisticas['dados_banco'] = [
-                'total_midias_registradas' => $this->chatModel->contarTotalMidias(),
-                'por_tipo' => $this->chatModel->buscarEstatisticasMidiasPorTipo(),
-                'por_mes' => $this->chatModel->buscarEstatisticasMidiasPorMes(12),
-                'conversas_com_mais_midias' => $this->chatModel->buscarConversasComMaisMidias(10)
-            ];
-
-            $estatisticas['espaco_total_formatado'] = $this->formatarTamanho($estatisticas['espaco_total']);
-
-            echo json_encode([
-                'success' => true,
-                'estatisticas' => $estatisticas
-            ]);
-
-        } catch (Exception $e) {
-            echo json_encode([
-                'success' => false,
-                'error' => 'Erro ao calcular estatísticas: ' . $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Calcula estatísticas recursivamente
-     */
-    private function calcularEstatisticasDiretorio($diretorio, &$estatisticas)
-    {
-        $arquivos = glob($diretorio . '/*');
-        
-        foreach ($arquivos as $arquivo) {
-            if (is_dir($arquivo)) {
-                $this->calcularEstatisticasDiretorio($arquivo, $estatisticas);
-            } else {
-                $estatisticas['total_arquivos']++;
-                $tamanho = filesize($arquivo);
-                $estatisticas['espaco_total'] += $tamanho;
-                
-                // Estatísticas por tipo
-                $extensao = strtolower(pathinfo($arquivo, PATHINFO_EXTENSION));
-                if (!isset($estatisticas['por_tipo'][$extensao])) {
-                    $estatisticas['por_tipo'][$extensao] = ['count' => 0, 'size' => 0];
-                }
-                $estatisticas['por_tipo'][$extensao]['count']++;
-                $estatisticas['por_tipo'][$extensao]['size'] += $tamanho;
-                
-                // Estatísticas por mês (baseado no caminho)
-                $caminhoRelativo = str_replace(APPROOT . '/public/uploads/chat/midias/', '', $arquivo);
-                $partes = explode('/', $caminhoRelativo);
-                if (count($partes) >= 2) {
-                    $anoMes = $partes[0] . '-' . $partes[1];
-                    if (!isset($estatisticas['por_mes'][$anoMes])) {
-                        $estatisticas['por_mes'][$anoMes] = ['count' => 0, 'size' => 0];
-                    }
-                    $estatisticas['por_mes'][$anoMes]['count']++;
-                    $estatisticas['por_mes'][$anoMes]['size'] += $tamanho;
-                }
-            }
-        }
-    }
+    //         // Atualizar conversa
+    //         $this->chatModel->atualizarConversa($conversa->id);
+    //     }
+    // }
 }
 

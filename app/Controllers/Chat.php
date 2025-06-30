@@ -876,6 +876,9 @@ class Chat extends Controllers
     private function processarMensagemN8n($mensagemData)
     {
         try {
+            // Carrega o helper do MinIO
+            require_once APPROOT . '/Libraries/MinioHelper.php';
+            
             $numero = $mensagemData['from'];
             $messageId = $mensagemData['id'] ?? uniqid('n8n_');
             $timestamp = $mensagemData['timestamp'] ?? time();
@@ -887,6 +890,7 @@ class Chat extends Controllers
             $midiaTipo = null;
             $midiaFilename = null;
             $midiaUrl = null;
+            $caminhoMinio = null;
             
             switch ($tipo) {
                 case 'text':
@@ -896,26 +900,26 @@ class Chat extends Controllers
                 case 'image':
                     $midiaId = $mensagemData['image']['id'] ?? '';
                     $midiaTipo = $mensagemData['image']['mime_type'] ?? 'image/jpeg';
-                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do arquivo
+                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do MinIO
                     break;
                     
                 case 'audio':
                     $midiaId = $mensagemData['audio']['id'] ?? '';
                     $midiaTipo = $mensagemData['audio']['mime_type'] ?? 'audio/ogg';
-                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do arquivo
+                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do MinIO
                     break;
                     
                 case 'video':
                     $midiaId = $mensagemData['video']['id'] ?? '';
                     $midiaTipo = $mensagemData['video']['mime_type'] ?? 'video/mp4';
-                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do arquivo
+                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do MinIO
                     break;
                     
                 case 'document':
                     $midiaId = $mensagemData['document']['id'] ?? '';
                     $midiaTipo = $mensagemData['document']['mime_type'] ?? 'application/octet-stream';
                     $midiaFilename = $mensagemData['document']['filename'] ?? 'documento';
-                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do arquivo
+                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do MinIO
                     break;
                     
                 case 'button':
@@ -934,6 +938,23 @@ class Chat extends Controllers
                 $mensagemExistente = $this->verificarMensagemExistente($messageId);
                 
                 if (!$mensagemExistente) {
+                    // Se há mídia, fazer download da API SERPRO e upload para MinIO
+                    if ($midiaId && in_array($tipo, ['image', 'audio', 'video', 'document'])) {
+                        $resultadoDownload = $this->baixarESalvarMidiaMinIO($midiaId, $tipo, $midiaTipo, $midiaFilename);
+                        
+                        if ($resultadoDownload['sucesso']) {
+                            $midiaUrl = $resultadoDownload['url_minio'];
+                            $caminhoMinio = $resultadoDownload['caminho_minio'];
+                            $midiaFilename = $resultadoDownload['nome_arquivo'];
+                            $conteudo = $caminhoMinio; // Usar caminho do MinIO ao invés do ID
+                            
+                            error_log("✅ Mídia N8N baixada e salva no MinIO: {$caminhoMinio}");
+                        } else {
+                            error_log("❌ Erro ao baixar/salvar mídia N8N: " . $resultadoDownload['erro']);
+                            // Continua salvando com o ID da mídia mesmo se o download falhar
+                        }
+                    }
+                    
                     // Salvar mensagem recebida
                     $dadosMensagem = [
                         'conversa_id' => $conversa->id,
@@ -955,20 +976,74 @@ class Chat extends Controllers
                         
                         // Log de sucesso
                         $tipoLog = $midiaId ? "mídia ($tipo)" : "texto";
-                        error_log("✅ Mensagem $tipoLog salva com sucesso: ID={$messageId}, Conversa={$conversa->id}");
+                        error_log("✅ Mensagem N8N $tipoLog salva com sucesso: ID={$messageId}, Conversa={$conversa->id}");
                     } else {
-                        error_log("❌ Erro ao salvar mensagem n8n no banco: " . print_r($dadosMensagem, true));
+                        error_log("❌ Erro ao salvar mensagem N8N no banco: " . print_r($dadosMensagem, true));
                     }
                 } else {
-                    error_log("⚠️ Mensagem n8n duplicada ignorada: ID={$messageId}");
+                    error_log("⚠️ Mensagem N8N duplicada ignorada: ID={$messageId}");
                 }
             } else {
-                error_log("❌ Erro ao criar/buscar conversa para número: {$numero}");
+                error_log("❌ Erro ao criar/buscar conversa N8N para número: {$numero}");
             }
             
         } catch (Exception $e) {
-            error_log("❌ ERRO ao processar mensagem n8n: " . $e->getMessage());
+            error_log("❌ ERRO ao processar mensagem N8N: " . $e->getMessage());
             error_log("Dados da mensagem: " . print_r($mensagemData, true));
+        }
+    }
+
+    /**
+     * Baixa mídia da API SERPRO e salva no MinIO
+     */
+    private function baixarESalvarMidiaMinIO($midiaId, $tipo, $mimeType, $filename = null)
+    {
+        try {
+            // Passo 1: Baixar mídia da API SERPRO
+            $resultadoDownload = SerproHelper::downloadMidia($midiaId);
+            
+            if ($resultadoDownload['status'] !== 200) {
+                return [
+                    'sucesso' => false,
+                    'erro' => 'Erro ao baixar mídia da API SERPRO: ' . ($resultadoDownload['error'] ?? 'Status ' . $resultadoDownload['status'])
+                ];
+            }
+            
+            // Passo 2: Upload para MinIO
+            $resultadoUpload = MinioHelper::uploadMidia(
+                $resultadoDownload['data'], 
+                $tipo, 
+                $mimeType, 
+                $filename
+            );
+            
+            if (!$resultadoUpload['sucesso']) {
+                return [
+                    'sucesso' => false,
+                    'erro' => 'Erro ao fazer upload para MinIO: ' . $resultadoUpload['erro']
+                ];
+            }
+            
+            // Log de sucesso
+            error_log("📁 Mídia {$midiaId} salva no MinIO: {$resultadoUpload['caminho_minio']} (Tamanho: " . 
+                     number_format($resultadoUpload['tamanho'] / 1024, 2) . " KB)");
+            
+            return [
+                'sucesso' => true,
+                'caminho_minio' => $resultadoUpload['caminho_minio'],
+                'url_minio' => $resultadoUpload['url_minio'],
+                'nome_arquivo' => $resultadoUpload['nome_arquivo'],
+                'tamanho' => $resultadoUpload['tamanho'],
+                'mime_type' => $mimeType,
+                'bucket' => $resultadoUpload['bucket']
+            ];
+            
+        } catch (Exception $e) {
+            error_log("❌ Erro ao baixar/salvar mídia {$midiaId}: " . $e->getMessage());
+            return [
+                'sucesso' => false,
+                'erro' => 'Exceção: ' . $e->getMessage()
+            ];
         }
     }
 
@@ -2145,6 +2220,225 @@ class Chat extends Controllers
             // Atualizar conversa
             $this->chatModel->atualizarConversa($conversa->id);
         }
+    }
+
+    /**
+     * Visualiza mídia do MinIO com autenticação
+     */
+    public function visualizarMidiaMinIO($caminhoMinio = null)
+    {
+        // Verificar se o usuário está logado
+        if (!isset($_SESSION['usuario_id'])) {
+            http_response_code(403);
+            echo "Acesso negado";
+            return;
+        }
+
+        if (!$caminhoMinio) {
+            http_response_code(404);
+            echo "Mídia não encontrada";
+            return;
+        }
+
+        // Decodificar caminho
+        $caminhoMinio = urldecode($caminhoMinio);
+
+        // Verificar se o usuário tem acesso à mídia
+        if (!$this->verificarAcessoMidiaMinIO($_SESSION['usuario_id'], $caminhoMinio)) {
+            http_response_code(403);
+            echo "Acesso negado a esta mídia";
+            return;
+        }
+
+        // Carregar helper do MinIO
+        require_once APPROOT . '/Libraries/MinioHelper.php';
+
+        // Baixar arquivo do MinIO
+        $resultado = MinioHelper::baixarArquivo($caminhoMinio);
+
+        if (!$resultado['sucesso']) {
+            http_response_code(404);
+            echo "Arquivo não encontrado: " . $resultado['erro'];
+            return;
+        }
+
+        // Definir headers apropriados
+        header('Content-Type: ' . $resultado['content_type']);
+        header('Content-Length: ' . $resultado['tamanho']);
+        header('Cache-Control: private, max-age=3600');
+        
+        // Para documentos, forçar download
+        $nomeArquivo = basename($caminhoMinio);
+        if (strpos($resultado['content_type'], 'application/') === 0 || strpos($resultado['content_type'], 'text/') === 0) {
+            header('Content-Disposition: attachment; filename="' . $nomeArquivo . '"');
+        } else {
+            // Para imagens, áudio e vídeo, permitir visualização inline
+            header('Content-Disposition: inline; filename="' . $nomeArquivo . '"');
+        }
+
+        // Servir o arquivo
+        echo $resultado['dados'];
+    }
+
+    /**
+     * Verifica se o usuário tem acesso à mídia do MinIO
+     */
+    private function verificarAcessoMidiaMinIO($usuario_id, $caminhoMinio)
+    {
+        try {
+            // Admins têm acesso a todas as mídias
+            if (isset($_SESSION['usuario_perfil']) && $_SESSION['usuario_perfil'] === 'admin') {
+                return true;
+            }
+
+            // Usar método do ChatModel
+            return $this->chatModel->verificarAcessoMidiaMinIO($usuario_id, $caminhoMinio);
+
+        } catch (Exception $e) {
+            error_log("Erro ao verificar acesso à mídia MinIO: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Gera URL temporária para visualização da mídia
+     */
+    public function gerarUrlMidia()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['error' => 'Método não permitido']);
+            return;
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $caminhoMinio = $input['caminho_minio'] ?? '';
+
+        if (empty($caminhoMinio)) {
+            echo json_encode(['error' => 'Caminho da mídia não informado']);
+            return;
+        }
+
+        // Verificar se o usuário tem acesso
+        if (!$this->verificarAcessoMidiaMinIO($_SESSION['usuario_id'], $caminhoMinio)) {
+            echo json_encode(['error' => 'Acesso negado']);
+            return;
+        }
+
+        // Carregar helper do MinIO
+        require_once APPROOT . '/Libraries/MinioHelper.php';
+
+        // Gerar URL temporária (válida por 1 hora)
+        $url = MinioHelper::gerarUrlVisualizacao($caminhoMinio, 3600);
+
+        if ($url) {
+            echo json_encode([
+                'success' => true,
+                'url' => $url,
+                'expires_in' => 3600
+            ]);
+        } else {
+            echo json_encode(['error' => 'Erro ao gerar URL']);
+        }
+    }
+
+    /**
+     * Obtém estatísticas do MinIO
+     */
+    public function estatisticasMinIO()
+    {
+        // Verificar se tem permissão admin
+        if (!isset($_SESSION['usuario_perfil']) || $_SESSION['usuario_perfil'] !== 'admin') {
+            echo json_encode(['success' => false, 'error' => 'Acesso negado']);
+            return;
+        }
+
+        // Carregar helper do MinIO
+        require_once APPROOT . '/Libraries/MinioHelper.php';
+
+        try {
+            $estatisticas = MinioHelper::obterEstatisticas();
+
+            // Adicionar estatísticas formatadas
+            $estatisticas['tamanho_total_formatado'] = $this->formatarTamanho($estatisticas['tamanho_total']);
+            
+            foreach ($estatisticas['por_tipo'] as $tipo => &$dados) {
+                $dados['size_formatted'] = $this->formatarTamanho($dados['size']);
+            }
+
+            echo json_encode([
+                'success' => true,
+                'estatisticas' => $estatisticas
+            ]);
+
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Erro ao obter estatísticas: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Lista arquivos do MinIO por tipo
+     */
+    public function listarArquivosMinIO()
+    {
+        // Verificar se tem permissão admin
+        if (!isset($_SESSION['usuario_perfil']) || $_SESSION['usuario_perfil'] !== 'admin') {
+            echo json_encode(['success' => false, 'error' => 'Acesso negado']);
+            return;
+        }
+
+        $tipo = $_GET['tipo'] ?? '';
+        $ano = $_GET['ano'] ?? '';
+
+        // Construir prefixo de busca
+        $prefixo = '';
+        if ($tipo) {
+            $prefixo = $tipo . '/';
+            if ($ano) {
+                $prefixo .= $ano . '/';
+            }
+        }
+
+        // Carregar helper do MinIO
+        require_once APPROOT . '/Libraries/MinioHelper.php';
+
+        try {
+            $arquivos = MinioHelper::listarArquivos($prefixo, 100);
+
+            echo json_encode([
+                'success' => true,
+                'arquivos' => $arquivos,
+                'prefixo' => $prefixo,
+                'total' => count($arquivos)
+            ]);
+
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Erro ao listar arquivos: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Testa conexão com MinIO
+     */
+    public function testarMinIO()
+    {
+        // Verificar se tem permissão admin
+        if (!isset($_SESSION['usuario_perfil']) || $_SESSION['usuario_perfil'] !== 'admin') {
+            echo json_encode(['success' => false, 'error' => 'Acesso negado']);
+            return;
+        }
+
+        // Carregar helper do MinIO
+        require_once APPROOT . '/Libraries/MinioHelper.php';
+
+        $resultado = MinioHelper::testarConexao();
+
+        echo json_encode($resultado);
     }
 }
 

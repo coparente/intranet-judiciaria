@@ -723,4 +723,56 @@ class ChatModel
             return false;
         }
     }
+
+    /**
+     * Busca conversas com mais mídias
+     */
+    public function buscarConversasComMaisMidias($limite = 10)
+    {
+        try {
+            $sql = "SELECT 
+                        c.id,
+                        c.contato_nome,
+                        c.contato_numero,
+                        COUNT(m.id) as total_midias
+                    FROM conversas c
+                    INNER JOIN mensagens_chat m ON c.id = m.conversa_id
+                    WHERE m.tipo IN ('image', 'audio', 'video', 'document')
+                    GROUP BY c.id, c.contato_nome, c.contato_numero
+                    ORDER BY total_midias DESC
+                    LIMIT :limite";
+
+            $this->db->query($sql);
+            $this->db->bind(':limite', $limite, PDO::PARAM_INT);
+            return $this->db->resultados();
+
+        } catch (Exception $e) {
+            error_log("Erro ao buscar conversas com mais mídias: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Verifica se o usuário tem acesso à mídia do MinIO
+     */
+    public function verificarAcessoMidiaMinIO($usuario_id, $caminhoMinio)
+    {
+        try {
+            $sql = "SELECT c.* FROM conversas c 
+                    INNER JOIN mensagens_chat m ON c.id = m.conversa_id 
+                    WHERE c.usuario_id = :usuario_id 
+                    AND m.conteudo = :caminho_minio
+                    LIMIT 1";
+
+            $this->db->query($sql);
+            $this->db->bind(':usuario_id', $usuario_id);
+            $this->db->bind(':caminho_minio', $caminhoMinio);
+
+            return $this->db->resultado() !== false;
+
+        } catch (Exception $e) {
+            error_log("Erro ao verificar acesso à mídia MinIO: " . $e->getMessage());
+            return false;
+        }
+    }
 }

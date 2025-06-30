@@ -797,43 +797,76 @@ class SerproHelper
     }
 
     /**
-     * [ downloadMidia ] - Baixa mídia da Meta
+     * [ downloadMidia ] - Baixa mídia da API SERPRO
      */
     public static function downloadMidia($mediaId)
     {
-        $token = self::getToken();
-        if (!$token) {
-            return ['status' => 401, 'error' => 'Erro ao obter token: ' . self::$lastError];
+        try {
+            $token = self::getToken();
+            if (!$token) {
+                return [
+                    'status' => 401,
+                    'error' => 'Token não obtido'
+                ];
+            }
+
+            // URL seguindo a documentação da API SERPRO
+            $url = self::$baseUrl . "/client/" . self::$phoneNumberId . "/v2/media/{$mediaId}";
+
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => $url,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER => [
+                    'Authorization: Bearer ' . $token,
+                    'Accept: application/json'
+                ],
+                CURLOPT_TIMEOUT => 60,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_SSL_VERIFYPEER => false
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+            $error = curl_error($ch);
+            curl_close($ch);
+
+            if ($error) {
+                error_log("ERRO cURL download mídia: " . $error);
+                return [
+                    'status' => 500,
+                    'error' => 'Erro cURL: ' . $error
+                ];
+            }
+
+            if ($httpCode === 200 && $response) {
+                return [
+                    'status' => 200,
+                    'data' => $response,
+                    'content_type' => $contentType ?: 'application/octet-stream',
+                    'size' => strlen($response)
+                ];
+            } else {
+                // Tentar decodificar resposta de erro
+                $errorResponse = json_decode($response, true);
+                $errorMsg = $errorResponse['error']['message'] ?? 'Erro desconhecido';
+                
+                error_log("ERRO download mídia - HTTP {$httpCode}: {$errorMsg}");
+                return [
+                    'status' => $httpCode,
+                    'error' => $errorMsg,
+                    'response' => $errorResponse
+                ];
+            }
+
+        } catch (Exception $e) {
+            error_log("EXCEÇÃO download mídia: " . $e->getMessage());
+            return [
+                'status' => 500,
+                'error' => 'Exceção: ' . $e->getMessage()
+            ];
         }
-
-        $url = self::$baseUrl . '/client/' . self::$phoneNumberId . '/v2/media/' . $mediaId;
-        
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Authorization: Bearer ' . $token
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-        $error = curl_error($ch);
-        curl_close($ch);
-
-        if ($error) {
-            self::$lastError = "Erro cURL: " . $error;
-            return ['status' => 500, 'error' => self::$lastError];
-        }
-
-        return [
-            'status' => $httpCode,
-            'data' => $response,
-            'content_type' => $contentType,
-            'error' => $httpCode >= 400 ? $response : null
-        ];
     }
 
     /**

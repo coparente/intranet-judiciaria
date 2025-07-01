@@ -102,18 +102,14 @@ class MinioHelper
             // Determinar extensão baseada no MIME type
             $extensao = self::obterExtensaoPorMimeType($mimeType);
             
-            // Gerar nome do arquivo se não fornecido
-            if (!$nomeOriginal) {
-                $nomeOriginal = uniqid('midia_') . '.' . $extensao;
-            } else {
-                // Garantir que tem extensão
-                if (!pathinfo($nomeOriginal, PATHINFO_EXTENSION)) {
-                    $nomeOriginal .= '.' . $extensao;
-                }
-            }
+            // CORREÇÃO: Sempre gerar nome único no padrão: tipo_hash.extensao
+            $hashUnico = uniqid();
+            $nomeArquivo = strtolower($tipoMidia) . '_' . $hashUnico . '.' . $extensao;
             
-            // Sanitizar nome do arquivo
-            $nomeArquivo = self::sanitizarNomeArquivo($nomeOriginal);
+            // Log do nome original vs nome gerado
+            if ($nomeOriginal) {
+                error_log("📝 Nome original: {$nomeOriginal} -> Nome sanitizado: {$nomeArquivo}");
+            }
             
             // Organizar por tipo e ano: tipo/ano/arquivo
             $ano = date('Y');
@@ -127,7 +123,7 @@ class MinioHelper
                 'ContentType' => $mimeType,
                 'Metadata' => [
                     'tipo_midia' => $tipoMidia,
-                    'nome_original' => $nomeOriginal,
+                    'nome_original' => $nomeOriginal ?: $nomeArquivo,
                     'upload_timestamp' => time()
                 ]
             ]);
@@ -465,22 +461,33 @@ class MinioHelper
      */
     private static function sanitizarNomeArquivo($filename)
     {
-        // Remover caracteres especiais perigosos
-        $filename = preg_replace('/[^a-zA-Z0-9._\-àáâãäåçèéêëìíîïñòóôõöùúûüýÿ]/', '_', $filename);
+        // CORREÇÃO: Primeiro decodificar URLs encoded (%xx)
+        $filename = urldecode($filename);
         
-        // Limitar tamanho
+        // Remover acentos e caracteres especiais
+        $filename = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $filename);
+        
+        // Manter apenas caracteres seguros: letras, números, ponto, hífen e underscore
+        $filename = preg_replace('/[^a-zA-Z0-9._\-]/', '_', $filename);
+        
+        // Remover múltiplos underscores consecutivos
+        $filename = preg_replace('/_+/', '_', $filename);
+        
+        // Remover underscore no início ou fim
+        $filename = trim($filename, '_');
+        
+        // Se ficou vazio, gerar nome genérico
+        if (empty($filename) || $filename === '.') {
+            $filename = 'arquivo_' . uniqid();
+        }
+        
+        // Limitar tamanho (máximo 100 caracteres)
         if (strlen($filename) > 100) {
             $extensao = pathinfo($filename, PATHINFO_EXTENSION);
             $nome = pathinfo($filename, PATHINFO_FILENAME);
             $nome = substr($nome, 0, 100 - strlen($extensao) - 1);
             $filename = $nome . '.' . $extensao;
         }
-        
-        // Remover múltiplos underscores
-        $filename = preg_replace('/_+/', '_', $filename);
-        
-        // Remover underscore no início ou fim
-        $filename = trim($filename, '_');
         
         return $filename;
     }

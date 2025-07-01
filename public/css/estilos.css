@@ -711,6 +711,19 @@ body.dark-mode .tooltip {
     display: inline-block;
 }
 
+/* Mensagens com áudio precisam de mais espaço */
+.message-bubble.has-audio {
+    max-width: 350px !important; /* Largura fixa adequada para player de áudio */
+    min-width: 300px !important;
+    padding: 8px 10px !important; /* Padding maior para acomodar o player */
+}
+
+/* Fallback para navegadores que não suportam :has() */
+.message-bubble .message-media audio {
+    /* Força o bubble pai a ter tamanho adequado */
+    width: 100%;
+}
+
 .message-bubble.sent {
     background: #d9fdd3;
     color: #111b21;
@@ -776,8 +789,29 @@ body.dark-mode .tooltip {
 
 .message-media audio {
     width: 100%;
-    max-width: 250px;
-    height: 32px;
+    min-width: 280px; /* Largura mínima adequada para mostrar controles completos */
+    max-width: 320px; /* Largura máxima */
+    height: 40px; /* Altura aumentada para melhor visualização */
+    border-radius: 7.5px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+}
+
+/* Player de áudio personalizado para melhor experiência */
+.message-media audio::-webkit-media-controls-panel {
+    background-color: #f8f9fa;
+    border-radius: 7.5px;
+}
+
+.message-media audio::-webkit-media-controls-play-button {
+    background-color: var(--whatsapp-teal);
+    border-radius: 50%;
+}
+
+.message-media audio::-webkit-media-controls-current-time-display,
+.message-media audio::-webkit-media-controls-time-remaining-display {
+    color: #667781;
+    font-size: 12px;
 }
 
 /* Documentos estilo WhatsApp */
@@ -1165,6 +1199,19 @@ body.dark-mode .tooltip {
         font-size: 14px;
         padding: 6px 4px;
     }
+    
+    /* Ajustes para áudio em mobile */
+    .message-media audio {
+        min-width: 250px;
+        max-width: 280px;
+        height: 38px;
+    }
+    
+    /* Mensagens com áudio em mobile */
+    .message-bubble.has-audio {
+        max-width: 290px !important;
+        min-width: 260px !important;
+    }
 }
 
 @media (max-width: 576px) {
@@ -1193,6 +1240,19 @@ body.dark-mode .tooltip {
     
     .document-preview {
         max-width: 240px;
+    }
+    
+    /* Ajustes para áudio em telas muito pequenas */
+    .message-media audio {
+        min-width: 220px;
+        max-width: 250px;
+        height: 36px;
+    }
+    
+    /* Mensagens com áudio em telas muito pequenas */
+    .message-bubble.has-audio {
+        max-width: 260px !important;
+        min-width: 230px !important;
     }
 }
 

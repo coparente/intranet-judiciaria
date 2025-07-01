@@ -82,7 +82,7 @@
                                     $bubbleClass = $isUsuario ? 'sent' : 'received';
                                     ?>
                                     <div class="message-wrapper <?= $messageClass ?>" data-message-id="<?= $mensagem->id ?>">
-                                        <div class="message-bubble <?= $bubbleClass ?>">
+                                        <div class="message-bubble <?= $bubbleClass ?> <?= $mensagem->tipo == 'audio' ? 'has-audio' : '' ?>">
                                             <?php if ($mensagem->tipo == 'text'): ?>
                                                 <div class="message-content">
                                                     <?= nl2br(htmlspecialchars($mensagem->conteudo)) ?>
@@ -114,7 +114,7 @@
                                                 <?php endif; ?>
                                             <?php elseif ($mensagem->tipo == 'audio'): ?>
                                                 <div class="message-media">
-                                                    <audio controls class="" style="max-width: 100%;">
+                                                    <audio controls class="audio-player">
                                                         <source src="<?= URL ?>/media/<?= $mensagem->midia_url ?>" type="audio/mpeg">
                                                         Seu navegador não suporta áudios HTML5.
                                                     </audio>

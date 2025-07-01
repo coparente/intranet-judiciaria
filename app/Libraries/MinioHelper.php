@@ -30,11 +30,11 @@ class MinioHelper
 
         try {
             // Configurações do MinIO (descomente e configure no app/configuracao.php)
-            $endpoint = 'https://minioapidj.helpersti.online';
-            $region = 'sa-east-1';
-            $accessKeyId = 'pBb2oG0RcNzZfEJJzOrh';
-            $secretAccessKey = 'J401ezyGzLCgNgVLGRmvjPXfZqXeS10OzI0JdI01';
-            self::$bucket = 'chatserpro';
+            $endpoint = MINIO_ENDPOINT;
+            $region = MINIO_REGION;
+            $accessKeyId = MINIO_ACCESS_KEY;
+            $secretAccessKey = MINIO_SECRET_KEY;
+            self::$bucket = MINIO_BUCKET;
 
             self::$s3Client = new S3Client([
                 'version' => 'latest',

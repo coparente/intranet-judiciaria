@@ -37,12 +37,24 @@ if ($ambiente === 'local') {
     define('URL', 'https://coparente.top/intranet');
 }
 
+/**
+ * Configurações do MinIO
+ */ 
+define('MINIO_ENDPOINT', 'https://minioapidj.helpersti.online');
+define('MINIO_REGION', 'sa-east-1');
+define('MINIO_ACCESS_KEY', 'pBb2oG0RcNzZfEJJzOrh');
+define('MINIO_SECRET_KEY', 'J401ezyGzLCgNgVLGRmvjPXfZqXeS10OzI0JdI01');
+define('MINIO_BUCKET', 'chatserpro');
+define('MINIO_USE_PATH_STYLE_ENDPOINT', true);
+
 // $endpoint = 'https://minioapidj.helpersti.online'; // Host correto da API
 // $region = 'sa-east-1';
 // $use_path_style_endpoint = true; // Essencial para MinIO
 // $access_key_id = 'pBb2oG0RcNzZfEJJzOrh';
 // $secret_access_key = 'J401ezyGzLCgNgVLGRmvjPXfZqXeS10OzI0JdI01';
 // $bucket = 'chatserpro';
+
+
 /**
  * Configurações da Aplicação
  */

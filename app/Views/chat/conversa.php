@@ -654,7 +654,7 @@
             <div class="container-fluid">
                 <!-- Botão Voltar -->
                 <div class="mb-3">
-                    <a href="<?= URL ?>/chat/index" class="btn btn-outline-primary btn-sm">
+                    <a href="<?= URL ?>/chat/index" class="btn btn-secondary btn-sm">
                         <i class="fas fa-arrow-left me-2"></i> Voltar para Conversas
                     </a>
                 </div>

@@ -1,206 +1,216 @@
 <?php include 'app/Views/include/nav.php' ?>
 
-<style>
-/* === ESTILOS WHATSAPP-LIKE === */
-
-</style>
-
 <main>
     <div class="content">
         <section class="content">
-            <div class="container-fluid">
-                <!-- Botão Voltar -->
-                <div class="mb-3">
-                    <a href="<?= URL ?>/chat/index" class="btn btn-secondary btn-sm">
-                        <i class="fas fa-arrow-left me-2"></i> Voltar para Conversas
-                    </a>
+            <div class="row">
+                <div class="col-md-3">
+                    <!-- Menu Lateral -->
+                    <?php if (isset($_SESSION['usuario_perfil']) && $_SESSION['usuario_perfil'] == 'admin'): ?>
+                        <?php include 'app/Views/include/menu_adm.php' ?>
+                    <?php endif; ?>
+                    <?php include 'app/Views/include/menu.php' ?>
                 </div>
+                
+                <!-- Conteúdo Principal -->
+                <div class="col-md-9">
+                    <!-- Alertas e Mensagens -->
+                    <?= Helper::mensagem('chat') ?>
+                    <?= Helper::mensagemSweetAlert('chat') ?>
+                    
+                    <!-- Botão Voltar -->
+                    <div class="mb-3">
+                        <a href="<?= URL ?>/chat/index" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left me-2"></i> Voltar para Conversas
+                        </a>
+                    </div>
 
-                <!-- Container do Chat -->
-                <div class="chat-container fade-in">
-                    <!-- Header do Chat -->
-                    <div class="chat-header">
-                        <div class="contact-info">
-                            <div class="contact-avatar">
-                                <?= strtoupper(substr($dados['conversa']->contato_nome, 0, 2)) ?>
+                    <!-- Container do Chat estilo WhatsApp -->
+                    <div class="chat-container fade-in">
+                        <!-- Header do Chat -->
+                        <div class="chat-header">
+                            <div class="contact-info">
+                                <div class="contact-avatar">
+                                    <?= strtoupper(substr($dados['conversa']->contato_nome, 0, 2)) ?>
+                                </div>
+                                <div class="contact-details">
+                                    <h5><?= htmlspecialchars($dados['conversa']->contato_nome) ?></h5>
+                                    <small><?= htmlspecialchars($dados['conversa']->contato_numero) ?></small>
+                                </div>
                             </div>
-                            <div class="contact-details">
-                                <h5><?= htmlspecialchars($dados['conversa']->contato_nome) ?></h5>
-                                <small><?= htmlspecialchars($dados['conversa']->contato_numero) ?></small>
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="api-status">
+                                    <div class="status-indicator" id="statusIndicator"></div>
+                                    <span id="apiStatusText">Verificando...</span>
+                                </div>
+                                <form method="POST" action="<?= URL ?>/chat/conversa/<?= $dados['conversa']->id ?>" style="display: inline;">
+                                    <input type="hidden" name="acao" value="verificar_status">
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm" title="Verificar status das mensagens">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </button>
+                                </form>
+                                <div class="dropdown">
+                                    <button class="btn btn-light btn-sm dropdown-toggle" type="button" data-toggle="dropdown">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                    <div class="dropdown-menu dropdown-menu-right">
+                                        <a class="dropdown-item" href="#" data-toggle="modal" data-target="#modalEditarConversa">
+                                            <i class="fas fa-edit me-2"></i> Editar Contato
+                                        </a>
+                                        <div class="dropdown-divider"></div>
+                                        <a class="dropdown-item text-danger" href="#" onclick="confirmarExclusao()">
+                                            <i class="fas fa-trash me-2"></i> Excluir Conversa
+                                        </a>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="d-flex align-items-center gap-3">
-                            <div class="api-status">
-                                <div class="status-indicator" id="statusIndicator"></div>
-                                <span id="apiStatusText">Verificando...</span>
+
+                        <!-- Área de Mensagens -->
+                        <div class="chat-messages" id="chatMessages">
+                            <?php if (empty($dados['mensagens'])): ?>
+                                <div class="empty-chat">
+                                    <i class="fas fa-comments"></i>
+                                    <h5>Nenhuma mensagem ainda</h5>
+                                    <p>Envie uma mensagem para iniciar a conversa com <?= htmlspecialchars($dados['conversa']->contato_nome) ?></p>
+                                </div>
+                            <?php else: ?>
+                                <?php foreach ($dados['mensagens'] as $mensagem): ?>
+                                    <?php 
+                                    $isUsuario = $mensagem->remetente_id == $_SESSION['usuario_id'];
+                                    $messageClass = $isUsuario ? 'sent' : 'received';
+                                    $bubbleClass = $isUsuario ? 'sent' : 'received';
+                                    ?>
+                                    <div class="message-wrapper <?= $messageClass ?>" data-message-id="<?= $mensagem->id ?>">
+                                        <div class="message-bubble <?= $bubbleClass ?>">
+                                            <?php if ($mensagem->tipo == 'text'): ?>
+                                                <div class="message-content">
+                                                    <?= nl2br(htmlspecialchars($mensagem->conteudo)) ?>
+                                                </div>
+                                            <?php elseif ($mensagem->tipo == 'button'): ?>
+                                                <div class="message-content">
+                                                    <?= nl2br(htmlspecialchars($mensagem->conteudo)) ?>
+                                                </div>
+                                            <?php elseif ($mensagem->tipo == 'image'): ?>
+                                                <div class="message-media">
+                                                    <img src="<?= URL ?>/media/<?= $mensagem->midia_url ?>" alt="Imagem" class="img-thumbnail">
+                                                </div>
+                                                <?php if (!empty($mensagem->conteudo) && $mensagem->conteudo !== $mensagem->midia_url): ?>
+                                                    <div class="message-content">
+                                                        <?= nl2br(htmlspecialchars($mensagem->conteudo)) ?>
+                                                    </div>
+                                                <?php endif; ?>
+                                            <?php elseif ($mensagem->tipo == 'video'): ?>
+                                                <div class="message-media">
+                                                    <video controls>
+                                                        <source src="<?= URL ?>/media/<?= $mensagem->midia_url ?>" type="video/mp4">
+                                                        Seu navegador não suporta vídeos HTML5.
+                                                    </video>
+                                                </div>
+                                                <?php if (!empty($mensagem->conteudo) && $mensagem->conteudo !== $mensagem->midia_url): ?>
+                                                    <div class="message-content">
+                                                        <?= nl2br(htmlspecialchars($mensagem->conteudo)) ?>
+                                                    </div>
+                                                <?php endif; ?>
+                                            <?php elseif ($mensagem->tipo == 'audio'): ?>
+                                                <div class="message-media">
+                                                    <audio controls class="">
+                                                        <source src="<?= URL ?>/media/<?= $mensagem->midia_url ?>" type="audio/mpeg">
+                                                        Seu navegador não suporta áudios HTML5.
+                                                    </audio>
+                                                </div>
+                                            <?php elseif ($mensagem->tipo == 'document'): ?>
+                                                <div class="document-preview">
+                                                    <div class="document-icon">
+                                                        <i class="fas fa-file-alt"></i>
+                                                    </div>
+                                                    <div class="document-info">
+                                                        <a href="<?= URL ?>/media/<?= $mensagem->midia_url ?>" target="_blank" class="document-name">
+                                                            <?= htmlspecialchars($mensagem->midia_nome ?? 'Documento') ?>
+                                                        </a>
+                                                        <div class="document-size">Clique para baixar</div>
+                                                    </div>
+                                                </div>
+                                            <?php endif; ?>
+                                            
+                                            <div class="message-time">
+                                                <span><?= date('d/m/Y H:i', strtotime($mensagem->enviado_em)) ?></span>
+                                                <?php if ($isUsuario): ?>
+                                                    <span class="message-status">
+                                                        <?php if ($mensagem->status == 'enviado'): ?>
+                                                            <i class="fas fa-check" title="Enviado"></i>
+                                                        <?php elseif ($mensagem->status == 'entregue'): ?>
+                                                            <i class="fas fa-check-double" title="Entregue"></i>
+                                                        <?php elseif ($mensagem->status == 'lido'): ?>
+                                                            <i class="fas fa-check-double text-lido" title="Lido"></i>
+                                                        <?php elseif ($mensagem->status == 'falhou'): ?>
+                                                            <i class="fas fa-exclamation-triangle text-danger" title="Falhou"></i>
+                                                        <?php else: ?>
+                                                            <i class="fas fa-clock" title="Pendente"></i>
+                                                        <?php endif; ?>
+                                                    </span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                            
+                            <!-- Indicador de digitação -->
+                            <div class="typing-indicator d-none" id="typingIndicator">
+                                <div class="message-wrapper received">
+                                    <div class="message-bubble received">
+                                        <div class="loading-indicator">
+                                            Digitando
+                                            <div class="loading-dots">
+                                                <span></span>
+                                                <span></span>
+                                                <span></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <form method="POST" action="<?= URL ?>/chat/conversa/<?= $dados['conversa']->id ?>" style="display: inline;">
-                                <input type="hidden" name="acao" value="verificar_status">
-                                <button type="submit" class="btn btn-outline-secondary btn-sm" title="Verificar status das mensagens">
-                                    <i class="fas fa-sync-alt"></i>
-                                </button>
+                        </div>
+
+                        <!-- Preview de arquivo -->
+                        <div class="file-preview d-none" id="filePreview">
+                            <div class="file-icon" id="fileIcon">
+                                <i class="fas fa-file fa-lg"></i>
+                            </div>
+                            <div class="file-preview-info flex-grow-1">
+                                <div class="fw-bold" id="fileName"></div>
+                                <small class="text-muted" id="fileSize"></small>
+                                <div class="progress mt-1 d-none" id="uploadProgress" style="height: 3px;">
+                                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFilePreview()" id="removeFileBtn">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+
+                        <!-- Área de Input -->
+                        <div class="chat-input-area">
+                            <form action="<?= URL ?>/chat/enviarMensagem/<?= $dados['conversa']->id ?>" method="POST" enctype="multipart/form-data" id="messageForm">
+                                <div class="input-group-modern">
+                                    <button type="button" class="btn-attachment" onclick="document.getElementById('fileInput').click()" title="Anexar arquivo" id="attachBtn">
+                                        <i class="fas fa-paperclip"></i>
+                                    </button>
+                                    <textarea 
+                                        class="message-input" 
+                                        name="mensagem" 
+                                        id="messageInput" 
+                                        placeholder="Digite uma mensagem" 
+                                        rows="1"></textarea>
+                                    <button type="submit" class="btn-send" id="sendButton" disabled title="Enviar mensagem">
+                                        <i class="fas fa-paper-plane" id="sendIcon"></i>
+                                    </button>
+                                </div>
+                                <input type="file" id="fileInput" name="midia" style="display: none;" 
+                                       accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx">
                             </form>
-                            <div class="dropdown">
-                                <button class="btn btn-light btn-sm dropdown-toggle" type="button" data-toggle="dropdown">
-                                    <i class="fas fa-ellipsis-v"></i>
-                                </button>
-                                <div class="dropdown-menu dropdown-menu-right">
-                                    <a class="dropdown-item" href="#" data-toggle="modal" data-target="#modalEditarConversa">
-                                        <i class="fas fa-edit me-2"></i> Editar Contato
-                                    </a>
-                                    <div class="dropdown-divider"></div>
-                                    <a class="dropdown-item text-danger" href="#" onclick="confirmarExclusao()">
-                                        <i class="fas fa-trash me-2"></i> Excluir Conversa
-                                    </a>
-                                </div>
-                            </div>
                         </div>
-                    </div>
-
-                    <!-- Área de Mensagens -->
-                    <div class="chat-messages" id="chatMessages">
-                        <?php if (empty($dados['mensagens'])): ?>
-                            <div class="empty-chat">
-                                <i class="fas fa-comments"></i>
-                                <h5>Nenhuma mensagem ainda</h5>
-                                <p>Envie uma mensagem para iniciar a conversa com <?= htmlspecialchars($dados['conversa']->contato_nome) ?></p>
-                            </div>
-                        <?php else: ?>
-                            <?php foreach ($dados['mensagens'] as $mensagem): ?>
-                                <?php 
-                                $isUsuario = $mensagem->remetente_id == $_SESSION['usuario_id'];
-                                $messageClass = $isUsuario ? 'sent' : 'received';
-                                $bubbleClass = $isUsuario ? 'sent' : 'received';
-                                ?>
-                                <div class="message-wrapper <?= $messageClass ?>" data-message-id="<?= $mensagem->id ?>">
-                                    <div class="message-bubble <?= $bubbleClass ?>">
-                                        <?php if ($mensagem->tipo == 'text'): ?>
-                                            <div class="message-content">
-                                                <?= nl2br(htmlspecialchars($mensagem->conteudo)) ?>
-                                            </div>
-                                        <?php elseif ($mensagem->tipo == 'button'): ?>
-                                            <div class="message-content">
-                                                <?= nl2br(htmlspecialchars($mensagem->conteudo)) ?>
-                                            </div>
-                                        <?php elseif ($mensagem->tipo == 'image'): ?>
-                                            <div class="message-media">
-                                                <img src="<?= URL ?>/media/<?= $mensagem->midia_url ?>" alt="Imagem" class="img-thumbnail">
-                                            </div>
-                                            <?php if (!empty($mensagem->conteudo) && $mensagem->conteudo !== $mensagem->midia_url): ?>
-                                                <div class="message-content">
-                                                    <?= nl2br(htmlspecialchars($mensagem->conteudo)) ?>
-                                                </div>
-                                            <?php endif; ?>
-                                        <?php elseif ($mensagem->tipo == 'video'): ?>
-                                            <div class="message-media">
-                                                <video controls>
-                                                    <source src="<?= URL ?>/media/<?= $mensagem->midia_url ?>" type="video/mp4">
-                                                    Seu navegador não suporta vídeos HTML5.
-                                                </video>
-                                            </div>
-                                            <?php if (!empty($mensagem->conteudo) && $mensagem->conteudo !== $mensagem->midia_url): ?>
-                                                <div class="message-content">
-                                                    <?= nl2br(htmlspecialchars($mensagem->conteudo)) ?>
-                                                </div>
-                                            <?php endif; ?>
-                                        <?php elseif ($mensagem->tipo == 'audio'): ?>
-                                            <div class="message-media">
-                                                <audio controls class="">
-                                                    <source src="<?= URL ?>/media/<?= $mensagem->midia_url ?>" type="audio/mpeg">
-                                                    Seu navegador não suporta áudios HTML5.
-                                                </audio>
-                                            </div>
-                                        <?php elseif ($mensagem->tipo == 'document'): ?>
-                                            <div class="document-preview">
-                                                <div class="document-icon">
-                                                    <i class="fas fa-file-alt"></i>
-                                                </div>
-                                                <div class="document-info">
-                                                    <a href="<?= URL ?>/media/<?= $mensagem->midia_url ?>" target="_blank" class="document-name">
-                                                        <?= htmlspecialchars($mensagem->midia_nome ?? 'Documento') ?>
-                                                    </a>
-                                                    <div class="document-size">Clique para baixar</div>
-                                                </div>
-                                            </div>
-                                        <?php endif; ?>
-                                        
-                                        <div class="message-time">
-                                            <span><?= date('d/m/Y H:i', strtotime($mensagem->enviado_em)) ?></span>
-                                            <?php if ($isUsuario): ?>
-                                                <span class="message-status">
-                                                    <?php if ($mensagem->status == 'enviado'): ?>
-                                                        <i class="fas fa-check" title="Enviado"></i>
-                                                    <?php elseif ($mensagem->status == 'entregue'): ?>
-                                                        <i class="fas fa-check-double" title="Entregue"></i>
-                                                    <?php elseif ($mensagem->status == 'lido'): ?>
-                                                        <i class="fas fa-check-double text-lido" title="Lido"></i>
-                                                    <?php elseif ($mensagem->status == 'falhou'): ?>
-                                                        <i class="fas fa-exclamation-triangle text-danger" title="Falhou"></i>
-                                                    <?php else: ?>
-                                                        <i class="fas fa-clock" title="Pendente"></i>
-                                                    <?php endif; ?>
-                                                </span>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                        
-                        <!-- Indicador de digitação -->
-                        <div class="typing-indicator d-none" id="typingIndicator">
-                            <div class="message-wrapper received">
-                                <div class="message-bubble received">
-                                    <div class="loading-indicator">
-                                        Digitando
-                                        <div class="loading-dots">
-                                            <span></span>
-                                            <span></span>
-                                            <span></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Preview de arquivo -->
-                    <div class="file-preview d-none" id="filePreview">
-                        <div class="file-icon" id="fileIcon">
-                            <i class="fas fa-file fa-lg"></i>
-                        </div>
-                        <div class="file-preview-info flex-grow-1">
-                            <div class="fw-bold" id="fileName"></div>
-                            <small class="text-muted" id="fileSize"></small>
-                            <div class="progress mt-1 d-none" id="uploadProgress" style="height: 3px;">
-                                <div class="progress-bar" role="progressbar" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFilePreview()" id="removeFileBtn">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-
-                    <!-- Área de Input -->
-                    <div class="chat-input-area">
-                        <form action="<?= URL ?>/chat/enviarMensagem/<?= $dados['conversa']->id ?>" method="POST" enctype="multipart/form-data" id="messageForm">
-                            <div class="input-group-modern">
-                                <button type="button" class="btn-attachment" onclick="document.getElementById('fileInput').click()" title="Anexar arquivo" id="attachBtn">
-                                    <i class="fas fa-paperclip"></i>
-                                </button>
-                                <textarea 
-                                    class="message-input" 
-                                    name="mensagem" 
-                                    id="messageInput" 
-                                    placeholder="Digite uma mensagem" 
-                                    rows="1"></textarea>
-                                <button type="submit" class="btn-send" id="sendButton" disabled title="Enviar mensagem">
-                                    <i class="fas fa-paper-plane" id="sendIcon"></i>
-                                </button>
-                            </div>
-                            <input type="file" id="fileInput" name="midia" style="display: none;" 
-                                   accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx">
-                        </form>
                     </div>
                 </div>
             </div>

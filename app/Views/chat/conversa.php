@@ -748,7 +748,7 @@
                                             <?php endif; ?>
                                         <?php elseif ($mensagem->tipo == 'audio'): ?>
                                             <div class="message-media">
-                                                <audio controls>
+                                                <audio controls class="">
                                                     <source src="<?= URL ?>/media/<?= $mensagem->midia_url ?>" type="audio/mpeg">
                                                     Seu navegador não suporta áudios HTML5.
                                                 </audio>
@@ -768,7 +768,7 @@
                                         <?php endif; ?>
                                         
                                         <div class="message-time">
-                                            <span><?= date('H:i', strtotime($mensagem->enviado_em)) ?></span>
+                                            <span><?= date('d/m/Y H:i', strtotime($mensagem->enviado_em)) ?></span>
                                             <?php if ($isUsuario): ?>
                                                 <span class="message-status">
                                                     <?php if ($mensagem->status == 'enviado'): ?>

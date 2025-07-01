@@ -114,7 +114,7 @@
                                                 <?php endif; ?>
                                             <?php elseif ($mensagem->tipo == 'audio'): ?>
                                                 <div class="message-media">
-                                                    <audio controls class="w-100">
+                                                    <audio controls class="w-100" style="max-width: 100%;">
                                                         <source src="<?= URL ?>/media/<?= $mensagem->midia_url ?>" type="audio/mpeg">
                                                         Seu navegador não suporta áudios HTML5.
                                                     </audio>

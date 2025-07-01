@@ -2223,20 +2223,20 @@ class Chat extends Controllers
     }
 
     /**
-     * Visualiza mídia do MinIO com autenticação
+     * Visualiza mídia do MinIO com autenticação (MÉTODO ATUALIZADO)
      */
     public function visualizarMidiaMinIO($caminhoMinio = null)
     {
         // Verificar se o usuário está logado
         if (!isset($_SESSION['usuario_id'])) {
             http_response_code(403);
-            echo "Acesso negado";
+            echo "Acesso negado - usuário não logado";
             return;
         }
 
         if (!$caminhoMinio) {
             http_response_code(404);
-            echo "Mídia não encontrada";
+            echo "Mídia não encontrada - caminho não informado";
             return;
         }
 
@@ -2253,31 +2253,39 @@ class Chat extends Controllers
         // Carregar helper do MinIO
         require_once APPROOT . '/Libraries/MinioHelper.php';
 
-        // Baixar arquivo do MinIO
-        $resultado = MinioHelper::baixarArquivo($caminhoMinio);
+        try {
+            // Usar método de acesso direto (mais confiável)
+            $resultado = MinioHelper::acessoDirecto($caminhoMinio);
 
-        if (!$resultado['sucesso']) {
-            http_response_code(404);
-            echo "Arquivo não encontrado: " . $resultado['erro'];
-            return;
+            if (!$resultado['sucesso']) {
+                http_response_code(404);
+                echo "Arquivo não encontrado: " . $resultado['erro'];
+                return;
+            }
+
+            // Definir headers apropriados
+            header('Content-Type: ' . $resultado['content_type']);
+            header('Content-Length: ' . $resultado['tamanho']);
+            header('Cache-Control: private, max-age=3600');
+            header('X-Content-Type-Options: nosniff');
+            
+            // Para documentos, forçar download
+            $nomeArquivo = basename($caminhoMinio);
+            if (strpos($resultado['content_type'], 'application/') === 0 || strpos($resultado['content_type'], 'text/') === 0) {
+                header('Content-Disposition: attachment; filename="' . $nomeArquivo . '"');
+            } else {
+                // Para imagens, áudio e vídeo, permitir visualização inline
+                header('Content-Disposition: inline; filename="' . $nomeArquivo . '"');
+            }
+
+            // Servir o arquivo
+            echo $resultado['dados'];
+            
+        } catch (Exception $e) {
+            error_log("Erro ao visualizar mídia MinIO: " . $e->getMessage());
+            http_response_code(500);
+            echo "Erro interno ao carregar mídia: " . $e->getMessage();
         }
-
-        // Definir headers apropriados
-        header('Content-Type: ' . $resultado['content_type']);
-        header('Content-Length: ' . $resultado['tamanho']);
-        header('Cache-Control: private, max-age=3600');
-        
-        // Para documentos, forçar download
-        $nomeArquivo = basename($caminhoMinio);
-        if (strpos($resultado['content_type'], 'application/') === 0 || strpos($resultado['content_type'], 'text/') === 0) {
-            header('Content-Disposition: attachment; filename="' . $nomeArquivo . '"');
-        } else {
-            // Para imagens, áudio e vídeo, permitir visualização inline
-            header('Content-Disposition: inline; filename="' . $nomeArquivo . '"');
-        }
-
-        // Servir o arquivo
-        echo $resultado['dados'];
     }
 
     /**
@@ -2327,17 +2335,70 @@ class Chat extends Controllers
         // Carregar helper do MinIO
         require_once APPROOT . '/Libraries/MinioHelper.php';
 
-        // Gerar URL temporária (válida por 1 hora)
-        $url = MinioHelper::gerarUrlVisualizacao($caminhoMinio, 3600);
+        try {
+            // Gerar URL temporária com expiração mais longa (2 horas)
+            $url = MinioHelper::gerarUrlVisualizacao($caminhoMinio, 7200);
 
-        if ($url) {
-            echo json_encode([
-                'success' => true,
-                'url' => $url,
-                'expires_in' => 3600
-            ]);
-        } else {
-            echo json_encode(['error' => 'Erro ao gerar URL']);
+            if ($url) {
+                echo json_encode([
+                    'success' => true,
+                    'url' => $url,
+                    'expires_in' => 7200,
+                    'generated_at' => date('Y-m-d H:i:s')
+                ]);
+            } else {
+                echo json_encode(['error' => 'Erro ao gerar URL']);
+            }
+        } catch (Exception $e) {
+            echo json_encode(['error' => 'Exceção: ' . $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Gera URL fresca para download via GET (alternativa mais simples)
+     */
+    public function gerarUrlFresca($caminhoMinio = null)
+    {
+        // Verificar se o usuário está logado
+        if (!isset($_SESSION['usuario_id'])) {
+            http_response_code(403);
+            echo "Acesso negado";
+            return;
+        }
+
+        if (!$caminhoMinio) {
+            http_response_code(404);
+            echo "Caminho não informado";
+            return;
+        }
+
+        // Decodificar caminho
+        $caminhoMinio = urldecode($caminhoMinio);
+
+        // Verificar se o usuário tem acesso
+        if (!$this->verificarAcessoMidiaMinIO($_SESSION['usuario_id'], $caminhoMinio)) {
+            http_response_code(403);
+            echo "Acesso negado";
+            return;
+        }
+
+        // Carregar helper do MinIO
+        require_once APPROOT . '/Libraries/MinioHelper.php';
+
+        try {
+            // Gerar URL fresca e redirecionar
+            $url = MinioHelper::gerarUrlVisualizacao($caminhoMinio, 3600);
+            
+            if ($url) {
+                header("Location: " . $url);
+                exit;
+            } else {
+                http_response_code(500);
+                echo "Erro ao gerar URL";
+            }
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo "Erro: " . $e->getMessage();
         }
     }
 

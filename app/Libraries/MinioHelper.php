@@ -45,6 +45,16 @@ class MinioHelper
                     'key' => $accessKeyId,
                     'secret' => $secretAccessKey,
                 ],
+                // Configurações específicas para MinIO
+                'signature_version' => 'v4',
+                'http' => [
+                    'verify' => false, // Para desenvolvimento
+                ],
+                // Forçar estilo de URL path para MinIO
+                '@http' => [
+                    'timeout' => 60,
+                    'connect_timeout' => 30,
+                ],
             ]);
 
             // Verificar se o bucket existe
@@ -161,16 +171,74 @@ class MinioHelper
         }
 
         try {
+            // Método 1: Tentar com configurações padrão
             $comando = self::$s3Client->getCommand('GetObject', [
                 'Bucket' => self::$bucket,
                 'Key' => $caminhoMinIO
             ]);
 
             $request = self::$s3Client->createPresignedRequest($comando, "+{$tempoExpiracao} seconds");
+            $url = (string) $request->getUri();
+            
+            // Verificar se a URL foi gerada corretamente
+            if ($url && strpos($url, 'X-Amz-Signature') !== false) {
+                return $url;
+            }
+            
+            // Método 2: Tentar com configurações alternativas
+            return self::gerarUrlAlternativa($caminhoMinIO, $tempoExpiracao);
+
+        } catch (Exception $e) {
+            error_log("❌ Erro ao gerar URL método 1: " . $e->getMessage());
+            
+            // Tentar método alternativo
+            return self::gerarUrlAlternativa($caminhoMinIO, $tempoExpiracao);
+        }
+    }
+
+    /**
+     * Método alternativo de geração de URL para MinIO
+     */
+    private static function gerarUrlAlternativa($caminhoMinIO, $tempoExpiracao = 3600)
+    {
+        try {
+            // Recriar cliente com configurações específicas para assinatura
+            $endpoint = MINIO_ENDPOINT;
+            $region = MINIO_REGION;
+            $accessKeyId = MINIO_ACCESS_KEY;
+            $secretAccessKey = MINIO_SECRET_KEY;
+
+            $clienteAlternativo = new S3Client([
+                'version' => 'latest',
+                'region' => $region,
+                'endpoint' => $endpoint,
+                'use_path_style_endpoint' => true,
+                'credentials' => [
+                    'key' => $accessKeyId,
+                    'secret' => $secretAccessKey,
+                ],
+                'signature_version' => 'v4',
+                'signature_provider' => 'v4',
+                'http' => [
+                    'verify' => false,
+                    'timeout' => 60,
+                    'connect_timeout' => 30,
+                ],
+                's3' => [
+                    'addressing_style' => 'path',
+                ]
+            ]);
+
+            $comando = $clienteAlternativo->getCommand('GetObject', [
+                'Bucket' => self::$bucket,
+                'Key' => $caminhoMinIO
+            ]);
+
+            $request = $clienteAlternativo->createPresignedRequest($comando, "+{$tempoExpiracao} seconds");
             return (string) $request->getUri();
 
         } catch (Exception $e) {
-            error_log("❌ Erro ao gerar URL: " . $e->getMessage());
+            error_log("❌ Erro ao gerar URL método alternativo: " . $e->getMessage());
             return null;
         }
     }
@@ -446,6 +514,99 @@ class MinioHelper
             return [
                 'sucesso' => false,
                 'erro' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Método de debug para verificar geração de URL
+     */
+    public static function debugGeracaoUrl($caminhoMinIO, $tempoExpiracao = 3600)
+    {
+        if (!self::init()) {
+            return ['erro' => 'Falha na inicialização'];
+        }
+
+        $debug = [
+            'caminho' => $caminhoMinIO,
+            'bucket' => self::$bucket,
+            'expiracao' => $tempoExpiracao,
+            'tentativas' => []
+        ];
+
+        // Tentativa 1: Método padrão
+        try {
+            $comando = self::$s3Client->getCommand('GetObject', [
+                'Bucket' => self::$bucket,
+                'Key' => $caminhoMinIO
+            ]);
+
+            $request = self::$s3Client->createPresignedRequest($comando, "+{$tempoExpiracao} seconds");
+            $url = (string) $request->getUri();
+            
+            $debug['tentativas']['padrao'] = [
+                'sucesso' => !empty($url),
+                'url' => $url,
+                'tem_assinatura' => strpos($url, 'X-Amz-Signature') !== false
+            ];
+
+        } catch (Exception $e) {
+            $debug['tentativas']['padrao'] = [
+                'sucesso' => false,
+                'erro' => $e->getMessage()
+            ];
+        }
+
+        // Tentativa 2: Método alternativo
+        try {
+            $url = self::gerarUrlAlternativa($caminhoMinIO, $tempoExpiracao);
+            $debug['tentativas']['alternativo'] = [
+                'sucesso' => !empty($url),
+                'url' => $url,
+                'tem_assinatura' => $url ? strpos($url, 'X-Amz-Signature') !== false : false
+            ];
+
+        } catch (Exception $e) {
+            $debug['tentativas']['alternativo'] = [
+                'sucesso' => false,
+                'erro' => $e->getMessage()
+            ];
+        }
+
+        return $debug;
+    }
+
+    /**
+     * Acesso direto ao arquivo (método mais confiável)
+     */
+    public static function acessoDirecto($caminhoMinIO)
+    {
+        if (!self::init()) {
+            return [
+                'sucesso' => false,
+                'erro' => 'Erro ao inicializar MinIO'
+            ];
+        }
+
+        try {
+            $resultado = self::$s3Client->getObject([
+                'Bucket' => self::$bucket,
+                'Key' => $caminhoMinIO
+            ]);
+
+            return [
+                'sucesso' => true,
+                'dados' => $resultado['Body']->getContents(),
+                'content_type' => $resultado['ContentType'] ?? 'application/octet-stream',
+                'tamanho' => $resultado['ContentLength'] ?? 0,
+                'metadados' => $resultado['Metadata'] ?? []
+            ];
+
+        } catch (AwsException $e) {
+            error_log("❌ Erro ao acessar arquivo diretamente: " . $e->getMessage());
+            return [
+                'sucesso' => false,
+                'erro' => 'Erro AWS: ' . $e->getMessage()
             ];
         }
     }

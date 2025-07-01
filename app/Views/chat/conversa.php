@@ -125,7 +125,7 @@
                                             </div>
                                         <?php elseif ($mensagem->tipo == 'image'): ?>
                                             <div class="message-media">
-                                                <img src="<?= $mensagem->midia_url ?>" alt="Imagem" target="_blank" class="img-fluid">
+                                                <img src="<?= URL ?>/<?= $mensagem->midia_url ?>" alt="Imagem" target="_blank" class="img-fluid">
                                             </div>
                                             <?php if (!empty($mensagem->conteudo)): ?>
                                                 <div class="message-content">
@@ -135,7 +135,7 @@
                                         <?php elseif ($mensagem->tipo == 'video'): ?>
                                             <div class="message-media">
                                                 <video controls class="w-100">
-                                                    <source src="<?= $mensagem->midia_url ?>" target="_blank" type="video/mp4">
+                                                    <source src="<?= URL ?>/<?= $mensagem->midia_url ?>" target="_blank" type="video/mp4">
                                                     Seu navegador não suporta vídeos HTML5.
                                                 </video>
                                             </div>
@@ -147,7 +147,7 @@
                                         <?php elseif ($mensagem->tipo == 'audio'): ?>
                                             <div class="message-media">
                                                 <audio controls class="w-100">
-                                                    <source src="<?= $mensagem->midia_url ?>" target="_blank" type="audio/mpeg">
+                                                    <source src="<?= URL ?>/<?= $mensagem->midia_url ?>" target="_blank" type="audio/mpeg">
                                                     Seu navegador não suporta áudios HTML5.
                                                 </audio>
                                             </div>
@@ -155,7 +155,7 @@
                                             <div class="d-flex align-items-center gap-2 p-2 rounded" style="background: rgba(255,255,255,0.1);">
                                                 <i class="fas fa-file-alt fa-2x"></i>
                                                 <div class="flex-fill">
-                                                    <a href="<?= $mensagem->midia_url ?>" target="_blank" class="text-decoration-none">
+                                                    <a href="<?= URL ?>/<?= $mensagem->midia_url ?>" target="_blank" class="text-decoration-none">
                                                         <strong><?= htmlspecialchars($mensagem->midia_nome ?? 'Documento') ?></strong>
                                                     </a>
                                                 </div>

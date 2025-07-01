@@ -943,10 +943,11 @@ class Chat extends Controllers
                         $resultadoDownload = $this->baixarESalvarMidiaMinIO($midiaId, $tipo, $midiaTipo, $midiaFilename);
                         
                         if ($resultadoDownload['sucesso']) {
-                            $midiaUrl = $resultadoDownload['url_minio'];
+                            // CORREÇÃO: Salvar apenas o caminho no banco, não a URL assinada
                             $caminhoMinio = $resultadoDownload['caminho_minio'];
                             $midiaFilename = $resultadoDownload['nome_arquivo'];
                             $conteudo = $caminhoMinio; // Usar caminho do MinIO ao invés do ID
+                            $midiaUrl = $caminhoMinio; // Salvar caminho no campo midia_url (não URL assinada)
                             
                             error_log("✅ Mídia N8N baixada e salva no MinIO: {$caminhoMinio}");
                         } else {
@@ -961,7 +962,7 @@ class Chat extends Controllers
                         'remetente_id' => null, // Mensagem recebida (não enviada pelo sistema)
                         'tipo' => $tipo,
                         'conteudo' => $conteudo,
-                        'midia_url' => $midiaUrl,
+                        'midia_url' => $midiaUrl, // Agora contém apenas o caminho (ex: document/2025/arquivo.pdf)
                         'midia_nome' => $midiaFilename,
                         'message_id' => $messageId,
                         'status' => 'recebido',
@@ -977,6 +978,11 @@ class Chat extends Controllers
                         // Log de sucesso
                         $tipoLog = $midiaId ? "mídia ($tipo)" : "texto";
                         error_log("✅ Mensagem N8N $tipoLog salva com sucesso: ID={$messageId}, Conversa={$conversa->id}");
+                        
+                        // Log específico para mídia
+                        if ($midiaId && $midiaUrl) {
+                            error_log("📁 Caminho salvo no banco: {$midiaUrl} (ao invés de URL assinada)");
+                        }
                     } else {
                         error_log("❌ Erro ao salvar mensagem N8N no banco: " . print_r($dadosMensagem, true));
                     }
@@ -2223,10 +2229,15 @@ class Chat extends Controllers
     }
 
     /**
-     * Visualiza mídia do MinIO com autenticação (MÉTODO ATUALIZADO)
+     * Visualiza mídia do MinIO com autenticação (MÉTODO OTIMIZADO)
      */
     public function visualizarMidiaMinIO($caminhoMinio = null)
     {
+        // Limpar qualquer saída anterior que possa corromper o arquivo
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        
         // Verificar se o usuário está logado
         if (!isset($_SESSION['usuario_id'])) {
             http_response_code(403);
@@ -2242,11 +2253,15 @@ class Chat extends Controllers
 
         // Decodificar caminho
         $caminhoMinio = urldecode($caminhoMinio);
+        
+        // Log para debug
+        error_log("🔍 Visualizar mídia MinIO: {$caminhoMinio} (Usuário: {$_SESSION['usuario_id']})");
 
         // Verificar se o usuário tem acesso à mídia
         if (!$this->verificarAcessoMidiaMinIO($_SESSION['usuario_id'], $caminhoMinio)) {
             http_response_code(403);
             echo "Acesso negado a esta mídia";
+            error_log("❌ Acesso negado à mídia {$caminhoMinio} para usuário {$_SESSION['usuario_id']}");
             return;
         }
 
@@ -2260,7 +2275,20 @@ class Chat extends Controllers
             if (!$resultado['sucesso']) {
                 http_response_code(404);
                 echo "Arquivo não encontrado: " . $resultado['erro'];
+                error_log("❌ Arquivo não encontrado: {$caminhoMinio} - " . $resultado['erro']);
                 return;
+            }
+
+            // Garantir que não há saída anterior
+            if (headers_sent()) {
+                error_log("⚠️ Headers já enviados ao tentar servir mídia: {$caminhoMinio}");
+                echo "Erro: Headers já enviados";
+                return;
+            }
+
+            // Limpar qualquer buffer de saída
+            while (ob_get_level()) {
+                ob_end_clean();
             }
 
             // Definir headers apropriados
@@ -2268,9 +2296,14 @@ class Chat extends Controllers
             header('Content-Length: ' . $resultado['tamanho']);
             header('Cache-Control: private, max-age=3600');
             header('X-Content-Type-Options: nosniff');
+            header('Pragma: public');
+            header('Expires: ' . gmdate('D, d M Y H:i:s \G\M\T', time() + 3600));
+            
+            // Nome do arquivo para header
+            $nomeArquivo = basename($caminhoMinio);
+            $nomeArquivo = preg_replace('/[^a-zA-Z0-9._-]/', '_', $nomeArquivo); // Sanitizar nome
             
             // Para documentos, forçar download
-            $nomeArquivo = basename($caminhoMinio);
             if (strpos($resultado['content_type'], 'application/') === 0 || strpos($resultado['content_type'], 'text/') === 0) {
                 header('Content-Disposition: attachment; filename="' . $nomeArquivo . '"');
             } else {
@@ -2278,11 +2311,24 @@ class Chat extends Controllers
                 header('Content-Disposition: inline; filename="' . $nomeArquivo . '"');
             }
 
-            // Servir o arquivo
+            // Evitar timeout para arquivos grandes
+            set_time_limit(0);
+            
+            // Log de sucesso
+            error_log("✅ Servindo mídia: {$caminhoMinio} (" . number_format($resultado['tamanho'] / 1024, 2) . " KB)");
+
+            // Servir o arquivo de forma segura
             echo $resultado['dados'];
             
+            // Garantir que a saída seja enviada
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            } else {
+                flush();
+            }
+            
         } catch (Exception $e) {
-            error_log("Erro ao visualizar mídia MinIO: " . $e->getMessage());
+            error_log("❌ Erro ao visualizar mídia MinIO: " . $e->getMessage());
             http_response_code(500);
             echo "Erro interno ao carregar mídia: " . $e->getMessage();
         }

@@ -2,6 +2,20 @@
 # Ativa o módulo Rewrite, que faz a reescrita de URL.
 RewriteEngine On
 
+# ===================================================
+# REGRAS PARA SERVIR ARQUIVOS DE MÍDIA DO MINIO
+# ===================================================
+
+# Redirecionar /media/caminho/arquivo.ext para media.php
+RewriteRule ^media/(.+)$ media.php/$1 [L]
+
+# Redirecionar /document/, /image/, /audio/, /video/ para media.php  
+RewriteRule ^(document|image|audio|video)/(.+)$ media.php/$1/$2 [L]
+
+# ===================================================
+# REGRAS PADRÃO DO SISTEMA (MANTER COMO ESTÃO)
+# ===================================================
+
 # RewriteCond: Define uma condição para uma regra.
 # REQUEST_FILENAME é o caminho completo do diretório que atende ao request original, tomando por base o filesystem da máquina, e não relativo à hospedagem
 # RewriteCond %{REQUEST_FILENAME} !-d Informa que será criado uma condição a ser aplicado ao nome do diretório requisitado. A exclamação é o sinal de negação e -d pede para verificar a existência de um diretório físico. Ex: CONDIÇÃO = SE ARQUIVO_REQUISITADO NÃO EXISTE COMO DIRETÓRIO FISICAMENTE 

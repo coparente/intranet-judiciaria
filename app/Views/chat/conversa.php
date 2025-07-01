@@ -125,7 +125,7 @@
                                             </div>
                                         <?php elseif ($mensagem->tipo == 'image'): ?>
                                             <div class="message-media">
-                                                <img src="<?= URL ?>/<?= $mensagem->midia_url ?>" alt="Imagem" target="_blank" class="img-thumbnail">
+                                                <img src="<?= URL ?>/<?= $mensagem->midia_url ?>" alt="Imagem" target="_blank" class="img-thumbnail" style="width: 100%; height: auto;">
                                             </div>
                                             <?php if (!empty($mensagem->conteudo)): ?>
                                                 <div class="message-content">

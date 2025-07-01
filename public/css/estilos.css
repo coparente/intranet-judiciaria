@@ -682,7 +682,7 @@ body.dark-mode .tooltip {
     border-radius: 12px;
     overflow: hidden;
     margin-bottom: 0.5rem;
-    max-width: 100%;
+    max-width: 50%;
     position: relative;
 }
 

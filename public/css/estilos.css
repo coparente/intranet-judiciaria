@@ -531,8 +531,8 @@ body.dark-mode .tooltip {
 }
 
 .chat-container {
-    height: calc(100vh - 280px);
-    min-height: 500px;
+    height: calc(100vh - 180px);
+    min-height: 650px;
     display: flex;
     flex-direction: column;
     background: var(--whatsapp-bg);
@@ -562,14 +562,14 @@ body.dark-mode .tooltip {
 .chat-header {
     background: #f0f0f0;
     background: linear-gradient(to bottom, #f0f0f0, #e9edef);
-    padding: 10px 16px;
+    padding: 8px 16px;
     border-bottom: 1px solid #d1d7db;
     display: flex;
     align-items: center;
     justify-content: space-between;
     position: relative;
     z-index: 10;
-    min-height: 60px;
+    min-height: 56px;
     flex-shrink: 0;
 }
 
@@ -641,7 +641,7 @@ body.dark-mode .tooltip {
 /* Área de mensagens estilo WhatsApp */
 .chat-messages {
     flex: 1;
-    padding: 12px;
+    padding: 6px 8px;
     overflow-y: auto;
     background: var(--whatsapp-bg);
     position: relative;
@@ -898,7 +898,7 @@ body.dark-mode .tooltip {
 /* Área de input estilo WhatsApp */
 .chat-input-area {
     background: #f0f0f0;
-    padding: 8px 16px;
+    padding: 6px 16px;
     border-top: 1px solid #d1d7db;
     position: relative;
     z-index: 10;
@@ -1137,15 +1137,15 @@ body.dark-mode .tooltip {
 /* Responsivo melhorado */
 @media (max-width: 1200px) {
     .chat-container {
-        height: calc(100vh - 300px);
-        min-height: 450px;
+        height: calc(100vh - 200px);
+        min-height: 580px;
     }
 }
 
 @media (max-width: 992px) {
     .chat-container {
-        height: calc(100vh - 280px);
-        min-height: 400px;
+        height: calc(100vh - 180px);
+        min-height: 520px;
     }
     
     .message-bubble {
@@ -1155,12 +1155,12 @@ body.dark-mode .tooltip {
 
 @media (max-width: 768px) {
     .chat-container {
-        height: calc(100vh - 220px);
+        height: calc(100vh - 160px);
         border-radius: 0;
         margin: 0;
         border-left: none;
         border-right: none;
-        min-height: 400px;
+        min-height: 450px;
     }
     
     .message-bubble {
@@ -1181,7 +1181,7 @@ body.dark-mode .tooltip {
     }
     
     .chat-messages {
-        padding: 8px;
+        padding: 6px 8px;
     }
     
     .input-group-modern {
@@ -1216,8 +1216,8 @@ body.dark-mode .tooltip {
 
 @media (max-width: 576px) {
     .chat-container {
-        height: calc(100vh - 200px);
-        min-height: 350px;
+        height: calc(100vh - 140px);
+        min-height: 400px;
     }
     
     .contact-details small {

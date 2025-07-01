@@ -687,7 +687,7 @@ body.dark-mode .tooltip {
 }
 
 .message-media img, .message-media video {
-    width: 100%;
+    width: 50%;
     height: auto;
     display: block;
     transition: transform 0.3s ease;

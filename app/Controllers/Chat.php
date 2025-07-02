@@ -437,7 +437,19 @@ class Chat extends Controllers
                     $dadosMensagem['tipo'] = $tipoMidia;
                     $dadosMensagem['conteudo'] = $mensagem; // Caption se houver
                     $dadosMensagem['midia_nome'] = $_FILES['midia']['name'];
-                    $dadosMensagem['midia_url'] = null; // Será preenchido quando baixarmos da API
+                    
+                    // ✅ NOVO: Salvar mídia enviada no MinIO
+                    $resultadoMinIO = $this->salvarMidiaEnviadaMinIO($_FILES['midia'], $tipoMidia);
+                    
+                    if ($resultadoMinIO['sucesso']) {
+                        // Salvar caminho do MinIO (igual às mensagens recebidas)
+                        $dadosMensagem['midia_url'] = $resultadoMinIO['caminho_minio'];
+                        error_log("✅ Mídia ENVIADA salva no MinIO: {$resultadoMinIO['caminho_minio']}");
+                    } else {
+                        // Se falhar o MinIO, continua sem salvar o caminho
+                        $dadosMensagem['midia_url'] = null;
+                        error_log("⚠️ Falha ao salvar mídia ENVIADA no MinIO: " . $resultadoMinIO['erro']);
+                    }
                 } else {
                     $dadosMensagem['tipo'] = 'text';
                     $dadosMensagem['conteudo'] = $mensagem;
@@ -962,7 +974,7 @@ class Chat extends Controllers
                         'remetente_id' => null, // Mensagem recebida (não enviada pelo sistema)
                         'tipo' => $tipo,
                         'conteudo' => $conteudo,
-                        'midia_url' => $midiaUrl, // Agora contém apenas o caminho (ex: document/2025/arquivo.pdf)
+                        'midia_url' => $midiaUrl, // (ex: document/2025/arquivo.pdf)
                         'midia_nome' => $midiaFilename,
                         'message_id' => $messageId,
                         'status' => 'recebido',
@@ -2546,6 +2558,56 @@ class Chat extends Controllers
         $resultado = MinioHelper::testarConexao();
 
         echo json_encode($resultado);
+    }
+
+    /**
+     * Salva mídia enviada diretamente no MinIO
+     */
+    private function salvarMidiaEnviadaMinIO($arquivo, $tipoMidia)
+    {
+        try {
+            // Carrega o helper do MinIO
+            require_once APPROOT . '/Libraries/MinioHelper.php';
+            
+            // Ler o conteúdo do arquivo
+            $dadosArquivo = file_get_contents($arquivo['tmp_name']);
+            
+            // Fazer upload para o MinIO
+            $resultadoUpload = MinioHelper::uploadMidia(
+                $dadosArquivo, 
+                $tipoMidia, 
+                $arquivo['type'], 
+                $arquivo['name']
+            );
+            
+            if (!$resultadoUpload['sucesso']) {
+                return [
+                    'sucesso' => false,
+                    'erro' => 'Erro ao fazer upload para MinIO: ' . $resultadoUpload['erro']
+                ];
+            }
+            
+            // Log de sucesso
+            error_log("📁 Mídia ENVIADA salva no MinIO: {$resultadoUpload['caminho_minio']} (Tamanho: " . 
+                     number_format($resultadoUpload['tamanho'] / 1024, 2) . " KB)");
+            
+            return [
+                'sucesso' => true,
+                'caminho_minio' => $resultadoUpload['caminho_minio'],
+                'url_minio' => $resultadoUpload['url_minio'],
+                'nome_arquivo' => $resultadoUpload['nome_arquivo'],
+                'tamanho' => $resultadoUpload['tamanho'],
+                'mime_type' => $arquivo['type'],
+                'bucket' => $resultadoUpload['bucket']
+            ];
+            
+        } catch (Exception $e) {
+            error_log("❌ Erro ao salvar mídia ENVIADA no MinIO: " . $e->getMessage());
+            return [
+                'sucesso' => false,
+                'erro' => 'Exceção: ' . $e->getMessage()
+            ];
+        }
     }
 }
 

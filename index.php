@@ -10,6 +10,11 @@ $db = new Database;
 $url = $_GET['url'] ?? '';
 $rotasAPI = [
     'chat/webhook',
+    'chat/carregarNovasMensagens',
+    'chat/downloadMidia',
+    'chat/enviarMensagemInterativa',
+    'chat/consultarStatus',
+    'chat/qrCode',
     'agenda/eventos',
     'agenda/detalhesEvento',
     'agenda/moverEvento',

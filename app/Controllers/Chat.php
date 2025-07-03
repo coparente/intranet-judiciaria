@@ -342,38 +342,78 @@ class Chat extends Controllers
      */
     public function enviarMensagem($conversa_id = null)
     {
+        // DEBUG: Log inicial
+        error_log("🚀 === INÍCIO ENVIAR MENSAGEM ===");
+        error_log("🚀 Method: " . $_SERVER['REQUEST_METHOD']);
+        error_log("🚀 Conversa ID: " . ($conversa_id ?? 'null'));
+        error_log("🚀 POST Data: " . print_r($_POST, true));
+        error_log("🚀 FILES Data: " . print_r($_FILES, true));
+
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            error_log("❌ Método não é POST");
             Helper::redirecionar("chat/conversa/{$conversa_id}");
             return;
         }
 
         if (!$conversa_id) {
+            error_log("❌ ID da conversa não informado");
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> ID da conversa não informado', 'alert alert-danger');
             Helper::redirecionar('chat');
             return;
         }
 
         // Buscar conversa
+        error_log("🔍 Buscando conversa: {$conversa_id}");
         $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
 
         if (!$conversa || $conversa->usuario_id != $_SESSION['usuario_id']) {
+            error_log("❌ Conversa não encontrada ou sem permissão");
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Conversa não encontrada', 'alert alert-danger');
             Helper::redirecionar('chat/index');
             return;
         }
 
+        error_log("✅ Conversa encontrada: {$conversa->contato_nome} ({$conversa->contato_numero})");
+
         $mensagem = trim($_POST['mensagem'] ?? '');
-        $temArquivo = isset($_FILES['midia']) && $_FILES['midia']['error'] === UPLOAD_ERR_OK;
+        
+        // Verificar arquivo em ambos os inputs
+        $arquivo = null;
+        $temArquivo = false;
+        $tipoInput = '';
+        
+        // DEBUG: Verificar arquivos
+        error_log("🔍 Verificando arquivos enviados...");
+        if (isset($_FILES['midia']) && $_FILES['midia']['error'] === UPLOAD_ERR_OK) {
+            $arquivo = $_FILES['midia'];
+            $temArquivo = true;
+            $tipoInput = 'midia';
+            error_log("✅ Arquivo encontrado em 'midia': {$arquivo['name']} ({$arquivo['type']}, {$arquivo['size']} bytes)");
+        } elseif (isset($_FILES['audio_gravado']) && $_FILES['audio_gravado']['error'] === UPLOAD_ERR_OK) {
+            $arquivo = $_FILES['audio_gravado'];
+            $temArquivo = true;
+            $tipoInput = 'audio_gravado';
+            error_log("✅ Arquivo encontrado em 'audio_gravado': {$arquivo['name']} ({$arquivo['type']}, {$arquivo['size']} bytes)");
+        } else {
+            error_log("❌ Nenhum arquivo válido encontrado");
+            if (isset($_FILES['midia'])) {
+                error_log("   midia error: " . $_FILES['midia']['error']);
+            }
+            if (isset($_FILES['audio_gravado'])) {
+                error_log("   audio_gravado error: " . $_FILES['audio_gravado']['error']);
+            }
+        }
 
         // Verificar se há mensagem ou arquivo
         if (empty($mensagem) && !$temArquivo) {
+            error_log("❌ Nem mensagem nem arquivo foram enviados");
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> É necessário informar uma mensagem ou anexar um arquivo', 'alert alert-danger');
             Helper::redirecionar("chat/conversa/{$conversa_id}");
             return;
         }
 
         // Verificar erro de upload APENAS se um arquivo foi selecionado (mas falhou)
-        if (isset($_FILES['midia']) && $_FILES['midia']['error'] !== UPLOAD_ERR_OK && $_FILES['midia']['error'] !== UPLOAD_ERR_NO_FILE) {
+        if ($arquivo && $arquivo['error'] !== UPLOAD_ERR_OK) {
             $errosUpload = [
                 UPLOAD_ERR_INI_SIZE => 'Arquivo muito grande (limite do servidor)',
                 UPLOAD_ERR_FORM_SIZE => 'Arquivo muito grande (limite do formulário)',
@@ -383,25 +423,48 @@ class Chat extends Controllers
                 UPLOAD_ERR_EXTENSION => 'Upload bloqueado por extensão'
             ];
 
-            $erroMsg = $errosUpload[$_FILES['midia']['error']] ?? 'Erro desconhecido no upload';
+            $erroMsg = $errosUpload[$arquivo['error']] ?? 'Erro desconhecido no upload';
+            error_log("❌ Erro no upload: " . $erroMsg);
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro no upload: ' . $erroMsg, 'alert alert-danger');
             Helper::redirecionar("chat/conversa/{$conversa_id}");
             return;
         }
 
         // Verificar se é a primeira mensagem
+        error_log("🔍 Verificando se é primeira mensagem...");
         $mensagensExistentes = $this->chatModel->contarMensagens($conversa_id);
         $precisaTemplate = ($mensagensExistentes == 0);
+        error_log("📊 Mensagens existentes: {$mensagensExistentes}, Precisa template: " . ($precisaTemplate ? 'sim' : 'não'));
 
         $resultado = null;
 
         try {
             if ($temArquivo) {
+                // DEBUG: Log específico para áudio
+                if ($tipoInput === 'audio_gravado') {
+                    error_log("🎵 === PROCESSANDO ÁUDIO GRAVADO ===");
+                    error_log("🎵 Tipo de input: {$tipoInput}");
+                    error_log("🎵 Arquivo: {$arquivo['name']}");
+                    error_log("🎵 Tipo MIME: {$arquivo['type']}");
+                    error_log("🎵 Tamanho: {$arquivo['size']} bytes");
+                    error_log("🎵 Mensagem/Caption: " . ($mensagem ?: 'vazio'));
+                    error_log("🎵 === CHAMANDO processarEnvioMidia ===");
+                }
+                
                 // Processar envio de mídia
-                $resultado = $this->processarEnvioMidia($conversa, $_FILES['midia'], $mensagem, $precisaTemplate);
+                $resultado = $this->processarEnvioMidia($conversa, $arquivo, $mensagem, $precisaTemplate);
+                
+                if ($tipoInput === 'audio_gravado') {
+                    error_log("🎵 === RESULTADO processarEnvioMidia ===");
+                    error_log("🎵 Status: " . ($resultado['status'] ?? 'indefinido'));
+                    if (isset($resultado['error'])) {
+                        error_log("🎵 Erro: " . $resultado['error']);
+                    }
+                    error_log("🎵 === FIM RESULTADO ===");
+                }
             } else {
                 // Processar envio de texto
-                error_log("DEBUG: Enviando mensagem de texto");
+                error_log("📝 Enviando mensagem de texto: " . substr($mensagem, 0, 50) . "...");
 
                 if ($precisaTemplate) {
                     // Primeira mensagem - tentar template, se falhar usar mensagem normal
@@ -409,7 +472,7 @@ class Chat extends Controllers
 
                     // Se o template falhar, tentar mensagem normal
                     if (!$resultado || ($resultado['status'] !== 200 && $resultado['status'] !== 201)) {
-                        error_log("DEBUG: Template falhou, tentando mensagem normal");
+                        error_log("⚠️ Template falhou, tentando mensagem normal");
                         $resultado = SerproHelper::enviarMensagemTexto($conversa->contato_numero, $mensagem);
                     }
                 } else {
@@ -418,7 +481,11 @@ class Chat extends Controllers
                 }
             }
 
+            error_log("📊 Resultado final: Status " . ($resultado['status'] ?? 'indefinido'));
+            
             if ($resultado && ($resultado['status'] == 200 || $resultado['status'] == 201)) {
+                error_log("✅ Envio bem-sucedido!");
+                
                 // Salvar no banco
                 $messageId = $resultado['response']['id'] ?? uniqid();
 
@@ -431,15 +498,15 @@ class Chat extends Controllers
                 ];
 
                 if ($temArquivo) {
-                    // Determinar tipo de mídia
-                    $tipoMidia = $this->determinarTipoMidia($_FILES['midia']['type']);
+                    // Determinar tipo de mídia para salvar no banco
+                    $tipoMidia = $this->determinarTipoMidia($arquivo['type']);
 
                     $dadosMensagem['tipo'] = $tipoMidia;
                     $dadosMensagem['conteudo'] = $mensagem; // Caption se houver
-                    $dadosMensagem['midia_nome'] = $_FILES['midia']['name'];
+                    $dadosMensagem['midia_nome'] = $arquivo['name'];
                     
                     // ✅ NOVO: Salvar mídia enviada no MinIO
-                    $resultadoMinIO = $this->salvarMidiaEnviadaMinIO($_FILES['midia'], $tipoMidia);
+                    $resultadoMinIO = $this->salvarMidiaEnviadaMinIO($arquivo, $tipoMidia);
                     
                     if ($resultadoMinIO['sucesso']) {
                         // Salvar caminho do MinIO (igual às mensagens recebidas)
@@ -463,14 +530,16 @@ class Chat extends Controllers
                 Helper::mensagem('chat', '<i class="fas fa-check"></i> ' . ($temArquivo ? 'Mídia enviada' : 'Mensagem enviada') . ' com sucesso', 'alert alert-success');
             } else {
                 $erro = $resultado['error'] ?? 'Erro desconhecido';
-                error_log("ERRO ENVIO: " . print_r($resultado, true));
+                error_log("❌ ERRO ENVIO: " . print_r($resultado, true));
                 Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro ao enviar: ' . $erro, 'alert alert-danger');
             }
         } catch (Exception $e) {
-            error_log("EXCEÇÃO ENVIO: " . $e->getMessage());
+            error_log("❌ EXCEÇÃO ENVIO: " . $e->getMessage());
+            error_log("❌ Stack trace: " . $e->getTraceAsString());
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro interno: ' . $e->getMessage(), 'alert alert-danger');
         }
 
+        error_log("🚀 === FIM ENVIAR MENSAGEM ===");
         Helper::redirecionar("chat/conversa/{$conversa_id}");
     }
 
@@ -479,27 +548,129 @@ class Chat extends Controllers
      */
     private function processarEnvioMidia($conversa, $arquivo, $caption, $precisaTemplate)
     {
+        // DEBUG: Log inicial para áudio
+        if (strpos($arquivo['type'], 'audio/') === 0 || strpos($arquivo['name'], 'audio_gravado') !== false) {
+            error_log("🎵 === INÍCIO DEBUG ÁUDIO ===");
+            error_log("🎵 Arquivo recebido:");
+            error_log("🎵   Nome: {$arquivo['name']}");
+            error_log("🎵   Tipo: {$arquivo['type']}");
+            error_log("🎵   Tamanho: {$arquivo['size']} bytes");
+            error_log("🎵   Tmp: {$arquivo['tmp_name']}");
+            error_log("🎵   Caption: " . ($caption ? $caption : 'vazio'));
+            error_log("🎵   PrecisaTemplate: " . ($precisaTemplate ? 'sim' : 'não'));
+            error_log("🎵 === === === === === ===");
+        }
+
+        // === CORREÇÃO: Normalização avançada de tipos MIME ===
+        $tipoOriginal = $arquivo['type'];
+        $tipoNormalizado = $tipoOriginal;
+        $isAudioGravado = strpos($arquivo['name'], 'audio_gravado') !== false;
+        
+        // Para áudios gravados, aplicar normalização específica
+        if ($isAudioGravado || strpos($arquivo['type'], 'audio/') === 0) {
+            
+            // Verificar se o arquivo realmente existe e ler conteúdo
+            if (!file_exists($arquivo['tmp_name'])) {
+                error_log("❌ ÁUDIO: Arquivo temporário não existe: {$arquivo['tmp_name']}");
+                throw new Exception('Arquivo temporário não encontrado');
+            }
+            
+            $conteudoArquivo = file_get_contents($arquivo['tmp_name']);
+            $tamanhoReal = strlen($conteudoArquivo);
+            
+            error_log("🎵 VERIFICAÇÃO ARQUIVO:");
+            error_log("🎵   Tamanho relatado: {$arquivo['size']} bytes");
+            error_log("🎵   Tamanho real: {$tamanhoReal} bytes");
+            
+            if ($tamanhoReal === 0) {
+                error_log("❌ ÁUDIO: Arquivo vazio");
+                throw new Exception('Arquivo de áudio está vazio');
+            }
+            
+            // === CORREÇÃO: Detecção inteligente de formato ===
+            $primeirosBytes = substr($conteudoArquivo, 0, 16);
+            $tipoDetectado = $this->detectarTipoAudio($primeirosBytes, $arquivo['type']);
+            
+            if ($tipoDetectado && $tipoDetectado !== $tipoOriginal) {
+                error_log("🎵 NORMALIZAÇÃO INTELIGENTE: {$tipoOriginal} → {$tipoDetectado}");
+                $tipoNormalizado = $tipoDetectado;
+            }
+            
+            // Simplificar tipos complexos
+            if (strpos($tipoNormalizado, ';') !== false) {
+                $parteTipo = explode(';', $tipoNormalizado)[0];
+                error_log("🎵 SIMPLIFICAÇÃO MIME: {$tipoNormalizado} → {$parteTipo}");
+                $tipoNormalizado = $parteTipo;
+            }
+            
+            // Atualizar o tipo no array
+            $arquivo['type'] = $tipoNormalizado;
+            
+            error_log("🎵 TIPO FINAL: {$tipoNormalizado}");
+        }
+
         // Validar arquivo
         $validacao = $this->validarArquivoMidia($arquivo);
         if (!$validacao['valido']) {
+            error_log("❌ ÁUDIO: Falha na validação - " . $validacao['erro']);
             throw new Exception($validacao['erro']);
         }
 
-        // Fazer upload da mídia primeiro
-        $resultadoUpload = SerproHelper::uploadMidia($arquivo, $arquivo['type']);
+        // Log específico para áudio
+        if (strpos($arquivo['type'], 'audio/') === 0) {
+            error_log("✅ ÁUDIO: Validação passou!");
+        }
 
-        // CORREÇÃO: Aceitar tanto 200 quanto 201 como sucesso
+        // === CORREÇÃO: Upload com retry para áudios gravados ===
+        error_log("🔄 ÁUDIO: Iniciando upload para API SERPRO...");
+        
+        $tentativas = $isAudioGravado ? 2 : 1; // Retry para áudios gravados
+        $resultadoUpload = null;
+        
+        for ($tentativa = 1; $tentativa <= $tentativas; $tentativa++) {
+            if ($tentativa > 1) {
+                error_log("🔄 ÁUDIO: Tentativa {$tentativa} de upload...");
+                sleep(1); // Aguardar 1 segundo entre tentativas
+            }
+            
+            $resultadoUpload = SerproHelper::uploadMidia($arquivo, $arquivo['type']);
+            
+            // DEBUG: Log resultado do upload
+            if (strpos($arquivo['type'], 'audio/') === 0) {
+                error_log("🎵 UPLOAD TENTATIVA {$tentativa}:");
+                error_log("🎵   Status: " . $resultadoUpload['status']);
+                error_log("🎵   Response: " . json_encode($resultadoUpload['response'] ?? []));
+                if (isset($resultadoUpload['error'])) {
+                    error_log("🎵   Erro: " . $resultadoUpload['error']);
+                }
+            }
+            
+            // Se sucesso, parar tentativas
+            if ($resultadoUpload['status'] === 200 || $resultadoUpload['status'] === 201) {
+                break;
+            }
+        }
+
+        // Verificar se upload foi bem-sucedido
         if ($resultadoUpload['status'] !== 200 && $resultadoUpload['status'] !== 201) {
-            throw new Exception('Erro no upload da mídia: ' . ($resultadoUpload['error'] ?? 'Erro desconhecido'));
+            $errorMsg = 'Erro no upload da mídia: ' . ($resultadoUpload['error'] ?? 'Erro desconhecido');
+            
+            // Para áudios gravados, dar erro mais específico
+            if ($isAudioGravado) {
+                $errorMsg = 'Erro no upload do áudio gravado: ' . ($resultadoUpload['error'] ?? 'Formato não suportado pela API');
+            }
+            
+            error_log("❌ ÁUDIO: " . $errorMsg);
+            throw new Exception($errorMsg);
         }
 
         $mediaId = $resultadoUpload['response']['id'];
-        error_log("MÍDIA: Upload bem-sucedido - Media ID: $mediaId");
+        error_log("✅ ÁUDIO: Upload bem-sucedido - Media ID: $mediaId");
 
         // Determinar tipo de mídia
         $tipoMidia = $this->mapearTipoMidiaParaAPI($arquivo['type']);
 
-        // Preparar parâmetros conforme tipo de mídia
+        // === CORREÇÃO: Preparar parâmetros de envio específicos para áudio ===
         $filename = null;
         $captionParaEnvio = null;
 
@@ -510,34 +681,75 @@ class Chat extends Controllers
 
             // Se há caption, enviar como mensagem de texto separada APÓS o documento
             if (!empty($caption)) {
-                // Não enviar caption junto com documento, será enviado depois
                 error_log("MÍDIA: Caption será enviado como mensagem separada após documento");
             }
-        } elseif ($tipoMidia === 'image') {
-            // Para imagens: caption permitido
+        } elseif ($tipoMidia === 'audio') {
+            // === CORREÇÃO: Para áudios, testar envio com e sem caption ===
             $captionParaEnvio = $caption;
-            error_log("MÍDIA: Enviando imagem" . ($caption ? " com caption" : " sem caption"));
+            error_log("🎵 ÁUDIO: Enviando $tipoMidia" . ($caption ? " com caption" : " sem caption"));
+            
+            if ($isAudioGravado) {
+                error_log("🎵 ÁUDIO GRAVADO: Preparando envio especial");
+            }
         } else {
-            // Para vídeo/áudio: testar se caption é permitido
+            // Para outras mídias
             $captionParaEnvio = $caption;
             error_log("MÍDIA: Enviando $tipoMidia" . ($caption ? " com caption" : " sem caption"));
         }
 
+        // === CORREÇÃO: Template apenas se necessário e não for áudio gravado simples ===
         if ($precisaTemplate && !empty($caption) && $tipoMidia !== 'document') {
-            // Se é primeira mensagem e tem caption (exceto documentos), enviar template primeiro
+            error_log("🎵 ÁUDIO: Enviando template primeiro...");
             $resultadoTemplate = $this->enviarPrimeiraMensagem($conversa->contato_numero, $caption);
 
             if ($resultadoTemplate['status'] !== 200 && $resultadoTemplate['status'] !== 201) {
+                error_log("❌ ÁUDIO: Falha no template - " . ($resultadoTemplate['error'] ?? 'Erro desconhecido'));
                 throw new Exception('Erro ao enviar template: ' . ($resultadoTemplate['error'] ?? 'Erro desconhecido'));
             }
 
-            // Aguardar um pouco antes de enviar a mídia
+            error_log("✅ ÁUDIO: Template enviado com sucesso");
             sleep(1);
-            // Não enviar caption novamente na mídia
-            $captionParaEnvio = null;
+            $captionParaEnvio = null; // Não enviar caption novamente
         }
 
-        $resultadoEnvio = SerproHelper::enviarMidia($conversa->contato_numero, $tipoMidia, $mediaId, $captionParaEnvio, null, $filename);
+        // DEBUG: Log antes do envio
+        if (strpos($arquivo['type'], 'audio/') === 0) {
+            error_log("🎵 ÁUDIO: Preparando envio da mídia...");
+            error_log("🎵   Destinatário: {$conversa->contato_numero}");
+            error_log("🎵   Tipo mídia: {$tipoMidia}");
+            error_log("🎵   Media ID: {$mediaId}");
+            error_log("🎵   Caption: " . ($captionParaEnvio ? $captionParaEnvio : 'null'));
+            error_log("🎵   Filename: " . ($filename ? $filename : 'null'));
+        }
+
+        // === CORREÇÃO: Envio com retry para áudios gravados ===
+        $tentativasEnvio = $isAudioGravado ? 2 : 1;
+        $resultadoEnvio = null;
+        
+        for ($tentativa = 1; $tentativa <= $tentativasEnvio; $tentativa++) {
+            if ($tentativa > 1) {
+                error_log("🔄 ÁUDIO: Tentativa {$tentativa} de envio...");
+                sleep(2); // Aguardar mais tempo entre tentativas de envio
+            }
+            
+            $resultadoEnvio = SerproHelper::enviarMidia($conversa->contato_numero, $tipoMidia, $mediaId, $captionParaEnvio, null, $filename);
+            
+            // DEBUG: Log resultado do envio
+            if (strpos($arquivo['type'], 'audio/') === 0) {
+                error_log("🎵 ENVIO TENTATIVA {$tentativa}:");
+                error_log("🎵   Status: " . $resultadoEnvio['status']);
+                error_log("🎵   Response: " . json_encode($resultadoEnvio['response'] ?? []));
+                if (isset($resultadoEnvio['error'])) {
+                    error_log("🎵   Erro: " . $resultadoEnvio['error']);
+                }
+            }
+            
+            // Se sucesso, parar tentativas
+            if ($resultadoEnvio['status'] === 200 || $resultadoEnvio['status'] === 201) {
+                break;
+            }
+        }
+        
         error_log("MÍDIA: Resultado envio - Status: " . $resultadoEnvio['status']);
 
         // Se documento foi enviado com sucesso e há caption, enviar como mensagem separada
@@ -546,16 +758,44 @@ class Chat extends Controllers
             ($resultadoEnvio['status'] === 200 || $resultadoEnvio['status'] === 201) &&
             !empty($caption)
         ) {
-
             error_log("MÍDIA: Enviando caption como mensagem separada...");
-            sleep(1); // Aguardar um pouco
-
-            // Enviar caption como mensagem de texto normal
+            sleep(1);
             $resultadoCaption = SerproHelper::enviarMensagemTexto($conversa->contato_numero, $caption);
             error_log("MÍDIA: Caption enviado - Status: " . ($resultadoCaption['status'] ?? 'erro'));
         }
 
+        if (strpos($arquivo['type'], 'audio/') === 0) {
+            error_log("🎵 === FIM DEBUG ÁUDIO ===");
+        }
+
         return $resultadoEnvio;
+    }
+
+    /**
+     * Detecta tipo de áudio pelos bytes iniciais
+     */
+    private function detectarTipoAudio($primeirosBytes, $tipoOriginal)
+    {
+        // Assinaturas conhecidas de formatos de áudio
+        $assinaturas = [
+            'OggS' => 'audio/ogg',
+            'ID3' => 'audio/mpeg',
+            'RIFF' => 'audio/wav', // Pode ser WAV ou WebM
+            'ftyp' => 'audio/mp4'
+        ];
+        
+        foreach ($assinaturas as $assinatura => $tipo) {
+            if (strpos($primeirosBytes, $assinatura) !== false) {
+                // Para RIFF, verificar se é WebM
+                if ($assinatura === 'RIFF' && strpos($primeirosBytes, 'WEBM') !== false) {
+                    return 'audio/webm';
+                }
+                return $tipo;
+            }
+        }
+        
+        // Se não detectou nada, retornar o tipo original
+        return $tipoOriginal;
     }
 
     /**
@@ -563,17 +803,42 @@ class Chat extends Controllers
      */
     private function validarArquivoMidia($arquivo)
     {
+        // DEBUG: Log do arquivo recebido
+        error_log("🔍 DEBUG VALIDAÇÃO: Nome: {$arquivo['name']}, Tipo: {$arquivo['type']}, Tamanho: {$arquivo['size']}");
+        
+        // DEBUG específico para áudio gravado
+        if (strpos($arquivo['name'], 'audio_gravado') !== false) {
+            error_log("🎵 VALIDAÇÃO ÁUDIO GRAVADO: Arquivo detectado - Tipo: {$arquivo['type']}");
+        }
+        
+        // === CORREÇÃO: Lista expandida de tipos aceitos ===
         $tiposPermitidos = [
+            // Imagens
             'image/jpeg',
             'image/png',
             'image/gif',
+            'image/webp',
+            
+            // Vídeo
             'video/mp4',
             'video/3gpp',
+            'video/quicktime',
+            
+            // Áudio (EXPANDIDO para suportar todos os formatos do MediaRecorder)
             'audio/aac',
-            'audio/amr',
-            'audio/mpeg',
-            'audio/mp4',
-            'audio/ogg',
+            'audio/amr', 
+            'audio/mpeg',           // MP3
+            'audio/mp3',            // Variação MP3
+            'audio/mp4',            // M4A
+            'audio/x-m4a',          // Variação M4A
+            'audio/ogg',            // OGG
+            'audio/ogg;codecs=opus',    // OGG com codec opus
+            'audio/ogg;codecs=vorbis',  // OGG com codec vorbis
+            'audio/webm',           // WebM audio
+            'audio/webm;codecs=opus',   // WebM com opus
+            'audio/wav',            // WAV (algumas implementações)
+            
+            // Documentos
             'application/pdf',
             'application/msword',
             'text/plain',
@@ -584,23 +849,62 @@ class Chat extends Controllers
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         ];
 
-        if (!in_array($arquivo['type'], $tiposPermitidos)) {
+        // === CORREÇÃO: Verificação especial para arquivos de áudio ===
+        $isAudioByExtension = preg_match('/\.(m4a|ogg|mp3|aac|amr|mp4|webm|wav)$/i', $arquivo['name']);
+        $isAudioByType = strpos($arquivo['type'], 'audio/') === 0;
+        $isAudioGravado = strpos($arquivo['name'], 'audio_gravado') !== false;
+        
+        // DEBUG: Log das verificações
+        if ($isAudioByType || $isAudioGravado) {
+            error_log("🎵 VALIDAÇÃO ÁUDIO:");
+            error_log("🎵   Tipo permitido na lista? " . (in_array($arquivo['type'], $tiposPermitidos) ? 'SIM' : 'NÃO'));
+            error_log("🎵   É áudio por extensão? " . ($isAudioByExtension ? 'SIM' : 'NÃO'));
+            error_log("🎵   É áudio por tipo? " . ($isAudioByType ? 'SIM' : 'NÃO'));
+            error_log("🎵   É áudio gravado? " . ($isAudioGravado ? 'SIM' : 'NÃO'));
+        }
+        
+        // === CORREÇÃO: Lógica de validação mais permissiva para áudios ===
+        $tipoValido = in_array($arquivo['type'], $tiposPermitidos) || 
+                      ($isAudioByType && ($isAudioByExtension || $isAudioGravado));
+        
+        if (!$tipoValido) {
+            error_log("❌ DEBUG VALIDAÇÃO: Arquivo rejeitado - Tipo: {$arquivo['type']}, Nome: {$arquivo['name']}");
+            
+            // Para áudios gravados, dar mensagem mais específica
+            if ($isAudioGravado) {
+                return ['valido' => false, 'erro' => 'Formato de áudio gravado não suportado: ' . $arquivo['type'] . '. Tente gravar novamente.'];
+            }
+            
             return ['valido' => false, 'erro' => 'Tipo de arquivo não permitido: ' . $arquivo['type']];
         }
+        
+        // Se passou na validação
+        if ($isAudioByType || $isAudioGravado) {
+            error_log("✅ DEBUG VALIDAÇÃO: Arquivo de áudio aceito - Tipo: {$arquivo['type']}, Nome: {$arquivo['name']}");
+        }
 
-        // Verificar tamanho
+        // === CORREÇÃO: Verificação de tamanho específica para áudios gravados ===
         $limiteTamanho = 5 * 1024 * 1024; // 5MB padrão
-        if (strpos($arquivo['type'], 'video/') === 0 || strpos($arquivo['type'], 'audio/') === 0) {
+        
+        if (strpos($arquivo['type'], 'video/') === 0 || strpos($arquivo['type'], 'audio/') === 0 || $isAudioByExtension) {
             $limiteTamanho = 16 * 1024 * 1024; // 16MB para vídeo/áudio
         } elseif (strpos($arquivo['type'], 'application/') === 0) {
             $limiteTamanho = 95 * 1024 * 1024; // 95MB para documentos
         }
 
+        // Para áudios gravados, verificar tamanho mínimo também
+        if ($isAudioGravado && $arquivo['size'] < 1024) {
+            error_log("❌ DEBUG VALIDAÇÃO: Áudio gravado muito pequeno - {$arquivo['size']} bytes");
+            return ['valido' => false, 'erro' => 'Áudio gravado muito pequeno. Grave por pelo menos 2 segundos.'];
+        }
+
         if ($arquivo['size'] > $limiteTamanho) {
             $limiteMB = round($limiteTamanho / (1024 * 1024), 1);
+            error_log("❌ DEBUG VALIDAÇÃO: Arquivo muito grande - {$arquivo['size']} bytes, limite: {$limiteTamanho} bytes");
             return ['valido' => false, 'erro' => "Arquivo muito grande. Limite: {$limiteMB}MB"];
         }
 
+        error_log("✅ DEBUG VALIDAÇÃO: Arquivo validado com sucesso");
         return ['valido' => true, 'erro' => null];
     }
 
@@ -614,6 +918,7 @@ class Chat extends Controllers
         } elseif (strpos($mimeType, 'video/') === 0) {
             return 'video';
         } elseif (strpos($mimeType, 'audio/') === 0) {
+            // === CORREÇÃO: Mapeamento mais abrangente para áudio ===
             return 'audio';
         } else {
             return 'document';
@@ -630,6 +935,7 @@ class Chat extends Controllers
         } elseif (strpos($mimeType, 'video/') === 0) {
             return 'video';
         } elseif (strpos($mimeType, 'audio/') === 0) {
+            // === CORREÇÃO: Sempre retornar 'audio' para qualquer tipo de áudio ===
             return 'audio';
         } else {
             return 'document';
@@ -723,7 +1029,7 @@ class Chat extends Controllers
     private function enviarPrimeiraMensagem($numero, $mensagem)
     {
         // Nome do template que deve estar aprovado na Meta
-        $nomeTemplate = 'central_intimacao_remota'; // Substitua pelo nome do seu template aprovado
+        $nomeTemplate = 'central_intimacao_remota'; // template aprovado
 
         // Parâmetros do template (se o template tiver variáveis)
         $parametros = [
@@ -1355,10 +1661,12 @@ class Chat extends Controllers
             'image/gif',
             'video/mp4',
             'video/3gpp',
+            // Áudio (formatos aceitos pela API SERPRO)
             'audio/aac',
             'audio/amr',
-            'audio/mpeg',
+            'audio/mpeg', 
             'audio/mp4',
+            'audio/x-m4a', // Variação do MP4 criada por alguns navegadores
             'audio/ogg',
             'application/pdf',
             'application/msword',
@@ -1386,6 +1694,11 @@ class Chat extends Controllers
         if ($arquivo['size'] > $limiteTamanho) {
             echo json_encode(['success' => false, 'error' => 'Arquivo muito grande']);
             return;
+        }
+
+        // Log específico para arquivos OGG (padrão das mensagens recebidas)
+        if ($tipoMidia === 'audio/ogg' || strpos($tipoMidia, 'audio/ogg') === 0) {
+            error_log("✅ UPLOAD OGG: Formato padrão das mensagens recebidas - {$arquivo['name']}");
         }
 
         $resultado = SerproHelper::uploadMidia($arquivo, $tipoMidia);
@@ -2588,8 +2901,8 @@ class Chat extends Controllers
             }
             
             // Log de sucesso
-            error_log("📁 Mídia ENVIADA salva no MinIO: {$resultadoUpload['caminho_minio']} (Tamanho: " . 
-                     number_format($resultadoUpload['tamanho'] / 1024, 2) . " KB)");
+            // error_log("📁 Mídia ENVIADA salva no MinIO: {$resultadoUpload['caminho_minio']} (Tamanho: " . 
+            //          number_format($resultadoUpload['tamanho'] / 1024, 2) . " KB)");
             
             return [
                 'sucesso' => true,

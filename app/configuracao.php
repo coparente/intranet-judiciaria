@@ -26,7 +26,8 @@ if ($ambiente === 'local') {
     define('USUARIO', 'root');
     define('SENHA', '');
     //URL do Intranet Judiciária local
-    define('URL', 'http://10.90.18.141/intranet-judiciaria');
+    // define('URL', 'http://10.90.18.141/intranet-judiciaria');
+    define('URL', 'http://localhost/intranet-judiciaria');
 } else {
     define('HOST', 'localhost');
     define('PORTA', 3306);

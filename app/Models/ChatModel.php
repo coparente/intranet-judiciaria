@@ -121,38 +121,79 @@ class ChatModel
      */
     public function buscarOuCriarConversa($usuario_id, $numero, $contato_nome = null, $processo_id = null)
     {
-        // Primeiro, buscar conversa existente
-        if ($usuario_id) {
-            $sql = "SELECT * FROM conversas 
-                    WHERE usuario_id = :usuario_id AND contato_numero = :contato_numero 
-                    LIMIT 1";
-            
+        try {
+            // Primeiro, buscar se já existe uma conversa ativa
+            $sql = "SELECT * FROM conversas WHERE contato_numero = :numero AND usuario_id = :usuario_id LIMIT 1";
             $this->db->query($sql);
+            $this->db->bind(':numero', $numero);
             $this->db->bind(':usuario_id', $usuario_id);
-            $this->db->bind(':contato_numero', $numero);
             $conversa = $this->db->resultado();
-            
+
             if ($conversa) {
                 return $conversa;
             }
-        }
 
-        // Se não encontrou, criar nova conversa
-        $sql = "INSERT INTO conversas (usuario_id, contato_nome, contato_numero, processo_id, criado_em, atualizado_em) 
-                VALUES (:usuario_id, :contato_nome, :contato_numero, :processo_id, NOW(), NOW())";
-        
-        $this->db->query($sql);
-        $this->db->bind(':usuario_id', $usuario_id);
-        $this->db->bind(':contato_nome', $contato_nome ?: 'Contato ' . $numero);
-        $this->db->bind(':contato_numero', $numero);
-        $this->db->bind(':processo_id', $processo_id);
-        
-        if ($this->db->executa()) {
-            $conversa_id = $this->db->ultimoIdInserido();
-            return $this->buscarConversaPorId($conversa_id);
+            // Se não existe, criar nova conversa com ticket aberto automaticamente
+            $sql = "INSERT INTO conversas (
+                        usuario_id, 
+                        contato_nome, 
+                        contato_numero, 
+                        processo_id, 
+                        status_atendimento,
+                        ticket_aberto_em,
+                        observacoes,
+                        criado_em, 
+                        atualizado_em
+                    ) VALUES (
+                        :usuario_id, 
+                        :contato_nome, 
+                        :contato_numero, 
+                        :processo_id,
+                        'aberto',
+                        NOW(),
+                        CONCAT('[', NOW(), '] Ticket aberto automaticamente.'),
+                        NOW(), 
+                        NOW()
+                    )";
+
+            $this->db->query($sql);
+            $this->db->bind(':usuario_id', $usuario_id);
+            $this->db->bind(':contato_nome', $contato_nome ?: 'Contato');
+            $this->db->bind(':contato_numero', $numero);
+            $this->db->bind(':processo_id', $processo_id);
+
+            if ($this->db->executa()) {
+                $conversa_id = $this->db->ultimoIdInserido();
+                
+                // Inserir histórico inicial do ticket
+                $sql_historico = "INSERT INTO tickets_historico (
+                                    conversa_id, 
+                                    status_anterior, 
+                                    status_novo, 
+                                    usuario_id, 
+                                    observacao
+                                  ) VALUES (
+                                    :conversa_id,
+                                    NULL,
+                                    'aberto',
+                                    :usuario_id,
+                                    'Ticket aberto automaticamente ao criar conversa'
+                                  )";
+                
+                $this->db->query($sql_historico);
+                $this->db->bind(':conversa_id', $conversa_id);
+                $this->db->bind(':usuario_id', $usuario_id);
+                $this->db->executa();
+                
+                // Buscar a conversa criada
+                return $this->buscarConversaPorId($conversa_id);
+            }
+
+            return false;
+        } catch (Exception $e) {
+            error_log("Erro ao buscar ou criar conversa: " . $e->getMessage());
+            return false;
         }
-        
-        return false;
     }
 
     /**
@@ -160,10 +201,18 @@ class ChatModel
      */
     public function buscarConversaPorId($id)
     {
-        $sql = "SELECT * FROM conversas WHERE id = :id";
-        $this->db->query($sql);
-        $this->db->bind(':id', $id);
-        return $this->db->resultado();
+        try {
+            $sql = "SELECT c.*, u.nome as usuario_nome 
+                    FROM conversas c 
+                    LEFT JOIN usuarios u ON c.usuario_id = u.id 
+                    WHERE c.id = :id LIMIT 1";
+            $this->db->query($sql);
+            $this->db->bind(':id', $id);
+            return $this->db->resultado();
+        } catch (Exception $e) {
+            error_log("Erro ao buscar conversa por ID: " . $e->getMessage());
+            return false;
+        }
     }
 
     /**
@@ -773,6 +822,516 @@ class ChatModel
         } catch (Exception $e) {
             error_log("Erro ao verificar acesso à mídia MinIO: " . $e->getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Busca conversas ativas do mesmo número de telefone (exceto a conversa atual)
+     */
+    public function buscarConversasAtivasDoContato($contato_numero, $conversa_atual_id = null)
+    {
+        try {
+            $sql = "SELECT c.*, u.nome as agente_nome 
+                    FROM conversas c 
+                    LEFT JOIN usuarios u ON c.usuario_id = u.id 
+                    WHERE c.contato_numero = :contato_numero 
+                    AND c.usuario_id IS NOT NULL 
+                    AND c.usuario_id != 0";
+            
+            $params = [':contato_numero' => $contato_numero];
+            
+            // Se especificou conversa atual, exclui ela da busca
+            if ($conversa_atual_id !== null) {
+                $sql .= " AND c.id != :conversa_atual_id";
+                $params[':conversa_atual_id'] = $conversa_atual_id;
+            }
+            
+            $sql .= " ORDER BY c.atualizado_em DESC";
+
+            $this->db->query($sql);
+            
+            foreach ($params as $param => $valor) {
+                $this->db->bind($param, $valor);
+            }
+            
+            return $this->db->resultados();
+            
+        } catch (Exception $e) {
+            error_log("Erro ao buscar conversas ativas do contato: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Desativa (fecha) conversas do mesmo contato atribuídas a outros agentes
+     */
+    public function fecharConversasConflitantes($contato_numero, $conversa_atual_id, $usuario_atual_id)
+    {
+        try {
+            // Buscar conversas conflitantes
+            $conversasConflitantes = $this->buscarConversasAtivasDoContato($contato_numero, $conversa_atual_id);
+            
+            $conversasFechadas = [];
+            
+            foreach ($conversasConflitantes as $conversa) {
+                // Só fecha se for de outro agente
+                if ($conversa->usuario_id != $usuario_atual_id) {
+                    // Atualizar para desatribuir a conversa
+                    $sql = "UPDATE conversas SET 
+                            usuario_id = NULL, 
+                            atualizado_em = NOW(),
+                            observacoes = CONCAT(COALESCE(observacoes, ''), '\n[', NOW(), '] Conversa fechada automaticamente - usuário atribuído a outro agente.')
+                            WHERE id = :conversa_id";
+
+                    $this->db->query($sql);
+                    $this->db->bind(':conversa_id', $conversa->id);
+                    
+                    if ($this->db->executa()) {
+                        $conversasFechadas[] = [
+                            'id' => $conversa->id,
+                            'agente_anterior' => $conversa->agente_nome,
+                            'usuario_id_anterior' => $conversa->usuario_id
+                        ];
+                        
+                        error_log("CONVERSA FECHADA: ID {$conversa->id} do agente {$conversa->agente_nome} (ID: {$conversa->usuario_id})");
+                    }
+                }
+            }
+            
+            return $conversasFechadas;
+            
+        } catch (Exception $e) {
+            error_log("Erro ao fechar conversas conflitantes: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Busca usuário por ID
+     */
+    public function buscarUsuarioPorId($usuario_id)
+    {
+        try {
+            $sql = "SELECT id, nome, email, perfil FROM usuarios WHERE id = :usuario_id LIMIT 1";
+            $this->db->query($sql);
+            $this->db->bind(':usuario_id', $usuario_id);
+            return $this->db->resultado();
+        } catch (Exception $e) {
+            error_log("Erro ao buscar usuário por ID: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * NOVO: Relatório de conversas ativas por agente
+     */
+    public function relatorioConversasAtivas()
+    {
+        try {
+            $sql = "SELECT 
+                        u.id as usuario_id,
+                        u.nome as agente_nome,
+                        u.email as agente_email,
+                        COUNT(c.id) as total_conversas,
+                        GROUP_CONCAT(
+                            CONCAT(c.contato_nome, ' (', c.contato_numero, ')') 
+                            ORDER BY c.atualizado_em DESC
+                            SEPARATOR '; '
+                        ) as contatos
+                    FROM usuarios u 
+                    LEFT JOIN conversas c ON u.id = c.usuario_id 
+                    WHERE u.status = 'ativo' 
+                    AND u.perfil IN ('admin', 'analista', 'usuario')
+                    GROUP BY u.id, u.nome, u.email
+                    ORDER BY total_conversas DESC, u.nome ASC";
+
+            $this->db->query($sql);
+            return $this->db->resultados();
+            
+        } catch (Exception $e) {
+            error_log("Erro ao gerar relatório de conversas ativas: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * NOVO: Detectar possíveis conflitos no sistema
+     */
+    public function detectarConflitos()
+    {
+        try {
+            // Buscar contatos que têm conversas ativas com múltiplos agentes
+            $sql = "SELECT 
+                        c.contato_numero,
+                        c.contato_nome,
+                        COUNT(DISTINCT c.usuario_id) as agentes_distintos,
+                        COUNT(c.id) as total_conversas,
+                        GROUP_CONCAT(
+                            CONCAT(u.nome, ' (ID: ', c.usuario_id, ' - Conversa: ', c.id, ')') 
+                            ORDER BY c.atualizado_em DESC
+                            SEPARATOR '; '
+                        ) as detalhes_agentes
+                    FROM conversas c 
+                    INNER JOIN usuarios u ON c.usuario_id = u.id 
+                    WHERE c.usuario_id IS NOT NULL 
+                    AND c.usuario_id != 0
+                    GROUP BY c.contato_numero, c.contato_nome
+                    HAVING agentes_distintos > 1
+                    ORDER BY agentes_distintos DESC, total_conversas DESC";
+
+            $this->db->query($sql);
+            return $this->db->resultados();
+            
+        } catch (Exception $e) {
+            error_log("Erro ao detectar conflitos: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * NOVO: Limpar todos os conflitos automaticamente
+     */
+    public function limparTodosConflitos()
+    {
+        try {
+            $conflitos = $this->detectarConflitos();
+            $resultados = [];
+            
+            foreach ($conflitos as $conflito) {
+                // Para cada contato com conflito, manter apenas a conversa mais recente
+                $sql = "SELECT c.*, u.nome as agente_nome 
+                        FROM conversas c 
+                        INNER JOIN usuarios u ON c.usuario_id = u.id 
+                        WHERE c.contato_numero = :contato_numero 
+                        AND c.usuario_id IS NOT NULL 
+                        AND c.usuario_id != 0
+                        ORDER BY c.atualizado_em DESC";
+
+                $this->db->query($sql);
+                $this->db->bind(':contato_numero', $conflito->contato_numero);
+                $conversasContato = $this->db->resultados();
+                
+                if (count($conversasContato) > 1) {
+                    // Manter a primeira (mais recente) e fechar as outras
+                    $conversaMaisRecente = array_shift($conversasContato);
+                    $conversasFechadas = [];
+                    
+                    foreach ($conversasContato as $conversaParaFechar) {
+                        $sqlFechar = "UPDATE conversas SET 
+                                     usuario_id = NULL, 
+                                     atualizado_em = NOW(),
+                                     observacoes = CONCAT(COALESCE(observacoes, ''), '\n[', NOW(), '] Conversa fechada automaticamente - limpeza de conflitos em lote.')
+                                     WHERE id = :conversa_id";
+
+                        $this->db->query($sqlFechar);
+                        $this->db->bind(':conversa_id', $conversaParaFechar->id);
+                        
+                        if ($this->db->executa()) {
+                            $conversasFechadas[] = $conversaParaFechar->agente_nome;
+                        }
+                    }
+                    
+                    $resultados[] = [
+                        'contato' => $conflito->contato_numero,
+                        'nome' => $conflito->contato_nome,
+                        'conversa_mantida' => $conversaMaisRecente->agente_nome,
+                        'conversas_fechadas' => $conversasFechadas
+                    ];
+                }
+            }
+            
+            return $resultados;
+            
+        } catch (Exception $e) {
+            error_log("Erro ao limpar conflitos: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * =====================================================
+     * SISTEMA DE TICKETS PARA CONVERSAS
+     * =====================================================
+     */
+
+    /**
+     * Altera status do ticket de uma conversa
+     */
+    public function alterarStatusTicket($conversa_id, $novo_status, $usuario_id, $observacao = null)
+    {
+        try {
+            // Buscar status atual
+            $sql = "SELECT status_atendimento FROM conversas WHERE id = :conversa_id";
+            $this->db->query($sql);
+            $this->db->bind(':conversa_id', $conversa_id);
+            $conversa = $this->db->resultado();
+            
+            if (!$conversa) {
+                return false;
+            }
+
+            $status_anterior = $conversa->status_atendimento;
+
+            // Atualizar status
+            $sql = "UPDATE conversas SET 
+                    status_atendimento = :status,
+                    atualizado_em = NOW()";
+
+            // Se está fechando o ticket, registrar quando e quem fechou
+            if ($novo_status === 'fechado') {
+                $sql .= ", ticket_fechado_em = NOW(), ticket_fechado_por = :usuario_id";
+            }
+
+            // Adicionar observação se fornecida
+            if ($observacao) {
+                $sql .= ", observacoes = CONCAT(COALESCE(observacoes, ''), '\n[', NOW(), '] ', :observacao)";
+            }
+
+            $sql .= " WHERE id = :conversa_id";
+
+            $this->db->query($sql);
+            $this->db->bind(':status', $novo_status);
+            $this->db->bind(':conversa_id', $conversa_id);
+            
+            if ($novo_status === 'fechado') {
+                $this->db->bind(':usuario_id', $usuario_id);
+            }
+            
+            if ($observacao) {
+                $this->db->bind(':observacao', $observacao);
+            }
+
+            return $this->db->executa();
+
+        } catch (Exception $e) {
+            error_log("Erro ao alterar status do ticket: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Busca histórico de um ticket
+     */
+    public function buscarHistoricoTicket($conversa_id)
+    {
+        try {
+            $sql = "SELECT h.*, u.nome as usuario_nome 
+                    FROM tickets_historico h
+                    LEFT JOIN usuarios u ON h.usuario_id = u.id
+                    WHERE h.conversa_id = :conversa_id
+                    ORDER BY h.data_alteracao ASC";
+
+            $this->db->query($sql);
+            $this->db->bind(':conversa_id', $conversa_id);
+            return $this->db->resultados();
+
+        } catch (Exception $e) {
+            error_log("Erro ao buscar histórico do ticket: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Relatório de tickets por status
+     */
+    public function relatorioTicketsPorStatus($usuario_id = null)
+    {
+        try {
+            $sql = "SELECT 
+                        status_atendimento,
+                        COUNT(*) as total,
+                        AVG(TIMESTAMPDIFF(HOUR, ticket_aberto_em, COALESCE(ticket_fechado_em, NOW()))) as tempo_medio_horas
+                    FROM conversas 
+                    WHERE ticket_aberto_em IS NOT NULL";
+
+            if ($usuario_id) {
+                $sql .= " AND usuario_id = :usuario_id";
+            }
+
+            $sql .= " GROUP BY status_atendimento ORDER BY total DESC";
+
+            $this->db->query($sql);
+            
+            if ($usuario_id) {
+                $this->db->bind(':usuario_id', $usuario_id);
+            }
+
+            return $this->db->resultados();
+
+        } catch (Exception $e) {
+            error_log("Erro ao gerar relatório de tickets: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Busca tickets em aberto há mais de X horas
+     */
+    public function buscarTicketsVencidos($horas_limite = 24, $usuario_id = null)
+    {
+        try {
+            $sql = "SELECT c.*, u.nome as responsavel_nome,
+                           TIMESTAMPDIFF(HOUR, c.ticket_aberto_em, NOW()) as horas_em_aberto
+                    FROM conversas c
+                    LEFT JOIN usuarios u ON c.usuario_id = u.id
+                    WHERE c.status_atendimento IN ('aberto', 'em_andamento', 'aguardando_cliente')
+                    AND c.ticket_aberto_em IS NOT NULL
+                    AND TIMESTAMPDIFF(HOUR, c.ticket_aberto_em, NOW()) > :horas_limite";
+
+            if ($usuario_id) {
+                $sql .= " AND c.usuario_id = :usuario_id";
+            }
+
+            $sql .= " ORDER BY horas_em_aberto DESC";
+
+            $this->db->query($sql);
+            $this->db->bind(':horas_limite', $horas_limite, PDO::PARAM_INT);
+            
+            if ($usuario_id) {
+                $this->db->bind(':usuario_id', $usuario_id);
+            }
+
+            return $this->db->resultados();
+
+        } catch (Exception $e) {
+            error_log("Erro ao buscar tickets vencidos: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Busca conversas com filtro de status de ticket
+     */
+    public function buscarConversasPorStatusTicket($status_atendimento, $usuario_id = null, $limite = 10, $offset = 0)
+    {
+        try {
+            $sql = "SELECT c.*, 
+                    (SELECT COUNT(*) FROM mensagens_chat m 
+                     WHERE m.conversa_id = c.id AND m.lido = 0 AND m.remetente_id IS NULL) as nao_lidas,
+                    (SELECT m2.conteudo FROM mensagens_chat m2 
+                     WHERE m2.conversa_id = c.id 
+                     ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_mensagem,
+                    (SELECT m2.enviado_em FROM mensagens_chat m2 
+                     WHERE m2.conversa_id = c.id 
+                     ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_atividade,
+                    TIMESTAMPDIFF(HOUR, c.ticket_aberto_em, COALESCE(c.ticket_fechado_em, NOW())) as horas_em_aberto,
+                    u.nome as responsavel_nome
+                    FROM conversas c 
+                    LEFT JOIN usuarios u ON c.usuario_id = u.id
+                    WHERE c.status_atendimento = :status_atendimento";
+
+            if ($usuario_id) {
+                $sql .= " AND c.usuario_id = :usuario_id";
+            }
+
+            $sql .= " ORDER BY c.atualizado_em DESC LIMIT :limite OFFSET :offset";
+
+            $this->db->query($sql);
+            $this->db->bind(':status_atendimento', $status_atendimento);
+            $this->db->bind(':limite', $limite, PDO::PARAM_INT);
+            $this->db->bind(':offset', $offset, PDO::PARAM_INT);
+            
+            if ($usuario_id) {
+                $this->db->bind(':usuario_id', $usuario_id);
+            }
+
+            return $this->db->resultados();
+
+        } catch (Exception $e) {
+            error_log("Erro ao buscar conversas por status: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Busca estatísticas de tickets
+     */
+    public function estatisticasTickets($usuario_id = null)
+    {
+        try {
+            $sql = "SELECT 
+                        COUNT(*) as total_tickets,
+                        COUNT(CASE WHEN status_atendimento = 'aberto' THEN 1 END) as abertos,
+                        COUNT(CASE WHEN status_atendimento = 'em_andamento' THEN 1 END) as em_andamento,
+                        COUNT(CASE WHEN status_atendimento = 'aguardando_cliente' THEN 1 END) as aguardando_cliente,
+                        COUNT(CASE WHEN status_atendimento = 'resolvido' THEN 1 END) as resolvidos,
+                        COUNT(CASE WHEN status_atendimento = 'fechado' THEN 1 END) as fechados,
+                        AVG(CASE 
+                            WHEN status_atendimento = 'fechado' AND ticket_fechado_em IS NOT NULL 
+                            THEN TIMESTAMPDIFF(HOUR, ticket_aberto_em, ticket_fechado_em) 
+                            ELSE NULL 
+                        END) as tempo_medio_resolucao_horas,
+                        COUNT(CASE 
+                            WHEN status_atendimento IN ('aberto', 'em_andamento', 'aguardando_cliente') 
+                            AND TIMESTAMPDIFF(HOUR, ticket_aberto_em, NOW()) > 24 
+                            THEN 1 
+                        END) as tickets_vencidos
+                    FROM conversas 
+                    WHERE ticket_aberto_em IS NOT NULL";
+
+            if ($usuario_id) {
+                $sql .= " AND usuario_id = :usuario_id";
+            }
+
+            $this->db->query($sql);
+            
+            if ($usuario_id) {
+                $this->db->bind(':usuario_id', $usuario_id);
+            }
+
+            return $this->db->resultado();
+
+        } catch (Exception $e) {
+            error_log("Erro ao buscar estatísticas de tickets: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Reabrir ticket fechado
+     */
+    public function reabrirTicket($conversa_id, $usuario_id, $observacao = 'Ticket reaberto')
+    {
+        try {
+            $sql = "UPDATE conversas SET 
+                    status_atendimento = 'aberto',
+                    ticket_fechado_em = NULL,
+                    ticket_fechado_por = NULL,
+                    atualizado_em = NOW(),
+                    observacoes = CONCAT(COALESCE(observacoes, ''), '\n[', NOW(), '] ', :observacao)
+                    WHERE id = :conversa_id";
+
+            $this->db->query($sql);
+            $this->db->bind(':conversa_id', $conversa_id);
+            $this->db->bind(':observacao', $observacao);
+
+            return $this->db->executa();
+
+        } catch (Exception $e) {
+            error_log("Erro ao reabrir ticket: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Busca tickets para dashboard
+     */
+    public function dashboardTickets($usuario_id = null)
+    {
+        try {
+            $estatisticas = $this->estatisticasTickets($usuario_id);
+            $ticketsVencidos = $this->buscarTicketsVencidos(24, $usuario_id);
+            $relatorioPorStatus = $this->relatorioTicketsPorStatus($usuario_id);
+
+            return [
+                'estatisticas' => $estatisticas,
+                'tickets_vencidos' => $ticketsVencidos,
+                'relatorio_status' => $relatorioPorStatus
+            ];
+
+        } catch (Exception $e) {
+            error_log("Erro ao buscar dados do dashboard: " . $e->getMessage());
+            return null;
         }
     }
 }

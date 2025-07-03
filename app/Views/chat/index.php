@@ -32,6 +32,9 @@
                                 <a href="<?= URL ?>/chat/conversasNaoAtribuidas" class="btn btn-light btn-sm">
                                 <i class="fas fa-comments"></i> Não Atribuídas
                             </a>
+                                <a href="<?= URL ?>/chat/relatorioConversasAtivas" class="btn btn-light btn-sm">
+                                <i class="fas fa-file-alt"></i> Relatório
+                            </a>
                             </div>
                         </div>
 

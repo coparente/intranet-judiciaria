@@ -206,8 +206,6 @@ class Chat extends Controllers
             return;
         }
 
-        
-        
         // Verificar se a conversa existe e está não atribuída
         $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
         if (!$conversa) {
@@ -222,9 +220,44 @@ class Chat extends Controllers
             return;
         }
 
+        // ========== NOVO: CONTROLE DE CONVERSAS CONFLITANTES ==========
+        
+        // Verificar se existem outras conversas ativas do mesmo contato
+        $conversasConflitantes = $this->chatModel->buscarConversasAtivasDoContato($conversa->contato_numero, $conversa_id);
+        
+        $mensagensInfo = [];
+        
+        if (!empty($conversasConflitantes)) {
+            // Fechar conversas conflitantes
+            $conversasFechadas = $this->chatModel->fecharConversasConflitantes(
+                $conversa->contato_numero, 
+                $conversa_id, 
+                $usuario_id
+            );
+            
+            if (!empty($conversasFechadas)) {
+                $nomeAgentes = array_map(function($conv) {
+                    return $conv['agente_anterior'] ?? 'Agente ID ' . $conv['usuario_id_anterior'];
+                }, $conversasFechadas);
+                
+                $mensagensInfo[] = '<i class="fas fa-info-circle"></i> ' . count($conversasFechadas) . ' conversa(s) conflitante(s) foram fechadas automaticamente (agentes: ' . implode(', ', $nomeAgentes) . ')';
+                
+                error_log("CONTROLE CONFLITO: Fechadas " . count($conversasFechadas) . " conversas conflitantes para o contato " . $conversa->contato_numero);
+            }
+        }
+
+        // ========== FIM CONTROLE DE CONVERSAS CONFLITANTES ==========
+
         // Atribuir a conversa
         if ($this->chatModel->atribuirConversa($conversa_id, $usuario_id)) {
-            Helper::mensagem('chat', '<i class="fas fa-check"></i> Conversa atribuída com sucesso', 'alert alert-success');
+            $mensagem = '<i class="fas fa-check"></i> Conversa atribuída com sucesso';
+            
+            // Adicionar informações sobre conversas fechadas
+            if (!empty($mensagensInfo)) {
+                $mensagem .= '<br><small>' . implode('<br>', $mensagensInfo) . '</small>';
+            }
+            
+            Helper::mensagem('chat', $mensagem, 'alert alert-success');
             Helper::mensagemSweetAlert('chat', 'Conversa atribuída com sucesso', 'success');    
         } else {
             Helper::mensagem('chat', '<i class="fas fa-times"></i> Erro ao atribuir conversa', 'alert alert-danger');
@@ -243,7 +276,6 @@ class Chat extends Controllers
             return;
         }
 
-        
         $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
         
         if (!$conversa) {
@@ -252,8 +284,27 @@ class Chat extends Controllers
             return;
         }
 
+        // ========== NOVO: CONTROLE DE CONVERSAS CONFLITANTES ==========
+        
+        // Verificar se existe conflito de agentes para o mesmo contato
+        $conversasConflitantes = $this->chatModel->buscarConversasAtivasDoContato($conversa->contato_numero, $conversa_id);
+        
+        if (!empty($conversasConflitantes)) {
+            // Se o usuário atual tem uma conversa ativa com este contato, redirecionar para ela
+            foreach ($conversasConflitantes as $conversaConflitante) {
+                if ($conversaConflitante->usuario_id == $_SESSION['usuario_id']) {
+                    Helper::mensagem('chat', '<i class="fas fa-info-circle"></i> Você já tem uma conversa ativa com este contato. Redirecionando...', 'alert alert-info');
+                    Helper::redirecionar("chat/conversa/{$conversaConflitante->id}");
+                    return;
+                }
+            }
+        }
+
+        // ========== FIM CONTROLE DE CONVERSAS CONFLITANTES ==========
+
         // Verificar permissão de acesso à conversa
         $temPermissao = false;
+        $podeTomarConversa = false;
         
         // 1. Se a conversa pertence ao usuário logado
         if ($conversa->usuario_id == $_SESSION['usuario_id']) {
@@ -266,7 +317,14 @@ class Chat extends Controllers
             $temPermissao = true;
         }
         
-        if (!$temPermissao) {
+        // 3. NOVO: Se é admin/analista e a conversa está atribuída a outro usuário, pode "tomar" a conversa
+        if (in_array($_SESSION['usuario_perfil'], ['admin', 'analista']) && 
+            $conversa->usuario_id !== null && $conversa->usuario_id != 0 && 
+            $conversa->usuario_id != $_SESSION['usuario_id']) {
+            $podeTomarConversa = true;
+        }
+        
+        if (!$temPermissao && !$podeTomarConversa) {
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado a esta conversa', 'alert alert-danger');
             Helper::redirecionar('chat/conversasNaoAtribuidas');
             return;
@@ -280,8 +338,44 @@ class Chat extends Controllers
                 case 'verificar_status':
                     $this->processarVerificacaoStatusManual($conversa_id, $conversa);
                     break;
+                    
+                case 'tomar_conversa':
+                    if ($podeTomarConversa) {
+                        $this->processarTomarConversa($conversa_id, $conversa);
+                        return; // Função já redireciona
+                    }
+                    break;
             }
         }
+
+        // ========== NOVO: EXIBIR AVISO SE PODE TOMAR CONVERSA ==========
+        
+        if ($podeTomarConversa) {
+            // Buscar nome do agente atual
+            $usuarioAtual = $this->chatModel->buscarUsuarioPorId($conversa->usuario_id);
+            $nomeAgenteAtual = $usuarioAtual ? $usuarioAtual->nome : 'Agente ID ' . $conversa->usuario_id;
+            
+            Helper::mensagem('chat', 
+                '<i class="fas fa-exclamation-triangle"></i> <strong>Atenção:</strong> Esta conversa está sendo atendida por <strong>' . $nomeAgenteAtual . '</strong>. ' .
+                '<form method="POST" style="display:inline;"><input type="hidden" name="acao" value="tomar_conversa">' .
+                '<button type="submit" class="btn btn-warning btn-sm" onclick="return confirm(\'Tem certeza que deseja assumir esta conversa? Isso fechará a conversa do outro agente.\')"><i class="fas fa-hand-paper"></i> Assumir Conversa</button></form>', 
+                'alert alert-warning'
+            );
+            
+            // Não permitir envio de mensagens enquanto não tomar a conversa
+            $mensagens = [];
+            $dados = [
+                'tituloPagina' => 'Conversa - ' . $conversa->contato_nome . ' (Conflito)',
+                'conversa' => $conversa,
+                'mensagens' => $mensagens,
+                'bloqueado' => true
+            ];
+            
+            $this->view('chat/conversa', $dados);
+            return;
+        }
+
+        // ========== FIM CONTROLE ==========
 
         $mensagens = $this->chatModel->buscarMensagens($conversa_id);
 
@@ -292,6 +386,48 @@ class Chat extends Controllers
         ];
 
         $this->view('chat/conversa', $dados);
+    }
+
+    /**
+     * NOVO: Processa a ação de "tomar" uma conversa de outro agente
+     */
+    private function processarTomarConversa($conversa_id, $conversa)
+    {
+        // Verificar se é admin/analista
+        if (!in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat/conversasNaoAtribuidas');
+            return;
+        }
+
+        // Buscar nome do agente atual
+        $usuarioAtual = $this->chatModel->buscarUsuarioPorId($conversa->usuario_id);
+        $nomeAgenteAtual = $usuarioAtual ? $usuarioAtual->nome : 'Agente ID ' . $conversa->usuario_id;
+
+        // Fechar conversas conflitantes
+        $conversasFechadas = $this->chatModel->fecharConversasConflitantes(
+            $conversa->contato_numero, 
+            $conversa_id, 
+            $_SESSION['usuario_id']
+        );
+
+        // Atribuir conversa ao usuário atual
+        if ($this->chatModel->atribuirConversa($conversa_id, $_SESSION['usuario_id'])) {
+            $mensagem = '<i class="fas fa-check"></i> Conversa assumida com sucesso!';
+            
+            if (!empty($conversasFechadas)) {
+                $mensagem .= '<br><small><i class="fas fa-info-circle"></i> Conversa anterior de ' . $nomeAgenteAtual . ' foi fechada automaticamente.</small>';
+            }
+            
+            Helper::mensagem('chat', $mensagem, 'alert alert-success');
+            Helper::mensagemSweetAlert('chat', 'Conversa assumida com sucesso', 'success');
+            
+            error_log("CONVERSA ASSUMIDA: Usuário {$_SESSION['usuario_id']} assumiu conversa {$conversa_id} do agente {$nomeAgenteAtual}");
+        } else {
+            Helper::mensagem('chat', '<i class="fas fa-times"></i> Erro ao assumir conversa', 'alert alert-danger');
+        }
+
+        Helper::redirecionar("chat/conversa/{$conversa_id}");
     }
 
     /**
@@ -2921,6 +3057,291 @@ class Chat extends Controllers
                 'erro' => 'Exceção: ' . $e->getMessage()
             ];
         }
+    }
+
+    /**
+     * NOVO: Relatório de conversas ativas por agente
+     */
+    public function relatorioConversasAtivas()
+    {
+        // Verificar permissão - apenas admin
+        if (!isset($_SESSION['usuario_perfil']) || $_SESSION['usuario_perfil'] !== 'admin') {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        $relatorio = $this->chatModel->relatorioConversasAtivas();
+
+        $dados = [
+            'tituloPagina' => 'Relatório de Conversas Ativas',
+            'relatorio' => $relatorio
+        ];
+
+        $this->view('chat/relatorio_conversas_ativas', $dados);
+    }
+
+    /**
+     * NOVO: Detectar e resolver conflitos no sistema
+     */
+    public function gerenciarConflitos()
+    {
+        // Verificar permissão - apenas admin
+        if (!isset($_SESSION['usuario_perfil']) || $_SESSION['usuario_perfil'] !== 'admin') {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        // Processar ações POST
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $acao = $_POST['acao'] ?? '';
+
+            switch ($acao) {
+                case 'limpar_conflitos':
+                    $resultados = $this->chatModel->limparTodosConflitos();
+                    
+                    if (!empty($resultados)) {
+                        $totalResolvidos = count($resultados);
+                        $mensagem = "<i class='fas fa-check'></i> <strong>$totalResolvidos conflito(s) resolvido(s):</strong><br>";
+                        
+                        foreach ($resultados as $resultado) {
+                            $mensagem .= "<small>• {$resultado['nome']} ({$resultado['contato']}): mantida conversa de {$resultado['conversa_mantida']}, fechadas " . count($resultado['conversas_fechadas']) . " conversa(s)</small><br>";
+                        }
+                        
+                        Helper::mensagem('chat', $mensagem, 'alert alert-success');
+                        Helper::mensagemSweetAlert('chat', "Conflitos resolvidos: $totalResolvidos", 'success');
+                    } else {
+                        Helper::mensagem('chat', '<i class="fas fa-info-circle"></i> Nenhum conflito encontrado para resolver', 'alert alert-info');
+                    }
+                    break;
+            }
+        }
+
+        $conflitos = $this->chatModel->detectarConflitos();
+
+        $dados = [
+            'tituloPagina' => 'Gerenciar Conflitos de Conversas',
+            'conflitos' => $conflitos
+        ];
+
+        $this->view('chat/gerenciar_conflitos', $dados);
+    }
+
+    /**
+     * =====================================================
+     * SISTEMA DE TICKETS PARA CONVERSAS
+     * =====================================================
+     */
+
+    /**
+     * Altera status do ticket de uma conversa
+     */
+    public function alterarStatusTicket()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        $conversa_id = $_POST['conversa_id'] ?? null;
+        $novo_status = $_POST['status'] ?? null;
+        $observacao = $_POST['observacao'] ?? null;
+
+        if (!$conversa_id || !$novo_status) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Dados incompletos', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        // Verificar se o usuário tem acesso à conversa
+        $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
+        if (!$conversa || ($conversa->usuario_id != $_SESSION['usuario_id'] && !in_array($_SESSION['usuario_perfil'], ['admin', 'analista']))) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        // Alterar status
+        if ($this->chatModel->alterarStatusTicket($conversa_id, $novo_status, $_SESSION['usuario_id'], $observacao)) {
+            $statusNomes = [
+                'aberto' => 'Aberto',
+                'em_andamento' => 'Em Andamento',
+                'aguardando_cliente' => 'Aguardando Cliente',
+                'resolvido' => 'Resolvido',
+                'fechado' => 'Fechado'
+            ];
+
+            Helper::mensagem('chat', 
+                '<i class="fas fa-check"></i> Status do ticket alterado para: <strong>' . $statusNomes[$novo_status] . '</strong>', 
+                'alert alert-success'
+            );
+            Helper::mensagemSweetAlert('chat', 'Status alterado com sucesso', 'success');
+        } else {
+            Helper::mensagem('chat', '<i class="fas fa-times"></i> Erro ao alterar status do ticket', 'alert alert-danger');
+        }
+
+        Helper::redirecionar("chat/conversa/{$conversa_id}");
+    }
+
+    /**
+     * Página de gerenciamento de tickets
+     */
+    public function gerenciarTickets()
+    {
+        $filtroStatus = $_GET['status'] ?? 'todos';
+        $limite = 20;
+        $pagina = $_GET['pagina'] ?? 1;
+        $offset = ($pagina - 1) * $limite;
+
+        // Buscar conversas baseado no filtro
+        if ($filtroStatus === 'todos') {
+            $conversas = $this->chatModel->buscarConversasComFiltros($_SESSION['usuario_id'], '', '', $limite, $offset);
+        } else {
+            $conversas = $this->chatModel->buscarConversasPorStatusTicket($filtroStatus, $_SESSION['usuario_id'], $limite, $offset);
+        }
+
+        // Buscar estatísticas
+        $estatisticas = $this->chatModel->estatisticasTickets($_SESSION['usuario_id']);
+        $ticketsVencidos = $this->chatModel->buscarTicketsVencidos(24, $_SESSION['usuario_id']);
+
+        $dados = [
+            'tituloPagina' => 'Gerenciar Tickets',
+            'conversas' => $conversas,
+            'estatisticas' => $estatisticas,
+            'tickets_vencidos' => $ticketsVencidos,
+            'filtro_status' => $filtroStatus,
+            'pagina_atual' => $pagina
+        ];
+
+        $this->view('chat/gerenciar_tickets', $dados);
+    }
+
+    /**
+     * Dashboard de tickets (apenas admin/analista)
+     */
+    public function dashboardTickets()
+    {
+        // Verificar permissão
+        if (!in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        // Buscar dados do dashboard
+        $dashboardGeral = $this->chatModel->dashboardTickets(); // Todos os tickets
+        $dashboardUsuario = $this->chatModel->dashboardTickets($_SESSION['usuario_id']); // Tickets do usuário
+
+        $dados = [
+            'tituloPagina' => 'Dashboard de Tickets',
+            'dashboard_geral' => $dashboardGeral,
+            'dashboard_usuario' => $dashboardUsuario
+        ];
+
+        $this->view('chat/dashboard_tickets', $dados);
+    }
+
+    /**
+     * Relatório de tickets
+     */
+    public function relatorioTickets()
+    {
+        // Verificar permissão
+        if (!in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        $periodo = $_GET['periodo'] ?? '30'; // Últimos 30 dias
+        $usuario_filtro = $_GET['usuario'] ?? null;
+
+        // Buscar dados do relatório
+        $estatisticas = $this->chatModel->estatisticasTickets($usuario_filtro);
+        $relatorioPorStatus = $this->chatModel->relatorioTicketsPorStatus($usuario_filtro);
+        $ticketsVencidos = $this->chatModel->buscarTicketsVencidos(24, $usuario_filtro);
+        $usuariosDisponiveis = $this->chatModel->buscarUsuariosParaAtribuicao();
+
+        $dados = [
+            'tituloPagina' => 'Relatório de Tickets',
+            'estatisticas' => $estatisticas,
+            'relatorio_status' => $relatorioPorStatus,
+            'tickets_vencidos' => $ticketsVencidos,
+            'usuarios_disponiveis' => $usuariosDisponiveis,
+            'periodo_selecionado' => $periodo,
+            'usuario_filtro' => $usuario_filtro
+        ];
+
+        $this->view('chat/relatorio_tickets', $dados);
+    }
+
+    /**
+     * Exibir histórico de um ticket
+     */
+    public function historicoTicket($conversa_id = null)
+    {
+        if (!$conversa_id) {
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        // Verificar acesso à conversa
+        $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
+        if (!$conversa || ($conversa->usuario_id != $_SESSION['usuario_id'] && !in_array($_SESSION['usuario_perfil'], ['admin', 'analista']))) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        // Buscar histórico
+        $historico = $this->chatModel->buscarHistoricoTicket($conversa_id);
+
+        $dados = [
+            'tituloPagina' => 'Histórico do Ticket - ' . $conversa->contato_nome,
+            'conversa' => $conversa,
+            'historico' => $historico
+        ];
+
+        $this->view('chat/historico_ticket', $dados);
+    }
+
+    /**
+     * Reabrir ticket fechado
+     */
+    public function reabrirTicket()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        $conversa_id = $_POST['conversa_id'] ?? null;
+        $observacao = $_POST['observacao'] ?? 'Ticket reaberto pelo usuário';
+
+        if (!$conversa_id) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> ID da conversa não informado', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        // Verificar acesso
+        $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
+        if (!$conversa || ($conversa->usuario_id != $_SESSION['usuario_id'] && !in_array($_SESSION['usuario_perfil'], ['admin', 'analista']))) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        // Reabrir ticket
+        if ($this->chatModel->reabrirTicket($conversa_id, $_SESSION['usuario_id'], $observacao)) {
+            Helper::mensagem('chat', '<i class="fas fa-check"></i> Ticket reaberto com sucesso', 'alert alert-success');
+            Helper::mensagemSweetAlert('chat', 'Ticket reaberto', 'success');
+        } else {
+            Helper::mensagem('chat', '<i class="fas fa-times"></i> Erro ao reabrir ticket', 'alert alert-danger');
+        }
+
+        Helper::redirecionar("chat/conversa/{$conversa_id}");
     }
 }
 

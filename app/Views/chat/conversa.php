@@ -36,6 +36,40 @@
                                 <div class="contact-details">
                                     <h5><?= htmlspecialchars($dados['conversa']->contato_nome) ?></h5>
                                     <small><?= htmlspecialchars($dados['conversa']->contato_numero) ?></small>
+                                    
+                                    <!-- NOVO: Status do Ticket -->
+                                    <?php if (isset($dados['conversa']->status_atendimento)): ?>
+                                        <div class="ticket-status mt-1">
+                                            <?php
+                                            $statusClass = [
+                                                'aberto' => 'badge-danger',
+                                                'em_andamento' => 'badge-warning',
+                                                'aguardando_cliente' => 'badge-info',
+                                                'resolvido' => 'badge-success',
+                                                'fechado' => 'badge-secondary'
+                                            ];
+                                            $statusNomes = [
+                                                'aberto' => 'Aberto',
+                                                'em_andamento' => 'Em Andamento',
+                                                'aguardando_cliente' => 'Aguardando Cliente',
+                                                'resolvido' => 'Resolvido',
+                                                'fechado' => 'Fechado'
+                                            ];
+                                            $status = $dados['conversa']->status_atendimento ?? 'aberto';
+                                            ?>
+                                            <span class="badge <?= $statusClass[$status] ?? 'badge-secondary' ?>">
+                                                <i class="fas fa-ticket-alt me-1"></i>
+                                                <?= $statusNomes[$status] ?? 'Desconhecido' ?>
+                                            </span>
+                                            
+                                            <?php if (isset($dados['conversa']->ticket_aberto_em)): ?>
+                                                <small class="text-muted d-block">
+                                                    <i class="fas fa-clock me-1"></i>
+                                                    Aberto em: <?= date('d/m/Y H:i', strtotime($dados['conversa']->ticket_aberto_em)) ?>
+                                                </small>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             <div class="d-flex align-items-center gap-3">
@@ -43,6 +77,43 @@
                                     <div class="status-indicator" id="statusIndicator"></div>
                                     <span id="apiStatusText">Verificando...</span>
                                 </div>
+                                
+                                <!-- NOVO: Botões de Controle de Ticket -->
+                                <?php if (!isset($dados['bloqueado']) || !$dados['bloqueado']): ?>
+                                    <div class="ticket-controls">
+                                        <div class="dropdown">
+                                            <button class="btn btn-outline-primary btn-sm dropdown-toggle" type="button" data-toggle="dropdown">
+                                                <i class="fas fa-ticket-alt me-1"></i> Ticket
+                                            </button>
+                                            <div class="dropdown-menu">
+                                                <?php if ($dados['conversa']->status_atendimento !== 'fechado'): ?>
+                                                    <a class="dropdown-item" href="#" onclick="alterarStatusTicket('em_andamento')">
+                                                        <i class="fas fa-play text-warning me-2"></i> Em Andamento
+                                                    </a>
+                                                    <a class="dropdown-item" href="#" onclick="alterarStatusTicket('aguardando_cliente')">
+                                                        <i class="fas fa-clock text-info me-2"></i> Aguardando Cliente
+                                                    </a>
+                                                    <a class="dropdown-item" href="#" onclick="alterarStatusTicket('resolvido')">
+                                                        <i class="fas fa-check text-success me-2"></i> Resolvido
+                                                    </a>
+                                                    <div class="dropdown-divider"></div>
+                                                    <a class="dropdown-item text-danger" href="#" onclick="encerrarTicket()">
+                                                        <i class="fas fa-times-circle me-2"></i> Encerrar Ticket
+                                                    </a>
+                                                <?php else: ?>
+                                                    <a class="dropdown-item text-success" href="#" onclick="reabrirTicket()">
+                                                        <i class="fas fa-redo me-2"></i> Reabrir Ticket
+                                                    </a>
+                                                <?php endif; ?>
+                                                <div class="dropdown-divider"></div>
+                                                <a class="dropdown-item" href="<?= URL ?>/chat/historicoTicket/<?= $dados['conversa']->id ?>">
+                                                    <i class="fas fa-history me-2"></i> Ver Histórico
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+
                                 <form method="POST" action="<?= URL ?>/chat/conversa/<?= $dados['conversa']->id ?>" style="display: inline;">
                                     <input type="hidden" name="acao" value="verificar_status">
                                     <button type="submit" class="btn btn-outline-secondary btn-sm" title="Verificar status das mensagens">
@@ -206,50 +277,59 @@
 
                         <!-- Área de Input -->
                         <div class="chat-input-area">
-                            <form action="<?= URL ?>/chat/enviarMensagem/<?= $dados['conversa']->id ?>" method="POST" enctype="multipart/form-data" id="messageForm">
-                                <div class="input-group-modern">
-                                    <button type="button" class="btn-attachment" onclick="document.getElementById('fileInput').click()" title="Anexar arquivo" id="attachBtn">
-                                        <i class="fas fa-paperclip"></i>
-                                    </button>
-                                    <button type="button" class="btn-emoji" id="emojiBtn" title="Adicionar emoji">
-                                        <i class="fas fa-smile"></i>
-                                    </button>
-                                    <button type="button" class="btn-voice" id="voiceBtn" title="Gravar áudio">
-                                        <i class="fas fa-microphone"></i>
-                                    </button>
-                                    <textarea
-                                        class="message-input"
-                                        name="mensagem"
-                                        id="messageInput"
-                                        placeholder="Digite uma mensagem"
-                                        rows="1"></textarea>
-                                    <button type="submit" class="btn-send" id="sendButton" disabled title="Enviar mensagem">
-                                        <i class="fas fa-paper-plane" id="sendIcon"></i>
-                                    </button>
+                            <?php if (isset($dados['bloqueado']) && $dados['bloqueado']): ?>
+                                <!-- Bloqueado devido a conflito de agentes -->
+                                <div class="alert alert-warning text-center">
+                                    <i class="fas fa-lock me-2"></i>
+                                    <strong>Conversa Bloqueada</strong><br>
+                                    <small>Esta conversa está sendo atendida por outro agente. Use o botão "Assumir Conversa" acima para poder enviar mensagens.</small>
                                 </div>
-                                <input type="file" id="fileInput" name="midia" style="display: none;"
-                                    accept="image/*,video/*,audio/mpeg,audio/aac,audio/ogg,audio/amr,.pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx">
-                                <input type="file" id="audioInput" name="audio_gravado" style="display: none;" accept="audio/mpeg,audio/aac,audio/ogg,audio/amr">
-                            </form>
+                            <?php else: ?>
+                                <form action="<?= URL ?>/chat/enviarMensagem/<?= $dados['conversa']->id ?>" method="POST" enctype="multipart/form-data" id="messageForm">
+                                    <div class="input-group-modern">
+                                        <button type="button" class="btn-attachment" onclick="document.getElementById('fileInput').click()" title="Anexar arquivo" id="attachBtn">
+                                            <i class="fas fa-paperclip"></i>
+                                        </button>
+                                        <button type="button" class="btn-emoji" id="emojiBtn" title="Adicionar emoji">
+                                            <i class="fas fa-smile"></i>
+                                        </button>
+                                        <button type="button" class="btn-voice" id="voiceBtn" title="Gravar áudio">
+                                            <i class="fas fa-microphone"></i>
+                                        </button>
+                                        <textarea
+                                            class="message-input"
+                                            name="mensagem"
+                                            id="messageInput"
+                                            placeholder="Digite uma mensagem"
+                                            rows="1"></textarea>
+                                        <button type="submit" class="btn-send" id="sendButton" disabled title="Enviar mensagem">
+                                            <i class="fas fa-paper-plane" id="sendIcon"></i>
+                                        </button>
+                                    </div>
+                                    <input type="file" id="fileInput" name="midia" style="display: none;"
+                                        accept="image/*,video/*,audio/mpeg,audio/aac,audio/ogg,audio/amr,.pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx">
+                                    <input type="file" id="audioInput" name="audio_gravado" style="display: none;" accept="audio/mpeg,audio/aac,audio/ogg,audio/amr">
+                                </form>
 
-                            <!-- Controles de Gravação de Áudio -->
-                            <div class="voice-recording d-none" id="voiceRecording">
-                                <div class="recording-controls">
-                                    <div class="recording-indicator">
-                                        <div class="recording-dot"></div>
-                                        <span class="recording-text">Gravando...</span>
-                                        <span class="recording-time" id="recordingTime">00:00</span>
-                                    </div>
-                                    <div class="recording-actions">
-                                        <button type="button" class="btn-recording btn-cancel" id="cancelRecording" title="Cancelar gravação">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                        <button type="button" class="btn-recording btn-stop" id="stopRecording" title="Parar e enviar">
-                                            <i class="fas fa-stop"></i>
-                                        </button>
+                                <!-- Controles de Gravação de Áudio -->
+                                <div class="voice-recording d-none" id="voiceRecording">
+                                    <div class="recording-controls">
+                                        <div class="recording-indicator">
+                                            <div class="recording-dot"></div>
+                                            <span class="recording-text">Gravando...</span>
+                                            <span class="recording-time" id="recordingTime">00:00</span>
+                                        </div>
+                                        <div class="recording-actions">
+                                            <button type="button" class="btn-recording btn-cancel" id="cancelRecording" title="Cancelar gravação">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                            <button type="button" class="btn-recording btn-stop" id="stopRecording" title="Parar e enviar">
+                                                <i class="fas fa-stop"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -286,6 +366,77 @@
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-save me-1"></i> Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- NOVO: Modal Encerrar Ticket -->
+<div class="modal fade" id="modalEncerrarTicket" tabindex="-1" aria-labelledby="modalEncerrarTicketLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="<?= URL ?>/chat/alterarStatusTicket" method="POST">
+                <input type="hidden" name="conversa_id" value="<?= $dados['conversa']->id ?>">
+                <input type="hidden" name="status" value="fechado">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalEncerrarTicketLabel">
+                        <i class="fas fa-times-circle me-2"></i> Encerrar Ticket
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Atenção!</strong> O ticket será encerrado e não será possível enviar novas mensagens até que seja reaberto.
+                    </div>
+                    <div class="form-group">
+                        <label for="observacao_encerramento" class="form-label">Observação do encerramento</label>
+                        <textarea class="form-control" id="observacao_encerramento" name="observacao" rows="3" placeholder="Descreva o motivo do encerramento (opcional)"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-times-circle me-1"></i> Encerrar Ticket
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- NOVO: Modal Reabrir Ticket -->
+<div class="modal fade" id="modalReabrirTicket" tabindex="-1" aria-labelledby="modalReabrirTicketLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="<?= URL ?>/chat/reabrirTicket" method="POST">
+                <input type="hidden" name="conversa_id" value="<?= $dados['conversa']->id ?>">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalReabrirTicketLabel">
+                        <i class="fas fa-redo me-2"></i> Reabrir Ticket
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Informação:</strong> O ticket será reaberto e voltará ao status "Aberto".
+                    </div>
+                    <div class="form-group">
+                        <label for="observacao_reabertura" class="form-label">Motivo da reabertura</label>
+                        <textarea class="form-control" id="observacao_reabertura" name="observacao" rows="3" placeholder="Descreva o motivo da reabertura (opcional)"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-redo me-1"></i> Reabrir Ticket
                     </button>
                 </div>
             </form>
@@ -1600,6 +1751,81 @@
         };
 
         // === FIM SISTEMA DE DIAGNÓSTICO ===
+
+        // =========== NOVO: FUNÇÕES DE GERENCIAMENTO DE TICKETS ===========
+
+        // Função para alterar status do ticket
+        window.alterarStatusTicket = function(novoStatus) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '<?= URL ?>/chat/alterarStatusTicket';
+            
+            const inputs = [
+                { name: 'conversa_id', value: '<?= $dados['conversa']->id ?>' },
+                { name: 'status', value: novoStatus }
+            ];
+            
+            inputs.forEach(input => {
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = input.name;
+                hiddenInput.value = input.value;
+                form.appendChild(hiddenInput);
+            });
+            
+            document.body.appendChild(form);
+            form.submit();
+        };
+
+        // Função para encerrar ticket (com modal)
+        window.encerrarTicket = function() {
+            $('#modalEncerrarTicket').modal('show');
+        };
+
+        // Função para reabrir ticket (com modal)
+        window.reabrirTicket = function() {
+            $('#modalReabrirTicket').modal('show');
+        };
+
+        // Bloquear envio de mensagens se ticket estiver fechado
+        function verificarStatusTicket() {
+            const statusAtual = '<?= $dados['conversa']->status_atendimento ?? 'aberto' ?>';
+            
+            if (statusAtual === 'fechado') {
+                // Desabilitar controles de envio
+                const messageInput = document.getElementById('messageInput');
+                const sendButton = document.getElementById('sendButton');
+                const attachBtn = document.getElementById('attachBtn');
+                const voiceBtn = document.getElementById('voiceBtn');
+                
+                if (messageInput) {
+                    messageInput.disabled = true;
+                    messageInput.placeholder = 'Ticket fechado - não é possível enviar mensagens';
+                }
+                
+                if (sendButton) sendButton.disabled = true;
+                if (attachBtn) attachBtn.disabled = true;
+                if (voiceBtn) voiceBtn.disabled = true;
+                
+                // Mostrar aviso
+                const chatInputArea = document.querySelector('.chat-input-area');
+                if (chatInputArea && !chatInputArea.querySelector('.ticket-closed-warning')) {
+                    const warning = document.createElement('div');
+                    warning.className = 'alert alert-warning ticket-closed-warning';
+                    warning.innerHTML = `
+                        <i class="fas fa-lock me-2"></i>
+                        <strong>Ticket Fechado</strong><br>
+                        <small>Este ticket foi encerrado. Para enviar mensagens, é necessário reabrir o ticket.</small>
+                    `;
+                    chatInputArea.insertBefore(warning, chatInputArea.firstChild);
+                }
+            }
+        }
+
+        // Executar verificação na inicialização
+        setTimeout(verificarStatusTicket, 100);
+
+        // === FIM DAS FUNÇÕES DE TICKET ===
     });
 </script>
 

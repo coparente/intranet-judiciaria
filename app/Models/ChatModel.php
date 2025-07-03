@@ -1132,14 +1132,14 @@ class ChatModel
     }
 
     /**
-     * Relatório de tickets por status
+     * Busca relatório de tickets por status
      */
     public function relatorioTicketsPorStatus($usuario_id = null)
     {
         try {
             $sql = "SELECT 
-                        status_atendimento,
-                        COUNT(*) as total,
+                        status_atendimento as status,
+                        COUNT(*) as quantidade,
                         AVG(TIMESTAMPDIFF(HOUR, ticket_aberto_em, COALESCE(ticket_fechado_em, NOW()))) as tempo_medio_horas
                     FROM conversas 
                     WHERE ticket_aberto_em IS NOT NULL";
@@ -1148,7 +1148,7 @@ class ChatModel
                 $sql .= " AND usuario_id = :usuario_id";
             }
 
-            $sql .= " GROUP BY status_atendimento ORDER BY total DESC";
+            $sql .= " GROUP BY status_atendimento ORDER BY quantidade DESC";
 
             $this->db->query($sql);
             
@@ -1260,12 +1260,13 @@ class ChatModel
                             WHEN status_atendimento = 'fechado' AND ticket_fechado_em IS NOT NULL 
                             THEN TIMESTAMPDIFF(HOUR, ticket_aberto_em, ticket_fechado_em) 
                             ELSE NULL 
-                        END) as tempo_medio_resolucao_horas,
+                        END) as tempo_medio_resolucao,
                         COUNT(CASE 
                             WHEN status_atendimento IN ('aberto', 'em_andamento', 'aguardando_cliente') 
                             AND TIMESTAMPDIFF(HOUR, ticket_aberto_em, NOW()) > 24 
                             THEN 1 
-                        END) as tickets_vencidos
+                        END) as tickets_vencidos,
+                        COUNT(CASE WHEN DATE(ticket_aberto_em) = CURDATE() THEN 1 END) as tickets_hoje
                     FROM conversas 
                     WHERE ticket_aberto_em IS NOT NULL";
 
@@ -1279,7 +1280,17 @@ class ChatModel
                 $this->db->bind(':usuario_id', $usuario_id);
             }
 
-            return $this->db->resultado();
+            $resultado = $this->db->resultado();
+            
+            // Calcular campos derivados
+            if ($resultado) {
+                $resultado->tickets_pendentes = $resultado->abertos + $resultado->em_andamento + $resultado->aguardando_cliente;
+                $resultado->tickets_resolvidos = $resultado->resolvidos + $resultado->fechados;
+                $resultado->taxa_resolucao = $resultado->total_tickets > 0 ? 
+                    ($resultado->tickets_resolvidos / $resultado->total_tickets) * 100 : 0;
+            }
+
+            return $resultado;
 
         } catch (Exception $e) {
             error_log("Erro ao buscar estatísticas de tickets: " . $e->getMessage());

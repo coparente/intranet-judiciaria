@@ -129,6 +129,7 @@
                                 <table class="table table-hover">
                                     <thead>
                                         <tr>
+                                            <th>Status</th>
                                             <th>Contato</th>
                                             <th>Número</th>
                                             <th>Última Mensagem</th>
@@ -157,7 +158,11 @@
                                             </tr>
                                         <?php else : ?>
                                             <?php foreach ($dados['conversas'] as $conversa) : ?>
+
                                                 <tr>
+                                                    <td>
+                                                        <?= $conversa->status_atendimento ?>
+                                                    </td>
                                                     <td>
                                                         <?= $conversa->contato_nome ?>
                                                         <?php if (isset($conversa->lido) && $conversa->lido > 0) : ?>

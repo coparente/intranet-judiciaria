@@ -317,10 +317,10 @@
                                                 ?>
                                                 <div class="status-item mb-2">
                                                     <div class="d-flex justify-content-between align-items-center">
-                                                        <span class="badge badge-<?= $statusClass[$item->status_atendimento] ?? 'secondary' ?>">
-                                                            <?= $statusNomes[$item->status_atendimento] ?? 'Desconhecido' ?>
+                                                        <span class="badge badge-<?= $statusClass[$item->status] ?? 'secondary' ?>">
+                                                            <?= $statusNomes[$item->status] ?? 'Desconhecido' ?>
                                                         </span>
-                                                        <span class="fw-bold"><?= $item->total ?> tickets</span>
+                                                        <span class="fw-bold"><?= $item->quantidade ?> tickets</span>
                                                     </div>
                                                     <small class="text-muted">
                                                         Tempo médio: <?= number_format($item->tempo_medio_horas ?? 0, 1) ?>h
@@ -365,10 +365,10 @@
                                                 ?>
                                                 <div class="status-item mb-2">
                                                     <div class="d-flex justify-content-between align-items-center">
-                                                        <span class="badge badge-<?= $statusClass[$item->status_atendimento] ?? 'secondary' ?>">
-                                                            <?= $statusNomes[$item->status_atendimento] ?? 'Desconhecido' ?>
+                                                        <span class="badge badge-<?= $statusClass[$item->status] ?? 'secondary' ?>">
+                                                            <?= $statusNomes[$item->status] ?? 'Desconhecido' ?>
                                                         </span>
-                                                        <span class="fw-bold"><?= $item->total ?> tickets</span>
+                                                        <span class="fw-bold"><?= $item->quantidade ?> tickets</span>
                                                     </div>
                                                     <small class="text-muted">
                                                         Tempo médio: <?= number_format($item->tempo_medio_horas ?? 0, 1) ?>h

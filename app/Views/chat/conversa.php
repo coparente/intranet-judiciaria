@@ -11,13 +11,13 @@
                     <?php endif; ?>
                     <?php include 'app/Views/include/menu.php' ?>
                 </div>
-                
+
                 <!-- Conteúdo Principal -->
                 <div class="col-md-9">
                     <!-- Alertas e Mensagens -->
                     <?= Helper::mensagem('chat') ?>
                     <?= Helper::mensagemSweetAlert('chat') ?>
-                    
+
                     <!-- Botão Voltar -->
                     <div class="mb-3">
                         <a href="<?= URL ?>/chat/index" class="btn btn-secondary btn-sm">
@@ -58,7 +58,7 @@
                                             <i class="fas fa-edit me-2"></i> Editar Contato
                                         </a>
                                         <div class="dropdown-divider"></div>
-                                        
+
                                         <a class="dropdown-item" href="#" data-toggle="modal" data-target="#modalDiagnosticoAudio">
                                             <i class="fas fa-stethoscope me-2"></i> Diagnóstico de Áudio
                                         </a>
@@ -85,7 +85,7 @@
                                 </div>
                             <?php else: ?>
                                 <?php foreach ($dados['mensagens'] as $mensagem): ?>
-                                    <?php 
+                                    <?php
                                     $isUsuario = $mensagem->remetente_id == $_SESSION['usuario_id'];
                                     $messageClass = $isUsuario ? 'sent' : 'received';
                                     $bubbleClass = $isUsuario ? 'sent' : 'received';
@@ -140,8 +140,13 @@
                                                         <div class="document-size">Clique para baixar</div>
                                                     </div>
                                                 </div>
+                                                <?php if (!empty($mensagem->conteudo) && $mensagem->conteudo !== $mensagem->midia_url): ?>
+                                                    <div class="message-content">
+                                                        <?= nl2br(htmlspecialchars($mensagem->conteudo)) ?>
+                                                    </div>
+                                                <?php endif; ?>
                                             <?php endif; ?>
-                                            
+
                                             <div class="message-time">
                                                 <span><?= date('d/m/Y H:i', strtotime($mensagem->enviado_em)) ?></span>
                                                 <?php if ($isUsuario): ?>
@@ -164,7 +169,7 @@
                                     </div>
                                 <?php endforeach; ?>
                             <?php endif; ?>
-                            
+
                             <!-- Indicador de digitação -->
                             <div class="typing-indicator d-none" id="typingIndicator">
                                 <div class="message-wrapper received">
@@ -212,21 +217,21 @@
                                     <button type="button" class="btn-voice" id="voiceBtn" title="Gravar áudio">
                                         <i class="fas fa-microphone"></i>
                                     </button>
-                                    <textarea 
-                                        class="message-input" 
-                                        name="mensagem" 
-                                        id="messageInput" 
-                                        placeholder="Digite uma mensagem" 
+                                    <textarea
+                                        class="message-input"
+                                        name="mensagem"
+                                        id="messageInput"
+                                        placeholder="Digite uma mensagem"
                                         rows="1"></textarea>
                                     <button type="submit" class="btn-send" id="sendButton" disabled title="Enviar mensagem">
                                         <i class="fas fa-paper-plane" id="sendIcon"></i>
                                     </button>
                                 </div>
-                                <input type="file" id="fileInput" name="midia" style="display: none;" 
-                                       accept="image/*,video/*,audio/mpeg,audio/aac,audio/ogg,audio/amr,.pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx">
+                                <input type="file" id="fileInput" name="midia" style="display: none;"
+                                    accept="image/*,video/*,audio/mpeg,audio/aac,audio/ogg,audio/amr,.pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx">
                                 <input type="file" id="audioInput" name="audio_gravado" style="display: none;" accept="audio/mpeg,audio/aac,audio/ogg,audio/amr">
                             </form>
-                            
+
                             <!-- Controles de Gravação de Áudio -->
                             <div class="voice-recording d-none" id="voiceRecording">
                                 <div class="recording-controls">
@@ -313,7 +318,7 @@
                         <div id="resultadoCompatibilidade" class="mt-2"></div>
                     </div>
                 </div>
-                
+
                 <!-- Teste de Gravação -->
                 <div class="card mb-3">
                     <div class="card-header">
@@ -339,7 +344,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Teste de Envio -->
                 <div class="card mb-3">
                     <div class="card-header">
@@ -352,7 +357,7 @@
                         <div id="resultadoEnvio" class="mt-2"></div>
                     </div>
                 </div>
-                
+
                 <!-- Log de Debug -->
                 <div class="card">
                     <div class="card-header">
@@ -389,233 +394,235 @@
 </div>
 
 <script>
-// JavaScript melhorado para experiência WhatsApp-like
-document.addEventListener('DOMContentLoaded', function() {
-    const chatMessages = document.getElementById('chatMessages');
-    const messageInput = document.getElementById('messageInput');
-    const sendButton = document.getElementById('sendButton');
-    const fileInput = document.getElementById('fileInput');
-    const filePreview = document.getElementById('filePreview');
-    const fileName = document.getElementById('fileName');
-    const fileSize = document.getElementById('fileSize');
-    const statusIndicator = document.getElementById('statusIndicator');
-    const apiStatusText = document.getElementById('apiStatusText');
-    
-    // Elementos de gravação de áudio
-    const voiceBtn = document.getElementById('voiceBtn');
-    const audioInput = document.getElementById('audioInput');
-    const voiceRecording = document.getElementById('voiceRecording');
-    const recordingTime = document.getElementById('recordingTime');
-    const cancelRecording = document.getElementById('cancelRecording');
-    const stopRecording = document.getElementById('stopRecording');
-    
-    // Elementos do seletor de emojis
-    const emojiBtn = document.getElementById('emojiBtn');
-    const emojiPicker = document.getElementById('emojiPicker');
-    const emojiGrid = document.getElementById('emojiGrid');
-    const emojiCategories = document.querySelectorAll('.emoji-category');
-    
-    // Variáveis de gravação
-    let mediaRecorder = null;
-    let audioChunks = [];
-    let recordingTimer = null;
-    let recordingStartTime = 0;
-    let isRecording = false;
-    
-    let lastMessageId = <?= !empty($dados['mensagens']) ? end($dados['mensagens'])->id : 0 ?>;
-    let isApiOnline = null;
-    
-    // Scroll suave para o final
-    function scrollToBottom() {
-        if (chatMessages) {
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-    }
-    
-    // Scroll inicial
-    setTimeout(scrollToBottom, 100);
-    
-    // Auto-resize do textarea mais suave
-    messageInput.addEventListener('input', function() {
-        this.style.height = 'auto';
-        this.style.height = Math.min(this.scrollHeight, 100) + 'px';
-        updateSendButton();
-    });
-    
-    // Enter para enviar
-    messageInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            if (!sendButton.disabled) {
-                document.getElementById('messageForm').submit();
+    // JavaScript melhorado para experiência WhatsApp-like
+    document.addEventListener('DOMContentLoaded', function() {
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const fileInput = document.getElementById('fileInput');
+        const filePreview = document.getElementById('filePreview');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const apiStatusText = document.getElementById('apiStatusText');
+
+        // Elementos de gravação de áudio
+        const voiceBtn = document.getElementById('voiceBtn');
+        const audioInput = document.getElementById('audioInput');
+        const voiceRecording = document.getElementById('voiceRecording');
+        const recordingTime = document.getElementById('recordingTime');
+        const cancelRecording = document.getElementById('cancelRecording');
+        const stopRecording = document.getElementById('stopRecording');
+
+        // Elementos do seletor de emojis
+        const emojiBtn = document.getElementById('emojiBtn');
+        const emojiPicker = document.getElementById('emojiPicker');
+        const emojiGrid = document.getElementById('emojiGrid');
+        const emojiCategories = document.querySelectorAll('.emoji-category');
+
+        // Variáveis de gravação
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let recordingTimer = null;
+        let recordingStartTime = 0;
+        let isRecording = false;
+
+        let lastMessageId = <?= !empty($dados['mensagens']) ? end($dados['mensagens'])->id : 0 ?>;
+        let isApiOnline = null;
+
+        // Scroll suave para o final
+        function scrollToBottom() {
+            if (chatMessages) {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
             }
         }
-    });
-    
-    // Preview de arquivo melhorado
-    fileInput.addEventListener('change', function() {
-        const file = this.files[0];
-        if (file) {
-            if (!validateFile(file)) {
-                this.value = '';
-                return;
-            }
-            
-            // Limpar audioInput se fileInput for usado
-            audioInput.value = '';
-            
-            fileName.textContent = file.name;
-            fileSize.textContent = formatFileSize(file.size);
-            updateFileIcon(file.type);
-            filePreview.classList.remove('d-none');
-            updateSendButton();
-        } else {
-            filePreview.classList.add('d-none');
-            updateSendButton();
-        }
-    });
-    
-    function updateSendButton() {
-        const hasText = messageInput.value.trim();
-        const hasFile = fileInput.files.length > 0;
-        const hasAudio = audioInput.files.length > 0;
-        sendButton.disabled = (!hasText && !hasFile && !hasAudio) || (isApiOnline === false);
-    }
-    
-    function validateFile(file) {
-        const allowedTypes = [
-            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-            'video/mp4', 'video/3gpp', 'video/quicktime',
-            'audio/aac', 'audio/amr', 'audio/mpeg', 'audio/ogg', 
-            'audio/ogg;codecs=opus', 'audio/ogg;codecs=vorbis', // OGG com codecs (padrão das mensagens recebidas)
-            'application/pdf', 'application/msword', 'text/plain',
-            'application/vnd.ms-powerpoint', 'application/vnd.ms-excel',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        ];
-        
-        // Verificação especial para arquivos de áudio gravados (priorizar OGG)
-        const isAudioByExtension = /\.(ogg|m4a|mp3|aac|amr|mp4)$/i.test(file.name);
-        const isAudioByType = file.type.indexOf('audio/') === 0;
-        
-        if (!allowedTypes.includes(file.type) && !isAudioByType && !isAudioByExtension) {
-            alert('❌ Tipo de arquivo não permitido');
-            return false;
-        }
-        
-        let maxSize = 5 * 1024 * 1024; // 5MB padrão
-        if (file.type.startsWith('video/') || file.type.startsWith('audio/')) {
-            maxSize = 16 * 1024 * 1024; // 16MB
-        } else if (file.type.startsWith('application/')) {
-            maxSize = 95 * 1024 * 1024; // 95MB
-        }
-        
-        if (file.size > maxSize) {
-            const maxMB = Math.round(maxSize / (1024 * 1024));
-            alert(`❌ Arquivo muito grande. Limite: ${maxMB}MB`);
-            return false;
-        }
-        
-        return true;
-    }
-    
-    function updateFileIcon(fileType) {
-        const iconElement = document.querySelector('#fileIcon i');
-        const fileIcon = document.getElementById('fileIcon');
-        
-        if (fileType.startsWith('image/')) {
-            iconElement.className = 'fas fa-image';
-            fileIcon.style.background = '#4285f4';
-        } else if (fileType.startsWith('video/')) {
-            iconElement.className = 'fas fa-video';
-            fileIcon.style.background = '#ea4335';
-        } else if (fileType.startsWith('audio/')) {
-            iconElement.className = 'fas fa-music';
-            fileIcon.style.background = '#fbbc05';
-        } else if (fileType === 'application/pdf') {
-            iconElement.className = 'fas fa-file-pdf';
-            fileIcon.style.background = '#d93025';
-        } else {
-            iconElement.className = 'fas fa-file-alt';
-            fileIcon.style.background = 'var(--whatsapp-teal)';
-        }
-    }
-    
-    window.removeFilePreview = function() {
-        fileInput.value = '';
-        audioInput.value = '';
-        filePreview.classList.add('d-none');
-        updateSendButton();
-    };
-    
-    function formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-    
-    // Feedback visual no envio
-    document.getElementById('messageForm').addEventListener('submit', function(e) {
-        const sendIcon = document.getElementById('sendIcon');
-        sendButton.disabled = true;
-        sendIcon.className = 'fas fa-spinner fa-spin';
-        
-        if (fileInput.files.length > 0) {
-            const progressBar = document.getElementById('uploadProgress');
-            progressBar.classList.remove('d-none');
-        }
-    });
-    
-    // Verificar status da API
-    function checkApiStatus() {
-        fetch(`<?= URL ?>/chat/verificarStatusAPI?_=${Date.now()}`, {
-            method: 'POST',
-            headers: { 'Accept': 'application/json' }
-        })
-        .then(response => response.json())
-        .then(data => {
-            isApiOnline = data.online;
-            statusIndicator.className = data.online ? 'status-indicator' : 'status-indicator offline';
-            apiStatusText.textContent = data.online ? 'online' : 'offline';
-            updateSendButton();
-        })
-        .catch(error => {
-            statusIndicator.className = 'status-indicator warning';
-            apiStatusText.textContent = 'erro';
-            isApiOnline = null;
+
+        // Scroll inicial
+        setTimeout(scrollToBottom, 100);
+
+        // Auto-resize do textarea mais suave
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 100) + 'px';
             updateSendButton();
         });
-    }
-    
-    // Carregar novas mensagens
-    function loadNewMessages() {
-        fetch(`<?= URL ?>/chat/carregarNovasMensagens/<?= $dados['conversa']->id ?>/${lastMessageId}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.mensagens && data.mensagens.length > 0) {
-                    data.mensagens.forEach(message => {
-                        addMessageToChat(message);
-                        lastMessageId = message.id;
-                    });
-                    scrollToBottom();
+
+        // Enter para enviar
+        messageInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (!sendButton.disabled) {
+                    document.getElementById('messageForm').submit();
                 }
-            })
-            .catch(error => console.error('Erro ao carregar mensagens:', error));
-    }
-    
-    function addMessageToChat(message) {
-        const isUser = message.remetente_id == <?= $_SESSION['usuario_id'] ?>;
-        const messageClass = isUser ? 'sent' : 'received';
-        const bubbleClass = isUser ? 'sent' : 'received';
-        
-        let content = '';
-        if (message.tipo === 'text') {
-            content = `<div class="message-content">${message.conteudo}</div>`;
-        } else if (message.tipo === 'document') {
-            content = `
+            }
+        });
+
+        // Preview de arquivo melhorado
+        fileInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                if (!validateFile(file)) {
+                    this.value = '';
+                    return;
+                }
+
+                // Limpar audioInput se fileInput for usado
+                audioInput.value = '';
+
+                fileName.textContent = file.name;
+                fileSize.textContent = formatFileSize(file.size);
+                updateFileIcon(file.type);
+                filePreview.classList.remove('d-none');
+                updateSendButton();
+            } else {
+                filePreview.classList.add('d-none');
+                updateSendButton();
+            }
+        });
+
+        function updateSendButton() {
+            const hasText = messageInput.value.trim();
+            const hasFile = fileInput.files.length > 0;
+            const hasAudio = audioInput.files.length > 0;
+            sendButton.disabled = (!hasText && !hasFile && !hasAudio) || (isApiOnline === false);
+        }
+
+        function validateFile(file) {
+            const allowedTypes = [
+                'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+                'video/mp4', 'video/3gpp', 'video/quicktime',
+                'audio/aac', 'audio/amr', 'audio/mpeg', 'audio/ogg',
+                'audio/ogg;codecs=opus', 'audio/ogg;codecs=vorbis', // OGG com codecs (padrão das mensagens recebidas)
+                'application/pdf', 'application/msword', 'text/plain',
+                'application/vnd.ms-powerpoint', 'application/vnd.ms-excel',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            ];
+
+            // Verificação especial para arquivos de áudio gravados (priorizar OGG)
+            const isAudioByExtension = /\.(ogg|m4a|mp3|aac|amr|mp4)$/i.test(file.name);
+            const isAudioByType = file.type.indexOf('audio/') === 0;
+
+            if (!allowedTypes.includes(file.type) && !isAudioByType && !isAudioByExtension) {
+                alert('❌ Tipo de arquivo não permitido');
+                return false;
+            }
+
+            let maxSize = 5 * 1024 * 1024; // 5MB padrão
+            if (file.type.startsWith('video/') || file.type.startsWith('audio/')) {
+                maxSize = 16 * 1024 * 1024; // 16MB
+            } else if (file.type.startsWith('application/')) {
+                maxSize = 95 * 1024 * 1024; // 95MB
+            }
+
+            if (file.size > maxSize) {
+                const maxMB = Math.round(maxSize / (1024 * 1024));
+                alert(`❌ Arquivo muito grande. Limite: ${maxMB}MB`);
+                return false;
+            }
+
+            return true;
+        }
+
+        function updateFileIcon(fileType) {
+            const iconElement = document.querySelector('#fileIcon i');
+            const fileIcon = document.getElementById('fileIcon');
+
+            if (fileType.startsWith('image/')) {
+                iconElement.className = 'fas fa-image';
+                fileIcon.style.background = '#4285f4';
+            } else if (fileType.startsWith('video/')) {
+                iconElement.className = 'fas fa-video';
+                fileIcon.style.background = '#ea4335';
+            } else if (fileType.startsWith('audio/')) {
+                iconElement.className = 'fas fa-music';
+                fileIcon.style.background = '#fbbc05';
+            } else if (fileType === 'application/pdf') {
+                iconElement.className = 'fas fa-file-pdf';
+                fileIcon.style.background = '#d93025';
+            } else {
+                iconElement.className = 'fas fa-file-alt';
+                fileIcon.style.background = 'var(--whatsapp-teal)';
+            }
+        }
+
+        window.removeFilePreview = function() {
+            fileInput.value = '';
+            audioInput.value = '';
+            filePreview.classList.add('d-none');
+            updateSendButton();
+        };
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Feedback visual no envio
+        document.getElementById('messageForm').addEventListener('submit', function(e) {
+            const sendIcon = document.getElementById('sendIcon');
+            sendButton.disabled = true;
+            sendIcon.className = 'fas fa-spinner fa-spin';
+
+            if (fileInput.files.length > 0) {
+                const progressBar = document.getElementById('uploadProgress');
+                progressBar.classList.remove('d-none');
+            }
+        });
+
+        // Verificar status da API
+        function checkApiStatus() {
+            fetch(`<?= URL ?>/chat/verificarStatusAPI?_=${Date.now()}`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    isApiOnline = data.online;
+                    statusIndicator.className = data.online ? 'status-indicator' : 'status-indicator offline';
+                    apiStatusText.textContent = data.online ? 'online' : 'offline';
+                    updateSendButton();
+                })
+                .catch(error => {
+                    statusIndicator.className = 'status-indicator warning';
+                    apiStatusText.textContent = 'erro';
+                    isApiOnline = null;
+                    updateSendButton();
+                });
+        }
+
+        // Carregar novas mensagens
+        function loadNewMessages() {
+            fetch(`<?= URL ?>/chat/carregarNovasMensagens/<?= $dados['conversa']->id ?>/${lastMessageId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.mensagens && data.mensagens.length > 0) {
+                        data.mensagens.forEach(message => {
+                            addMessageToChat(message);
+                            lastMessageId = message.id;
+                        });
+                        scrollToBottom();
+                    }
+                })
+                .catch(error => console.error('Erro ao carregar mensagens:', error));
+        }
+
+        function addMessageToChat(message) {
+            const isUser = message.remetente_id == <?= $_SESSION['usuario_id'] ?>;
+            const messageClass = isUser ? 'sent' : 'received';
+            const bubbleClass = isUser ? 'sent' : 'received';
+
+            let content = '';
+            if (message.tipo === 'text') {
+                content = `<div class="message-content">${message.conteudo}</div>`;
+            } else if (message.tipo === 'document') {
+                content = `
                 <div class="document-preview">
                     <div class="document-icon"><i class="fas fa-file-alt"></i></div>
                     <div class="document-info">
@@ -626,9 +633,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
             `;
-        }
-        
-        const messageHTML = `
+            }
+
+            const messageHTML = `
             <div class="message-wrapper ${messageClass}" data-message-id="${message.id}">
                 <div class="message-bubble ${bubbleClass}">
                     ${content}
@@ -639,376 +646,378 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
         `;
-        
-        chatMessages.insertAdjacentHTML('beforeend', messageHTML);
-    }
-    
-    window.confirmarExclusao = function() {
-        if (confirm('Tem certeza que deseja excluir esta conversa? Esta ação não pode ser desfeita.')) {
-            window.location.href = `<?= URL ?>/chat/excluirConversa/<?= $dados['conversa']->id ?>`;
+
+            chatMessages.insertAdjacentHTML('beforeend', messageHTML);
         }
-    };
-    
-    // Inicializar
-    checkApiStatus();
-    updateSendButton();
-    
-    // Timers
-    setInterval(checkApiStatus, 30000);
-    setInterval(loadNewMessages, 5000);
-    
-    // ========== FUNÇÕES DE GRAVAÇÃO DE ÁUDIO ==========
-    
-    // Inicializar gravação de áudio
-    if (voiceBtn) {
-        voiceBtn.addEventListener('click', function() {
-            if (!isRecording) {
-                startRecording();
-            }
-        });
-    }
-    
-    // Cancelar gravação
-    if (cancelRecording) {
-        cancelRecording.addEventListener('click', function() {
-            stopRecordingProcess(false);
-        });
-    }
-    
-    // Parar e enviar gravação
-    if (stopRecording) {
-        stopRecording.addEventListener('click', function() {
-            stopRecordingProcess(true);
-        });
-    }
-    
-    function startRecording() {
-        // Verificar se o navegador suporta MediaRecorder
-        if (!window.MediaRecorder) {
-            alert('🎤 Seu navegador não suporta gravação de áudio. Use Chrome, Firefox ou Edge mais recentes.');
-            return;
-        }
-        
-        // Função para obter stream de áudio (compatível com HTTP e HTTPS)
-        function getUserMedia(constraints) {
-            // Verificar se estamos em um contexto inseguro (HTTP + IP)
-            const isHTTP = location.protocol === 'http:';
-            const isIP = /^\d+\.\d+\.\d+\.\d+$/.test(location.hostname);
-            const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-            
-            if (isHTTP && isIP && !isLocalhost) {
-                return Promise.reject(new Error('ERRO_IP_HTTP: Acesso via IP em HTTP não é permitido pelos navegadores. Use HTTPS ou localhost.'));
-            }
-            
-            // Tentar método moderno (HTTPS)
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                return navigator.mediaDevices.getUserMedia(constraints);
-            }
-            
-            // Fallback para HTTP (desenvolvimento)
-            const getUserMediaLegacy = navigator.getUserMedia || 
-                                      navigator.webkitGetUserMedia || 
-                                      navigator.mozGetUserMedia || 
-                                      navigator.msGetUserMedia;
-            
-            if (!getUserMediaLegacy) {
-                return Promise.reject(new Error('getUserMedia não suportado'));
-            }
-            
-            // Converter callback para Promise
-            return new Promise((resolve, reject) => {
-                getUserMediaLegacy.call(navigator, constraints, resolve, reject);
-            });
-        }
-        
-        // === CORREÇÃO: Configurações de áudio mais específicas ===
-        const audioConstraints = {
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-                sampleRate: 44100,
-                channelCount: 1
+
+        window.confirmarExclusao = function() {
+            if (confirm('Tem certeza que deseja excluir esta conversa? Esta ação não pode ser desfeita.')) {
+                window.location.href = `<?= URL ?>/chat/excluirConversa/<?= $dados['conversa']->id ?>`;
             }
         };
-        
-        // Solicitar permissão do microfone
-        getUserMedia(audioConstraints)
-            .then(function(stream) {
-                
-                // === CORREÇÃO: Nova estratégia de seleção de formato ===
-                const options = {};
-                
-                // Lista ordenada APENAS com formatos suportados pela API SERPRO
-                const formatosPreferidos = [
-                    // Formatos aceitos pela API SERPRO (ordem de preferência)
-                    'audio/mpeg',       // MP3 - universalmente suportado
-                    'audio/aac',        // AAC - padrão móvel
-                    'audio/ogg;codecs=opus',  // OGG com codec opus
-                    'audio/ogg',        // OGG padrão
-                    'audio/amr'         // AMR - formato móvel
-                ];
-                
-                let formatoEscolhido = null;
-                
-                for (const formato of formatosPreferidos) {
-                    const suportado = MediaRecorder.isTypeSupported(formato);
-                    
-                    if (suportado && !formatoEscolhido) {
-                        formatoEscolhido = formato;
-                        break;
-                    }
-                }
-                
-                if (formatoEscolhido) {
-                    options.mimeType = formatoEscolhido;
-                } else {
-                    alert('⚠️ Aviso: Seu navegador não suporta formatos de áudio compatíveis com a API SERPRO (MP3, AAC, OGG, AMR). O áudio gravado pode falhar no envio.');
-                    // Deixar sem mimeType para usar padrão do navegador
-                }
-                
-                // === CORREÇÃO: Configurações de qualidade otimizadas para API SERPRO ===
-                if (formatoEscolhido && formatoEscolhido.includes('opus')) {
-                    options.audioBitsPerSecond = 64000; // 64kbps para Opus
-                } else {
-                    options.audioBitsPerSecond = 128000; // 128kbps para outros formatos
-                }
-                
-                try {
-                    mediaRecorder = new MediaRecorder(stream, options);
-                    audioChunks = [];
-                    
-                    // === CORREÇÃO: Melhorar coleta de dados ===
-                    mediaRecorder.ondataavailable = function(event) {
-                        if (event.data.size > 0) {
-                            audioChunks.push(event.data);
-                        }
-                    };
-                    
-                    mediaRecorder.onstop = function() {
-                        stream.getTracks().forEach(track => track.stop());
-                    };
-                    
-                    mediaRecorder.onerror = function(event) {
-                        alert('❌ Erro durante a gravação: ' + event.error.name);
-                        hideRecordingUI();
-                    };
-                    
-                    // === CORREÇÃO: Interval otimizado para coleta de dados ===
-                    const intervaloColeta = formatoEscolhido?.includes('webm') ? 500 : 1000;
-                    mediaRecorder.start(intervaloColeta);
-                    
-                    isRecording = true;
-                    recordingStartTime = Date.now();
-                    
-                    // Mostrar interface de gravação
-                    showRecordingUI();
-                    
-                    // Iniciar timer
-                    startRecordingTimer();
-                    
-                } catch (error) {
-                    alert('❌ Erro ao inicializar gravação: ' + error.message);
-                    
-                    // Parar stream em caso de erro
-                    stream.getTracks().forEach(track => track.stop());
-                }
-                
-            })
-            .catch(function(error) {
-                
-                let errorMessage = 'Erro ao acessar o microfone.';
-                if (error.name === 'NotAllowedError') {
-                    errorMessage = 'Permissão para usar o microfone foi negada. Verifique as configurações do navegador.';
-                } else if (error.name === 'NotFoundError') {
-                    errorMessage = 'Nenhum microfone encontrado.';
-                } else if (error.name === 'NotSupportedError') {
-                    errorMessage = 'Gravação de áudio não suportada neste navegador.';
-                } else if (error.message.includes('getUserMedia')) {
-                    errorMessage = 'getUserMedia não disponível. Tente acessar via HTTPS ou localhost.';
-                }
-                
-                alert('🎤 ' + errorMessage);
-            });
-    }
-    
-    function stopRecordingProcess(shouldSend) {
-        if (!isRecording || !mediaRecorder) {
-            return;
-        }
-        
-        isRecording = false;
-        clearInterval(recordingTimer);
-        
-        if (shouldSend) {
-            mediaRecorder.onstop = function() {
-                if (audioChunks.length === 0) {
-                    alert('❌ Erro: Nenhum dado de áudio foi gravado. Tente gravar novamente.');
-                    hideRecordingUI();
-                    return;
-                }
-                
-                // === CORREÇÃO: Usar tipo do MediaRecorder real, não forçar OGG ===
-                let mimeTypeReal = mediaRecorder.mimeType || 'audio/ogg';
-                
-                // Criar blob com o tipo real
-                const audioBlob = new Blob(audioChunks, { 
-                    type: mimeTypeReal
-                });
-                
-                if (audioBlob.size === 0) {
-                    alert('❌ Erro: Áudio gravado está vazio. Tente gravar novamente.');
-                    hideRecordingUI();
-                    return;
-                }
-                
-                // === CORREÇÃO: Determinar extensão e nome corretos ===
-                let extensao = '.ogg';
-                let tipoFinal = 'audio/ogg';
-                
-                if (mimeTypeReal.includes('mpeg')) {
-                    extensao = '.mp3';
-                    tipoFinal = 'audio/mpeg';
-                } else if (mimeTypeReal.includes('aac')) {
-                    extensao = '.aac';
-                    tipoFinal = 'audio/aac';
-                } else if (mimeTypeReal.includes('amr')) {
-                    extensao = '.amr';
-                    tipoFinal = 'audio/amr';
-                } else {
-                    // Manter OGG como padrão (formato mais compatível com API SERPRO)
-                    tipoFinal = 'audio/ogg';
-                }
-                
-                const timestamp = Date.now();
-                const nomeArquivo = `audio_gravado_${timestamp}${extensao}`;
-                
-                // Criar File com tipo apropriado
-                const audioFile = new File([audioBlob], nomeArquivo, { 
-                    type: tipoFinal,
-                    lastModified: timestamp
-                });
-                
-                // Verificação final antes do envio
-                if (audioFile.size < 100) {
-                    alert('❌ Erro: Gravação muito curta ou corrompida. Tente gravar por mais tempo.');
-                    hideRecordingUI();
-                    return;
-                }
-                
-                // Enviar arquivo
-                uploadAudioFile(audioFile);
-                hideRecordingUI();
-            };
-        } else {
-            hideRecordingUI();
-        }
-        
-        mediaRecorder.stop();
-    }
-    
-    function showRecordingUI() {
-        voiceRecording.classList.remove('d-none');
-        voiceBtn.classList.add('recording');
-        messageInput.disabled = true;
-        sendButton.disabled = true;
-        document.getElementById('attachBtn').disabled = true;
-    }
-    
-    function hideRecordingUI() {
-        voiceRecording.classList.add('d-none');
-        voiceBtn.classList.remove('recording');
-        messageInput.disabled = false;
-        document.getElementById('attachBtn').disabled = false;
+
+        // Inicializar
+        checkApiStatus();
         updateSendButton();
-    }
-    
-    function startRecordingTimer() {
-        recordingTimer = setInterval(function() {
-            const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
-            const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
-            const seconds = (elapsed % 60).toString().padStart(2, '0');
-            recordingTime.textContent = `${minutes}:${seconds}`;
-            
-            // Limite de 10 minutos
-            if (elapsed >= 600) {
-                alert('⏰ Gravação limitada a 10 minutos. Áudio será enviado automaticamente.');
+
+        // Timers
+        setInterval(checkApiStatus, 30000);
+        setInterval(loadNewMessages, 5000);
+
+        // ========== FUNÇÕES DE GRAVAÇÃO DE ÁUDIO ==========
+
+        // Inicializar gravação de áudio
+        if (voiceBtn) {
+            voiceBtn.addEventListener('click', function() {
+                if (!isRecording) {
+                    startRecording();
+                }
+            });
+        }
+
+        // Cancelar gravação
+        if (cancelRecording) {
+            cancelRecording.addEventListener('click', function() {
+                stopRecordingProcess(false);
+            });
+        }
+
+        // Parar e enviar gravação
+        if (stopRecording) {
+            stopRecording.addEventListener('click', function() {
                 stopRecordingProcess(true);
-            }
-        }, 1000);
-    }
-    
-    function uploadAudioFile(audioFile) {
-        // === CORREÇÃO: Sistema melhorado de feedback e validação ===
-        
-        // === VERIFICAÇÕES INICIAIS ===
-        if (!audioFile || audioFile.size === 0) {
-            alert('❌ Erro: Arquivo de áudio inválido. Tente gravar novamente.');
-            return;
+            });
         }
-        
-        // Verificar tamanho mínimo mais rigoroso
-        if (audioFile.size < 2048) { // 2KB mínimo
-            alert('❌ Erro: Gravação muito curta. Grave por pelo menos 3 segundos.');
-            return;
-        }
-        
-        // Verificar tamanho máximo
-        if (audioFile.size > 16 * 1024 * 1024) { // 16MB máximo
-            alert('❌ Erro: Arquivo muito grande. Máximo: 16MB.');
-            return;
-        }
-        
-        // === CRIAR DATATRANSFER E ADICIONAR AO INPUT ===
-        try {
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(audioFile);
-            
-            // Limpar input anterior
-            audioInput.value = '';
-            fileInput.value = '';
-            
-            // Atribuir ao input de áudio
-            audioInput.files = dataTransfer.files;
-            
-            // Verificar se foi adicionado corretamente
-            if (audioInput.files.length === 0) {
-                alert('❌ Erro: Falha ao preparar arquivo para envio. Tente novamente.');
+
+        function startRecording() {
+            // Verificar se o navegador suporta MediaRecorder
+            if (!window.MediaRecorder) {
+                alert('🎤 Seu navegador não suporta gravação de áudio. Use Chrome, Firefox ou Edge mais recentes.');
                 return;
             }
-            
-        } catch (error) {
-            alert('❌ Erro: Falha ao processar arquivo. Tente novamente.');
-            return;
+
+            // Função para obter stream de áudio (compatível com HTTP e HTTPS)
+            function getUserMedia(constraints) {
+                // Verificar se estamos em um contexto inseguro (HTTP + IP)
+                const isHTTP = location.protocol === 'http:';
+                const isIP = /^\d+\.\d+\.\d+\.\d+$/.test(location.hostname);
+                const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+                if (isHTTP && isIP && !isLocalhost) {
+                    return Promise.reject(new Error('ERRO_IP_HTTP: Acesso via IP em HTTP não é permitido pelos navegadores. Use HTTPS ou localhost.'));
+                }
+
+                // Tentar método moderno (HTTPS)
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    return navigator.mediaDevices.getUserMedia(constraints);
+                }
+
+                // Fallback para HTTP (desenvolvimento)
+                const getUserMediaLegacy = navigator.getUserMedia ||
+                    navigator.webkitGetUserMedia ||
+                    navigator.mozGetUserMedia ||
+                    navigator.msGetUserMedia;
+
+                if (!getUserMediaLegacy) {
+                    return Promise.reject(new Error('getUserMedia não suportado'));
+                }
+
+                // Converter callback para Promise
+                return new Promise((resolve, reject) => {
+                    getUserMediaLegacy.call(navigator, constraints, resolve, reject);
+                });
+            }
+
+            // === CORREÇÃO: Configurações de áudio mais específicas ===
+            const audioConstraints = {
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    sampleRate: 44100,
+                    channelCount: 1
+                }
+            };
+
+            // Solicitar permissão do microfone
+            getUserMedia(audioConstraints)
+                .then(function(stream) {
+
+                    // === CORREÇÃO: Nova estratégia de seleção de formato ===
+                    const options = {};
+
+                    // Lista ordenada APENAS com formatos suportados pela API SERPRO
+                    const formatosPreferidos = [
+                        // Formatos aceitos pela API SERPRO (ordem de preferência)
+                        'audio/mpeg', // MP3 - universalmente suportado
+                        'audio/aac', // AAC - padrão móvel
+                        'audio/ogg;codecs=opus', // OGG com codec opus
+                        'audio/ogg', // OGG padrão
+                        'audio/amr' // AMR - formato móvel
+                    ];
+
+                    let formatoEscolhido = null;
+
+                    for (const formato of formatosPreferidos) {
+                        const suportado = MediaRecorder.isTypeSupported(formato);
+
+                        if (suportado && !formatoEscolhido) {
+                            formatoEscolhido = formato;
+                            break;
+                        }
+                    }
+
+                    if (formatoEscolhido) {
+                        options.mimeType = formatoEscolhido;
+                    } else {
+                        alert('⚠️ Aviso: Seu navegador não suporta formatos de áudio compatíveis com a API SERPRO (MP3, AAC, OGG, AMR). O áudio gravado pode falhar no envio.');
+                        // Deixar sem mimeType para usar padrão do navegador
+                    }
+
+                    // === CORREÇÃO: Configurações de qualidade otimizadas para API SERPRO ===
+                    if (formatoEscolhido && formatoEscolhido.includes('opus')) {
+                        options.audioBitsPerSecond = 64000; // 64kbps para Opus
+                    } else {
+                        options.audioBitsPerSecond = 128000; // 128kbps para outros formatos
+                    }
+
+                    try {
+                        mediaRecorder = new MediaRecorder(stream, options);
+                        audioChunks = [];
+
+                        // === CORREÇÃO: Melhorar coleta de dados ===
+                        mediaRecorder.ondataavailable = function(event) {
+                            if (event.data.size > 0) {
+                                audioChunks.push(event.data);
+                            }
+                        };
+
+                        mediaRecorder.onstop = function() {
+                            stream.getTracks().forEach(track => track.stop());
+                        };
+
+                        mediaRecorder.onerror = function(event) {
+                            alert('❌ Erro durante a gravação: ' + event.error.name);
+                            hideRecordingUI();
+                        };
+
+                        // === CORREÇÃO: Interval otimizado para coleta de dados ===
+                        const intervaloColeta = formatoEscolhido?.includes('webm') ? 500 : 1000;
+                        mediaRecorder.start(intervaloColeta);
+
+                        isRecording = true;
+                        recordingStartTime = Date.now();
+
+                        // Mostrar interface de gravação
+                        showRecordingUI();
+
+                        // Iniciar timer
+                        startRecordingTimer();
+
+                    } catch (error) {
+                        alert('❌ Erro ao inicializar gravação: ' + error.message);
+
+                        // Parar stream em caso de erro
+                        stream.getTracks().forEach(track => track.stop());
+                    }
+
+                })
+                .catch(function(error) {
+
+                    let errorMessage = 'Erro ao acessar o microfone.';
+                    if (error.name === 'NotAllowedError') {
+                        errorMessage = 'Permissão para usar o microfone foi negada. Verifique as configurações do navegador.';
+                    } else if (error.name === 'NotFoundError') {
+                        errorMessage = 'Nenhum microfone encontrado.';
+                    } else if (error.name === 'NotSupportedError') {
+                        errorMessage = 'Gravação de áudio não suportada neste navegador.';
+                    } else if (error.message.includes('getUserMedia')) {
+                        errorMessage = 'getUserMedia não disponível. Tente acessar via HTTPS ou localhost.';
+                    }
+
+                    alert('🎤 ' + errorMessage);
+                });
         }
-        
-        // === ATUALIZAR PREVIEW ===
-        try {
-            fileName.textContent = audioFile.name;
-            updateFileIcon(audioFile.type);
-            filePreview.classList.remove('d-none');
+
+        function stopRecordingProcess(shouldSend) {
+            if (!isRecording || !mediaRecorder) {
+                return;
+            }
+
+            isRecording = false;
+            clearInterval(recordingTimer);
+
+            if (shouldSend) {
+                mediaRecorder.onstop = function() {
+                    if (audioChunks.length === 0) {
+                        alert('❌ Erro: Nenhum dado de áudio foi gravado. Tente gravar novamente.');
+                        hideRecordingUI();
+                        return;
+                    }
+
+                    // === CORREÇÃO: Usar tipo do MediaRecorder real, não forçar OGG ===
+                    let mimeTypeReal = mediaRecorder.mimeType || 'audio/ogg';
+
+                    // Criar blob com o tipo real
+                    const audioBlob = new Blob(audioChunks, {
+                        type: mimeTypeReal
+                    });
+
+                    if (audioBlob.size === 0) {
+                        alert('❌ Erro: Áudio gravado está vazio. Tente gravar novamente.');
+                        hideRecordingUI();
+                        return;
+                    }
+
+                    // === CORREÇÃO: Determinar extensão e nome corretos ===
+                    let extensao = '.ogg';
+                    let tipoFinal = 'audio/ogg';
+
+                    if (mimeTypeReal.includes('mpeg')) {
+                        extensao = '.mp3';
+                        tipoFinal = 'audio/mpeg';
+                    } else if (mimeTypeReal.includes('aac')) {
+                        extensao = '.aac';
+                        tipoFinal = 'audio/aac';
+                    } else if (mimeTypeReal.includes('amr')) {
+                        extensao = '.amr';
+                        tipoFinal = 'audio/amr';
+                    } else {
+                        // Manter OGG como padrão (formato mais compatível com API SERPRO)
+                        tipoFinal = 'audio/ogg';
+                    }
+
+                    const timestamp = Date.now();
+                    const nomeArquivo = `audio_gravado_${timestamp}${extensao}`;
+
+                    // Criar File com tipo apropriado
+                    const audioFile = new File([audioBlob], nomeArquivo, {
+                        type: tipoFinal,
+                        lastModified: timestamp
+                    });
+
+                    // Verificação final antes do envio
+                    if (audioFile.size < 100) {
+                        alert('❌ Erro: Gravação muito curta ou corrompida. Tente gravar por mais tempo.');
+                        hideRecordingUI();
+                        return;
+                    }
+
+                    // Enviar arquivo
+                    uploadAudioFile(audioFile);
+                    hideRecordingUI();
+                };
+            } else {
+                hideRecordingUI();
+            }
+
+            mediaRecorder.stop();
+        }
+
+        function showRecordingUI() {
+            voiceRecording.classList.remove('d-none');
+            voiceBtn.classList.add('recording');
+            messageInput.disabled = true;
+            sendButton.disabled = true;
+            document.getElementById('attachBtn').disabled = true;
+        }
+
+        function hideRecordingUI() {
+            voiceRecording.classList.add('d-none');
+            voiceBtn.classList.remove('recording');
+            messageInput.disabled = false;
+            document.getElementById('attachBtn').disabled = false;
             updateSendButton();
-            
-            // Simular evento change para disparar validações
-            const event = new Event('change', { bubbles: true });
-            audioInput.dispatchEvent(event);
-            
-        } catch (error) {
-            // Continue mesmo com erro no preview
         }
-        
-        // === SISTEMA DE ENVIO AUTOMÁTICO COM FEEDBACK ===
-        let countdown = 3; // 3 segundos para o usuário cancelar se quiser
-        let countdownInterval;
-        
-        // Função para atualizar display do countdown
-        function atualizarCountdown() {
-            if (fileSize) {
-                const tamanhoFormatado = formatFileSize(audioFile.size);
-                const formato = audioFile.type.replace('audio/', '').toUpperCase();
-                
-                if (countdown > 0) {
-                    fileSize.innerHTML = `
+
+        function startRecordingTimer() {
+            recordingTimer = setInterval(function() {
+                const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                const seconds = (elapsed % 60).toString().padStart(2, '0');
+                recordingTime.textContent = `${minutes}:${seconds}`;
+
+                // Limite de 10 minutos
+                if (elapsed >= 600) {
+                    alert('⏰ Gravação limitada a 10 minutos. Áudio será enviado automaticamente.');
+                    stopRecordingProcess(true);
+                }
+            }, 1000);
+        }
+
+        function uploadAudioFile(audioFile) {
+            // === CORREÇÃO: Sistema melhorado de feedback e validação ===
+
+            // === VERIFICAÇÕES INICIAIS ===
+            if (!audioFile || audioFile.size === 0) {
+                alert('❌ Erro: Arquivo de áudio inválido. Tente gravar novamente.');
+                return;
+            }
+
+            // Verificar tamanho mínimo mais rigoroso
+            if (audioFile.size < 2048) { // 2KB mínimo
+                alert('❌ Erro: Gravação muito curta. Grave por pelo menos 3 segundos.');
+                return;
+            }
+
+            // Verificar tamanho máximo
+            if (audioFile.size > 16 * 1024 * 1024) { // 16MB máximo
+                alert('❌ Erro: Arquivo muito grande. Máximo: 16MB.');
+                return;
+            }
+
+            // === CRIAR DATATRANSFER E ADICIONAR AO INPUT ===
+            try {
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(audioFile);
+
+                // Limpar input anterior
+                audioInput.value = '';
+                fileInput.value = '';
+
+                // Atribuir ao input de áudio
+                audioInput.files = dataTransfer.files;
+
+                // Verificar se foi adicionado corretamente
+                if (audioInput.files.length === 0) {
+                    alert('❌ Erro: Falha ao preparar arquivo para envio. Tente novamente.');
+                    return;
+                }
+
+            } catch (error) {
+                alert('❌ Erro: Falha ao processar arquivo. Tente novamente.');
+                return;
+            }
+
+            // === ATUALIZAR PREVIEW ===
+            try {
+                fileName.textContent = audioFile.name;
+                updateFileIcon(audioFile.type);
+                filePreview.classList.remove('d-none');
+                updateSendButton();
+
+                // Simular evento change para disparar validações
+                const event = new Event('change', {
+                    bubbles: true
+                });
+                audioInput.dispatchEvent(event);
+
+            } catch (error) {
+                // Continue mesmo com erro no preview
+            }
+
+            // === SISTEMA DE ENVIO AUTOMÁTICO COM FEEDBACK ===
+            let countdown = 3; // 3 segundos para o usuário cancelar se quiser
+            let countdownInterval;
+
+            // Função para atualizar display do countdown
+            function atualizarCountdown() {
+                if (fileSize) {
+                    const tamanhoFormatado = formatFileSize(audioFile.size);
+                    const formato = audioFile.type.replace('audio/', '').toUpperCase();
+
+                    if (countdown > 0) {
+                        fileSize.innerHTML = `
                         <div class="text-success">
                             <i class="fas fa-microphone me-1"></i>
                             <strong>Áudio ${formato} (${tamanhoFormatado})</strong><br>
@@ -1016,447 +1025,449 @@ document.addEventListener('DOMContentLoaded', function() {
                             <span class="text-muted">(clique X para cancelar)</span></small>
                         </div>
                     `;
-                } else {
-                    fileSize.innerHTML = `
+                    } else {
+                        fileSize.innerHTML = `
                         <div class="text-primary">
                             <i class="fas fa-paper-plane me-1"></i>
                             <strong>Enviando áudio...</strong><br>
                             <small>Aguarde o processamento</small>
                         </div>
                     `;
+                    }
                 }
             }
-        }
-        
-        // Iniciar countdown
-        atualizarCountdown();
-        
-        countdownInterval = setInterval(() => {
-            countdown--;
+
+            // Iniciar countdown
             atualizarCountdown();
-            
-            if (countdown <= 0) {
-                clearInterval(countdownInterval);
-                
-                // Verificar se o arquivo ainda está lá (usuário não cancelou)
-                if (audioInput.files.length > 0) {
-                    
-                    // Desabilitar botão de cancelar durante envio
-                    const removeBtn = document.getElementById('removeFileBtn');
-                    if (removeBtn) {
-                        removeBtn.disabled = true;
-                        removeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                    }
-                    
-                    // Enviar formulário
-                    try {
-                        document.getElementById('messageForm').submit();
-                    } catch (error) {
-                        alert('❌ Erro: Falha ao enviar. Tente novamente.');
-                        
-                        // Restaurar botão
+
+            countdownInterval = setInterval(() => {
+                countdown--;
+                atualizarCountdown();
+
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+
+                    // Verificar se o arquivo ainda está lá (usuário não cancelou)
+                    if (audioInput.files.length > 0) {
+
+                        // Desabilitar botão de cancelar durante envio
+                        const removeBtn = document.getElementById('removeFileBtn');
                         if (removeBtn) {
-                            removeBtn.disabled = false;
-                            removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+                            removeBtn.disabled = true;
+                            removeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                        }
+
+                        // Enviar formulário
+                        try {
+                            document.getElementById('messageForm').submit();
+                        } catch (error) {
+                            alert('❌ Erro: Falha ao enviar. Tente novamente.');
+
+                            // Restaurar botão
+                            if (removeBtn) {
+                                removeBtn.disabled = false;
+                                removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+                            }
                         }
                     }
                 }
-            }
-        }, 1000);
-        
-        // === SUBSTITUIR FUNÇÃO DE REMOÇÃO TEMPORARIAMENTE ===
-        const originalRemoveFunction = window.removeFilePreview;
-        
-        window.removeFilePreview = function() {
-            // Parar countdown
-            if (countdownInterval) {
-                clearInterval(countdownInterval);
-            }
-            
-            // Chamar função original
-            originalRemoveFunction();
-            
-            // Restaurar função original
-            window.removeFilePreview = originalRemoveFunction;
+            }, 1000);
+
+            // === SUBSTITUIR FUNÇÃO DE REMOÇÃO TEMPORARIAMENTE ===
+            const originalRemoveFunction = window.removeFilePreview;
+
+            window.removeFilePreview = function() {
+                // Parar countdown
+                if (countdownInterval) {
+                    clearInterval(countdownInterval);
+                }
+
+                // Chamar função original
+                originalRemoveFunction();
+
+                // Restaurar função original
+                window.removeFilePreview = originalRemoveFunction;
+            };
+        }
+
+        // === SISTEMA DE EMOJIS SIMPLES ===
+
+        // Apenas pessoas e gestos como solicitado
+        const emojis = {
+            pessoas: [
+                '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '☺️', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪',
+                '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧',
+                '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐', '😕', '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢',
+                '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖'
+            ],
+            gestos: [
+                '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '👊', '✊', '🤛', '🤜',
+                '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃', '🧠', '🫀', '🫁', '🦷', '🦴', '👀', '👁️', '👅', '👄'
+            ]
         };
-    }
-    
-    // === SISTEMA DE EMOJIS SIMPLES ===
-    
-    // Apenas pessoas e gestos como solicitado
-    const emojis = {
-        pessoas: [
-            '😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','☺️','😚','😙','🥲','😋','😛','😜','🤪',
-            '😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬','🤥','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧',
-            '🥵','🥶','🥴','😵','🤯','🤠','🥳','🥸','😎','🤓','🧐','😕','😟','🙁','☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢',
-            '😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖'
-        ],
-        gestos: [
-            '👋','🤚','🖐️','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','👊','✊','🤛','🤜',
-            '👏','🙌','👐','🤲','🤝','🙏','✍️','💅','🤳','💪','🦾','🦿','🦵','🦶','👂','🦻','👃','🧠','🫀','🫁','🦷','🦴','👀','👁️','👅','👄'
-        ]
-    };
-    
-    let currentEmojiCategory = 'pessoas';
-    let isEmojiPickerOpen = false;
-    
-    // Função para abrir/fechar o seletor de emojis
-    function toggleEmojiPicker() {
-        if (isEmojiPickerOpen) {
-            emojiPicker.classList.add('d-none');
-            emojiBtn.classList.remove('active');
-            isEmojiPickerOpen = false;
-        } else {
-            emojiPicker.classList.remove('d-none');
-            emojiBtn.classList.add('active');
-            isEmojiPickerOpen = true;
-            loadEmojiCategory(currentEmojiCategory);
-        }
-    }
-    
-    // Função para carregar emojis da categoria
-    function loadEmojiCategory(category) {
-        // Atualizar categoria ativa
-        document.querySelectorAll('.emoji-category').forEach(cat => {
-            cat.classList.remove('active');
-            if (cat.dataset.category === category) {
-                cat.classList.add('active');
-            }
-        });
-        
-        // Limpar grid atual
-        emojiGrid.innerHTML = '';
-        
-        // Carregar emojis da categoria
-        const categoryEmojis = emojis[category] || emojis.pessoas;
-        categoryEmojis.forEach(emoji => {
-            const emojiButton = document.createElement('button');
-            emojiButton.className = 'emoji-item';
-            emojiButton.textContent = emoji;
-            emojiButton.title = emoji;
-            emojiButton.onclick = () => insertEmoji(emoji);
-            emojiGrid.appendChild(emojiButton);
-        });
-        
-        currentEmojiCategory = category;
-    }
-    
-    // Função para inserir emoji no campo de texto
-    function insertEmoji(emoji) {
-        const cursorPos = messageInput.selectionStart;
-        const textBefore = messageInput.value.substring(0, cursorPos);
-        const textAfter = messageInput.value.substring(messageInput.selectionEnd);
-        
-        // Inserir emoji na posição do cursor
-        messageInput.value = textBefore + emoji + textAfter;
-        
-        // Mover cursor para depois do emoji
-        const newCursorPos = cursorPos + emoji.length;
-        messageInput.setSelectionRange(newCursorPos, newCursorPos);
-        
-        // Focar no campo de entrada
-        messageInput.focus();
-        
-        // Atualizar botão de envio
-        updateSendButton();
-    }
-    
-    // Event listeners para emojis
-    if (emojiBtn) {
-        emojiBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleEmojiPicker();
-        });
-    }
-    
-    // Event listeners para categorias de emoji
-    document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('emoji-category')) {
-            loadEmojiCategory(e.target.dataset.category);
-        }
-    });
-    
-    // Fechar emoji picker ao clicar fora
-    document.addEventListener('click', function(e) {
-        if (isEmojiPickerOpen && 
-            emojiPicker && !emojiPicker.contains(e.target) && 
-            emojiBtn && !emojiBtn.contains(e.target)) {
-            toggleEmojiPicker();
-        }
-    });
-    
-    // === BOTÃO DE TESTE DE ÁUDIO ===
-    const testeAudioBtn = document.getElementById('testeAudioBtn');
-    if (testeAudioBtn) {
-        testeAudioBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            testarEnvioAudio();
-        });
-    }
-    
-    // Função para testar envio de áudio
-    function testarEnvioAudio() {
-        if (!audioInput.files.length) {
-            alert('ℹ️ Nenhum áudio gravado encontrado. Grave um áudio primeiro usando o botão de microfone.');
-            return;
-        }
-        
-        const audioFile = audioInput.files[0];
-        
-        // Criar FormData para enviar
-        const formData = new FormData();
-        formData.append('audio_gravado', audioFile);
-        formData.append('destinatario', '<?= $dados['conversa']->contato_numero ?>');
-        formData.append('caption', 'Teste de áudio gravado - ' + new Date().toLocaleTimeString());
-        
-        // Mostrar loading
-        const originalText = testeAudioBtn.innerHTML;
-        testeAudioBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Testando...';
-        testeAudioBtn.disabled = true;
-        
-        fetch('<?= URL ?>/chat/enviarMensagem/<?= $dados['conversa']->id ?>', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            
-            let message = '';
-            if (data.success) {
-                message = '✅ SUCESSO!\n\nÁudio enviado com sucesso!';
+
+        let currentEmojiCategory = 'pessoas';
+        let isEmojiPickerOpen = false;
+
+        // Função para abrir/fechar o seletor de emojis
+        function toggleEmojiPicker() {
+            if (isEmojiPickerOpen) {
+                emojiPicker.classList.add('d-none');
+                emojiBtn.classList.remove('active');
+                isEmojiPickerOpen = false;
             } else {
-                message = '❌ FALHA!\n\nErro: ' + (data.error || 'Erro desconhecido');
+                emojiPicker.classList.remove('d-none');
+                emojiBtn.classList.add('active');
+                isEmojiPickerOpen = true;
+                loadEmojiCategory(currentEmojiCategory);
             }
-            
-            alert(message);
-            
-            // Restaurar botão
-            testeAudioBtn.innerHTML = originalText;
-            testeAudioBtn.disabled = false;
-        })
-        .catch(error => {
-            alert('❌ Erro ao testar áudio: ' + error.message);
-            
-            // Restaurar botão
-            testeAudioBtn.innerHTML = originalText;
-            testeAudioBtn.disabled = false;
-        });
-    }
-    
-    // === FIM TESTE DE ÁUDIO ===
-    
-    // === SISTEMA DE DIAGNÓSTICO DE ÁUDIO ===
-    
-    let mediaRecorderTeste = null;
-    let audioChunksTeste = [];
-    let streamTeste = null;
-    let recordingTimerTeste = null;
-    let recordingStartTimeTeste = 0;
-    let isRecordingTeste = false;
-    let audioFileTeste = null;
-    
-    // Função para adicionar ao log de debug
-    window.adicionarLog = function(texto) {
-        const logDebug = document.getElementById('logDebug');
-        if (logDebug) {
-            const timestamp = new Date().toLocaleTimeString();
-            logDebug.value += `[${timestamp}] ${texto}\n`;
-            logDebug.scrollTop = logDebug.scrollHeight;
         }
-    };
-    
-    // Função para limpar log
-    window.limparLog = function() {
-        const logDebug = document.getElementById('logDebug');
-        if (logDebug) {
-            logDebug.value = '';
+
+        // Função para carregar emojis da categoria
+        function loadEmojiCategory(category) {
+            // Atualizar categoria ativa
+            document.querySelectorAll('.emoji-category').forEach(cat => {
+                cat.classList.remove('active');
+                if (cat.dataset.category === category) {
+                    cat.classList.add('active');
+                }
+            });
+
+            // Limpar grid atual
+            emojiGrid.innerHTML = '';
+
+            // Carregar emojis da categoria
+            const categoryEmojis = emojis[category] || emojis.pessoas;
+            categoryEmojis.forEach(emoji => {
+                const emojiButton = document.createElement('button');
+                emojiButton.className = 'emoji-item';
+                emojiButton.textContent = emoji;
+                emojiButton.title = emoji;
+                emojiButton.onclick = () => insertEmoji(emoji);
+                emojiGrid.appendChild(emojiButton);
+            });
+
+            currentEmojiCategory = category;
         }
-    };
-    
-    // Teste de compatibilidade
-    window.testarCompatibilidade = function() {
-        const resultDiv = document.getElementById('resultadoCompatibilidade');
-        resultDiv.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>Testando...';
-        
-        let resultados = [];
-        
-        // 1. Verificar suporte básico
-        const temMediaRecorder = !!window.MediaRecorder;
-        const temGetUserMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-        
-        resultados.push({
-            teste: 'MediaRecorder disponível',
-            resultado: temMediaRecorder,
-            detalhes: temMediaRecorder ? 'Suportado' : 'Não suportado'
-        });
-        
-        resultados.push({
-            teste: 'getUserMedia disponível',
-            resultado: temGetUserMedia,
-            detalhes: temGetUserMedia ? 'Suportado' : 'Não suportado'
-        });
-        
-        // 2. Testar formatos suportados
-        if (temMediaRecorder) {
-            const formatos = [
-                'audio/mpeg',
-                'audio/aac',
-                'audio/ogg;codecs=opus',
-                'audio/ogg',
-                'audio/amr'
-            ];
-            
-            formatos.forEach(formato => {
-                const suportado = MediaRecorder.isTypeSupported(formato);
-                resultados.push({
-                    teste: `Formato ${formato}`,
-                    resultado: suportado,
-                    detalhes: suportado ? 'Suportado' : 'Não suportado'
-                });
+
+        // Função para inserir emoji no campo de texto
+        function insertEmoji(emoji) {
+            const cursorPos = messageInput.selectionStart;
+            const textBefore = messageInput.value.substring(0, cursorPos);
+            const textAfter = messageInput.value.substring(messageInput.selectionEnd);
+
+            // Inserir emoji na posição do cursor
+            messageInput.value = textBefore + emoji + textAfter;
+
+            // Mover cursor para depois do emoji
+            const newCursorPos = cursorPos + emoji.length;
+            messageInput.setSelectionRange(newCursorPos, newCursorPos);
+
+            // Focar no campo de entrada
+            messageInput.focus();
+
+            // Atualizar botão de envio
+            updateSendButton();
+        }
+
+        // Event listeners para emojis
+        if (emojiBtn) {
+            emojiBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleEmojiPicker();
             });
         }
-        
-        // 3. Verificar contexto de segurança
-        const isHTTPS = location.protocol === 'https:';
-        const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-        const contextoSeguro = isHTTPS || isLocalhost;
-        
-        resultados.push({
-            teste: 'Contexto seguro (HTTPS/localhost)',
-            resultado: contextoSeguro,
-            detalhes: `${location.protocol}//${location.hostname}`
+
+        // Event listeners para categorias de emoji
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('emoji-category')) {
+                loadEmojiCategory(e.target.dataset.category);
+            }
         });
-        
-        // Montar resultado visual
-        let html = '<div class="mt-2">';
-        
-        resultados.forEach(item => {
-            const icone = item.resultado ? 
-                '<i class="fas fa-check-circle text-success"></i>' : 
-                '<i class="fas fa-times-circle text-danger"></i>';
-            
-            html += `
-                <div class="d-flex justify-content-between align-items-center py-1">
-                    <span>${item.teste}:</span>
-                    <span>${icone} ${item.detalhes}</span>
-                </div>
-            `;
+
+        // Fechar emoji picker ao clicar fora
+        document.addEventListener('click', function(e) {
+            if (isEmojiPickerOpen &&
+                emojiPicker && !emojiPicker.contains(e.target) &&
+                emojiBtn && !emojiBtn.contains(e.target)) {
+                toggleEmojiPicker();
+            }
         });
-        
-        html += '</div>';
-        
-        // Resumo geral
-        const todosSucessos = resultados.every(r => r.resultado);
-        const classeResumo = todosSucessos ? 'alert-success' : 'alert-warning';
-        const textoResumo = todosSucessos ? 
-            'Todos os testes passaram! Gravação de áudio deve funcionar.' :
-            'Alguns testes falharam. Pode haver limitações na gravação.';
-        
-        html += `<div class="alert ${classeResumo} mt-2">${textoResumo}</div>`;
-        
-        resultDiv.innerHTML = html;
-    };
-    
-    // Botões de teste de gravação
-    document.addEventListener('DOMContentLoaded', function() {
-        const btnIniciar = document.getElementById('btnIniciarTeste');
-        const btnParar = document.getElementById('btnPararTeste');
-        const btnTestarEnvio = document.getElementById('btnTestarEnvio');
-        
-        if (btnIniciar) {
-            btnIniciar.addEventListener('click', window.iniciarGravacaoTeste);
+
+        // === BOTÃO DE TESTE DE ÁUDIO ===
+        const testeAudioBtn = document.getElementById('testeAudioBtn');
+        if (testeAudioBtn) {
+            testeAudioBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                testarEnvioAudio();
+            });
         }
-        
-        if (btnParar) {
-            btnParar.addEventListener('click', window.pararGravacaoTeste);
+
+        // Função para testar envio de áudio
+        function testarEnvioAudio() {
+            if (!audioInput.files.length) {
+                alert('ℹ️ Nenhum áudio gravado encontrado. Grave um áudio primeiro usando o botão de microfone.');
+                return;
+            }
+
+            const audioFile = audioInput.files[0];
+
+            // Criar FormData para enviar
+            const formData = new FormData();
+            formData.append('audio_gravado', audioFile);
+            formData.append('destinatario', '<?= $dados['conversa']->contato_numero ?>');
+            formData.append('caption', 'Teste de áudio gravado - ' + new Date().toLocaleTimeString());
+
+            // Mostrar loading
+            const originalText = testeAudioBtn.innerHTML;
+            testeAudioBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Testando...';
+            testeAudioBtn.disabled = true;
+
+            fetch('<?= URL ?>/chat/enviarMensagem/<?= $dados['conversa']->id ?>', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+
+                    let message = '';
+                    if (data.success) {
+                        message = '✅ SUCESSO!\n\nÁudio enviado com sucesso!';
+                    } else {
+                        message = '❌ FALHA!\n\nErro: ' + (data.error || 'Erro desconhecido');
+                    }
+
+                    alert(message);
+
+                    // Restaurar botão
+                    testeAudioBtn.innerHTML = originalText;
+                    testeAudioBtn.disabled = false;
+                })
+                .catch(error => {
+                    alert('❌ Erro ao testar áudio: ' + error.message);
+
+                    // Restaurar botão
+                    testeAudioBtn.innerHTML = originalText;
+                    testeAudioBtn.disabled = false;
+                });
         }
-        
-        if (btnTestarEnvio) {
-            btnTestarEnvio.addEventListener('click', window.testarEnvioAPI);
-        }
-    });
-    
-    // Iniciar gravação de teste
-    window.iniciarGravacaoTeste = function() {
-        const btnIniciar = document.getElementById('btnIniciarTeste');
-        const btnParar = document.getElementById('btnPararTeste');
-        const resultDiv = document.getElementById('resultadoGravacao');
-        
-        // Mesmo código de configuração da gravação principal, mas adaptado
-        const audioConstraints = {
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-                sampleRate: 44100,
-                channelCount: 1
+
+        // === FIM TESTE DE ÁUDIO ===
+
+        // === SISTEMA DE DIAGNÓSTICO DE ÁUDIO ===
+
+        let mediaRecorderTeste = null;
+        let audioChunksTeste = [];
+        let streamTeste = null;
+        let recordingTimerTeste = null;
+        let recordingStartTimeTeste = 0;
+        let isRecordingTeste = false;
+        let audioFileTeste = null;
+
+        // Função para adicionar ao log de debug
+        window.adicionarLog = function(texto) {
+            const logDebug = document.getElementById('logDebug');
+            if (logDebug) {
+                const timestamp = new Date().toLocaleTimeString();
+                logDebug.value += `[${timestamp}] ${texto}\n`;
+                logDebug.scrollTop = logDebug.scrollHeight;
             }
         };
-        
-        navigator.mediaDevices.getUserMedia(audioConstraints)
-            .then(function(stream) {
-                streamTeste = stream;
-                
-                // Detectar melhor formato disponível
-                const formatosPreferidos = [
+
+        // Função para limpar log
+        window.limparLog = function() {
+            const logDebug = document.getElementById('logDebug');
+            if (logDebug) {
+                logDebug.value = '';
+            }
+        };
+
+        // Teste de compatibilidade
+        window.testarCompatibilidade = function() {
+            const resultDiv = document.getElementById('resultadoCompatibilidade');
+            resultDiv.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>Testando...';
+
+            let resultados = [];
+
+            // 1. Verificar suporte básico
+            const temMediaRecorder = !!window.MediaRecorder;
+            const temGetUserMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+
+            resultados.push({
+                teste: 'MediaRecorder disponível',
+                resultado: temMediaRecorder,
+                detalhes: temMediaRecorder ? 'Suportado' : 'Não suportado'
+            });
+
+            resultados.push({
+                teste: 'getUserMedia disponível',
+                resultado: temGetUserMedia,
+                detalhes: temGetUserMedia ? 'Suportado' : 'Não suportado'
+            });
+
+            // 2. Testar formatos suportados
+            if (temMediaRecorder) {
+                const formatos = [
                     'audio/mpeg',
                     'audio/aac',
                     'audio/ogg;codecs=opus',
                     'audio/ogg',
                     'audio/amr'
                 ];
-                
-                let formatoEscolhido = null;
-                for (const formato of formatosPreferidos) {
-                    if (MediaRecorder.isTypeSupported(formato)) {
-                        formatoEscolhido = formato;
-                        break;
-                    }
+
+                formatos.forEach(formato => {
+                    const suportado = MediaRecorder.isTypeSupported(formato);
+                    resultados.push({
+                        teste: `Formato ${formato}`,
+                        resultado: suportado,
+                        detalhes: suportado ? 'Suportado' : 'Não suportado'
+                    });
+                });
+            }
+
+            // 3. Verificar contexto de segurança
+            const isHTTPS = location.protocol === 'https:';
+            const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+            const contextoSeguro = isHTTPS || isLocalhost;
+
+            resultados.push({
+                teste: 'Contexto seguro (HTTPS/localhost)',
+                resultado: contextoSeguro,
+                detalhes: `${location.protocol}//${location.hostname}`
+            });
+
+            // Montar resultado visual
+            let html = '<div class="mt-2">';
+
+            resultados.forEach(item => {
+                const icone = item.resultado ?
+                    '<i class="fas fa-check-circle text-success"></i>' :
+                    '<i class="fas fa-times-circle text-danger"></i>';
+
+                html += `
+                <div class="d-flex justify-content-between align-items-center py-1">
+                    <span>${item.teste}:</span>
+                    <span>${icone} ${item.detalhes}</span>
+                </div>
+            `;
+            });
+
+            html += '</div>';
+
+            // Resumo geral
+            const todosSucessos = resultados.every(r => r.resultado);
+            const classeResumo = todosSucessos ? 'alert-success' : 'alert-warning';
+            const textoResumo = todosSucessos ?
+                'Todos os testes passaram! Gravação de áudio deve funcionar.' :
+                'Alguns testes falharam. Pode haver limitações na gravação.';
+
+            html += `<div class="alert ${classeResumo} mt-2">${textoResumo}</div>`;
+
+            resultDiv.innerHTML = html;
+        };
+
+        // Botões de teste de gravação
+        document.addEventListener('DOMContentLoaded', function() {
+            const btnIniciar = document.getElementById('btnIniciarTeste');
+            const btnParar = document.getElementById('btnPararTeste');
+            const btnTestarEnvio = document.getElementById('btnTestarEnvio');
+
+            if (btnIniciar) {
+                btnIniciar.addEventListener('click', window.iniciarGravacaoTeste);
+            }
+
+            if (btnParar) {
+                btnParar.addEventListener('click', window.pararGravacaoTeste);
+            }
+
+            if (btnTestarEnvio) {
+                btnTestarEnvio.addEventListener('click', window.testarEnvioAPI);
+            }
+        });
+
+        // Iniciar gravação de teste
+        window.iniciarGravacaoTeste = function() {
+            const btnIniciar = document.getElementById('btnIniciarTeste');
+            const btnParar = document.getElementById('btnPararTeste');
+            const resultDiv = document.getElementById('resultadoGravacao');
+
+            // Mesmo código de configuração da gravação principal, mas adaptado
+            const audioConstraints = {
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    sampleRate: 44100,
+                    channelCount: 1
                 }
-                
-                const options = {};
-                if (formatoEscolhido) {
-                    options.mimeType = formatoEscolhido;
-                }
-                
-                try {
-                    mediaRecorderTeste = new MediaRecorder(stream, options);
-                    audioChunksTeste = [];
-                    
-                    mediaRecorderTeste.ondataavailable = function(event) {
-                        if (event.data.size > 0) {
-                            audioChunksTeste.push(event.data);
+            };
+
+            navigator.mediaDevices.getUserMedia(audioConstraints)
+                .then(function(stream) {
+                    streamTeste = stream;
+
+                    // Detectar melhor formato disponível
+                    const formatosPreferidos = [
+                        'audio/mpeg',
+                        'audio/aac',
+                        'audio/ogg;codecs=opus',
+                        'audio/ogg',
+                        'audio/amr'
+                    ];
+
+                    let formatoEscolhido = null;
+                    for (const formato of formatosPreferidos) {
+                        if (MediaRecorder.isTypeSupported(formato)) {
+                            formatoEscolhido = formato;
+                            break;
                         }
-                    };
-                    
-                    mediaRecorderTeste.onstop = function() {
-                        const totalSize = audioChunksTeste.reduce((total, chunk) => total + chunk.size, 0);
-                        
-                        // Criar arquivo de teste
-                        const audioBlob = new Blob(audioChunksTeste, { type: mediaRecorderTeste.mimeType });
-                        
-                        // Determinar extensão
-                        let extensao = '.ogg';
-                        if (mediaRecorderTeste.mimeType.includes('mp3') || mediaRecorderTeste.mimeType.includes('mpeg')) extensao = '.mp3';
-                        else if (mediaRecorderTeste.mimeType.includes('aac')) extensao = '.aac';
-                        else if (mediaRecorderTeste.mimeType.includes('amr')) extensao = '.amr';
-                        
-                        const nomeArquivo = `teste_audio_${Date.now()}${extensao}`;
-                        audioFileTeste = new File([audioBlob], nomeArquivo, { 
-                            type: mediaRecorderTeste.mimeType 
-                        });
-                        
-                        // Mostrar player
-                        mostrarPlayerTeste(audioBlob);
-                        
-                        // Habilitar teste de envio
-                        document.getElementById('btnTestarEnvio').disabled = false;
-                        
-                        // Parar stream
-                        streamTeste.getTracks().forEach(track => track.stop());
-                        
-                        resultDiv.innerHTML = `
+                    }
+
+                    const options = {};
+                    if (formatoEscolhido) {
+                        options.mimeType = formatoEscolhido;
+                    }
+
+                    try {
+                        mediaRecorderTeste = new MediaRecorder(stream, options);
+                        audioChunksTeste = [];
+
+                        mediaRecorderTeste.ondataavailable = function(event) {
+                            if (event.data.size > 0) {
+                                audioChunksTeste.push(event.data);
+                            }
+                        };
+
+                        mediaRecorderTeste.onstop = function() {
+                            const totalSize = audioChunksTeste.reduce((total, chunk) => total + chunk.size, 0);
+
+                            // Criar arquivo de teste
+                            const audioBlob = new Blob(audioChunksTeste, {
+                                type: mediaRecorderTeste.mimeType
+                            });
+
+                            // Determinar extensão
+                            let extensao = '.ogg';
+                            if (mediaRecorderTeste.mimeType.includes('mp3') || mediaRecorderTeste.mimeType.includes('mpeg')) extensao = '.mp3';
+                            else if (mediaRecorderTeste.mimeType.includes('aac')) extensao = '.aac';
+                            else if (mediaRecorderTeste.mimeType.includes('amr')) extensao = '.amr';
+
+                            const nomeArquivo = `teste_audio_${Date.now()}${extensao}`;
+                            audioFileTeste = new File([audioBlob], nomeArquivo, {
+                                type: mediaRecorderTeste.mimeType
+                            });
+
+                            // Mostrar player
+                            mostrarPlayerTeste(audioBlob);
+
+                            // Habilitar teste de envio
+                            document.getElementById('btnTestarEnvio').disabled = false;
+
+                            // Parar stream
+                            streamTeste.getTracks().forEach(track => track.stop());
+
+                            resultDiv.innerHTML = `
                             <div class="alert alert-success">
                                 <strong>Gravação concluída!</strong><br>
                                 Arquivo: ${audioFileTeste.name}<br>
@@ -1464,132 +1475,132 @@ document.addEventListener('DOMContentLoaded', function() {
                                 Tipo: ${audioFileTeste.type}
                             </div>
                         `;
-                    };
-                    
-                    mediaRecorderTeste.onerror = function(event) {
-                        resultDiv.innerHTML = `<div class="alert alert-danger">Erro: ${event.error.name}</div>`;
-                    };
-                    
-                    // Iniciar gravação
-                    mediaRecorderTeste.start(1000);
-                    isRecordingTeste = true;
-                    recordingStartTimeTeste = Date.now();
-                    
-                    // Atualizar interface
-                    btnIniciar.classList.add('d-none');
-                    btnParar.classList.remove('d-none');
-                    
-                    // Iniciar timer
-                    recordingTimerTeste = setInterval(function() {
-                        const elapsed = Math.floor((Date.now() - recordingStartTimeTeste) / 1000);
-                        const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
-                        const seconds = (elapsed % 60).toString().padStart(2, '0');
-                        document.getElementById('tempoGravacaoTeste').textContent = `${minutes}:${seconds}`;
-                    }, 1000);
-                    
-                    resultDiv.innerHTML = '<div class="alert alert-info">Gravando... Fale algo no microfone.</div>';
-                    
-                } catch (error) {
-                    resultDiv.innerHTML = `<div class="alert alert-danger">Erro: ${error.message}</div>`;
-                    streamTeste.getTracks().forEach(track => track.stop());
-                }
-            })
-            .catch(function(error) {
-                
-                let mensagem = 'Erro ao acessar microfone: ';
-                if (error.name === 'NotAllowedError') {
-                    mensagem += 'Permissão negada';
-                } else if (error.name === 'NotFoundError') {
-                    mensagem += 'Microfone não encontrado';
-                } else {
-                    mensagem += error.message;
-                }
-                
-                resultDiv.innerHTML = `<div class="alert alert-danger">${mensagem}</div>`;
-            });
-    };
-    
-    // Parar gravação de teste
-    window.pararGravacaoTeste = function() {
-        if (isRecordingTeste && mediaRecorderTeste) {
-            mediaRecorderTeste.stop();
-            isRecordingTeste = false;
-            clearInterval(recordingTimerTeste);
-            
-            // Restaurar interface
-            document.getElementById('btnIniciarTeste').classList.remove('d-none');
-            document.getElementById('btnPararTeste').classList.add('d-none');
-            document.getElementById('tempoGravacaoTeste').textContent = '00:00';
-        }
-    };
-    
-    // Mostrar player de teste
-    window.mostrarPlayerTeste = function(audioBlob) {
-        const playerDiv = document.getElementById('playerTeste');
-        const audioElement = playerDiv.querySelector('audio');
-        
-        if (audioElement) {
-            const audioUrl = URL.createObjectURL(audioBlob);
-            audioElement.src = audioUrl;
-            playerDiv.classList.remove('d-none');
-        }
-    };
-    
-    // Testar envio via API
-    window.testarEnvioAPI = function() {
-        if (!audioFileTeste) {
-            alert('Grave um áudio de teste primeiro!');
-            return;
-        }
-        
-        const btnTeste = document.getElementById('btnTestarEnvio');
-        const resultDiv = document.getElementById('resultadoEnvio');
-        
-        btnTeste.disabled = true;
-        btnTeste.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Testando...';
-        resultDiv.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>Enviando para API...';
-        
-        // Criar FormData
-        const formData = new FormData();
-        formData.append('audio_gravado', audioFileTeste);
-        formData.append('destinatario', '<?= $dados['conversa']->contato_numero ?>');
-        formData.append('caption', `Teste de áudio - ${new Date().toLocaleTimeString()}`);
-        
-        // Enviar para API normal
-        fetch('<?= URL ?>/chat/enviarMensagem/<?= $dados['conversa']->id ?>', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            
-            if (data.success) {
-                resultDiv.innerHTML = `
+                        };
+
+                        mediaRecorderTeste.onerror = function(event) {
+                            resultDiv.innerHTML = `<div class="alert alert-danger">Erro: ${event.error.name}</div>`;
+                        };
+
+                        // Iniciar gravação
+                        mediaRecorderTeste.start(1000);
+                        isRecordingTeste = true;
+                        recordingStartTimeTeste = Date.now();
+
+                        // Atualizar interface
+                        btnIniciar.classList.add('d-none');
+                        btnParar.classList.remove('d-none');
+
+                        // Iniciar timer
+                        recordingTimerTeste = setInterval(function() {
+                            const elapsed = Math.floor((Date.now() - recordingStartTimeTeste) / 1000);
+                            const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                            const seconds = (elapsed % 60).toString().padStart(2, '0');
+                            document.getElementById('tempoGravacaoTeste').textContent = `${minutes}:${seconds}`;
+                        }, 1000);
+
+                        resultDiv.innerHTML = '<div class="alert alert-info">Gravando... Fale algo no microfone.</div>';
+
+                    } catch (error) {
+                        resultDiv.innerHTML = `<div class="alert alert-danger">Erro: ${error.message}</div>`;
+                        streamTeste.getTracks().forEach(track => track.stop());
+                    }
+                })
+                .catch(function(error) {
+
+                    let mensagem = 'Erro ao acessar microfone: ';
+                    if (error.name === 'NotAllowedError') {
+                        mensagem += 'Permissão negada';
+                    } else if (error.name === 'NotFoundError') {
+                        mensagem += 'Microfone não encontrado';
+                    } else {
+                        mensagem += error.message;
+                    }
+
+                    resultDiv.innerHTML = `<div class="alert alert-danger">${mensagem}</div>`;
+                });
+        };
+
+        // Parar gravação de teste
+        window.pararGravacaoTeste = function() {
+            if (isRecordingTeste && mediaRecorderTeste) {
+                mediaRecorderTeste.stop();
+                isRecordingTeste = false;
+                clearInterval(recordingTimerTeste);
+
+                // Restaurar interface
+                document.getElementById('btnIniciarTeste').classList.remove('d-none');
+                document.getElementById('btnPararTeste').classList.add('d-none');
+                document.getElementById('tempoGravacaoTeste').textContent = '00:00';
+            }
+        };
+
+        // Mostrar player de teste
+        window.mostrarPlayerTeste = function(audioBlob) {
+            const playerDiv = document.getElementById('playerTeste');
+            const audioElement = playerDiv.querySelector('audio');
+
+            if (audioElement) {
+                const audioUrl = URL.createObjectURL(audioBlob);
+                audioElement.src = audioUrl;
+                playerDiv.classList.remove('d-none');
+            }
+        };
+
+        // Testar envio via API
+        window.testarEnvioAPI = function() {
+            if (!audioFileTeste) {
+                alert('Grave um áudio de teste primeiro!');
+                return;
+            }
+
+            const btnTeste = document.getElementById('btnTestarEnvio');
+            const resultDiv = document.getElementById('resultadoEnvio');
+
+            btnTeste.disabled = true;
+            btnTeste.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Testando...';
+            resultDiv.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>Enviando para API...';
+
+            // Criar FormData
+            const formData = new FormData();
+            formData.append('audio_gravado', audioFileTeste);
+            formData.append('destinatario', '<?= $dados['conversa']->contato_numero ?>');
+            formData.append('caption', `Teste de áudio - ${new Date().toLocaleTimeString()}`);
+
+            // Enviar para API normal
+            fetch('<?= URL ?>/chat/enviarMensagem/<?= $dados['conversa']->id ?>', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+
+                    if (data.success) {
+                        resultDiv.innerHTML = `
                     <div class="alert alert-success">
                         <strong>✅ SUCESSO!</strong><br>
                         <small>Áudio enviado com sucesso!</small>
                     </div>
                 `;
-            } else {
-                resultDiv.innerHTML = `
+                    } else {
+                        resultDiv.innerHTML = `
                     <div class="alert alert-danger">
                         <strong>❌ FALHA!</strong><br>
                         <small>Erro: ${data.error || 'Erro desconhecido'}</small>
                     </div>
                 `;
-            }
-        })
-        .catch(error => {
-            resultDiv.innerHTML = `<div class="alert alert-danger">Erro na requisição: ${error.message}</div>`;
-        })
-        .finally(() => {
-            btnTeste.disabled = false;
-            btnTeste.innerHTML = '<i class="fas fa-upload me-1"></i> Testar Envio API';
-        });
-    };
-    
-    // === FIM SISTEMA DE DIAGNÓSTICO ===
-});
+                    }
+                })
+                .catch(error => {
+                    resultDiv.innerHTML = `<div class="alert alert-danger">Erro na requisição: ${error.message}</div>`;
+                })
+                .finally(() => {
+                    btnTeste.disabled = false;
+                    btnTeste.innerHTML = '<i class="fas fa-upload me-1"></i> Testar Envio API';
+                });
+        };
+
+        // === FIM SISTEMA DE DIAGNÓSTICO ===
+    });
 </script>
 
 <?php include 'app/Views/include/footer.php' ?>

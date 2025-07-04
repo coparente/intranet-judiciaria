@@ -1434,7 +1434,8 @@ class Chat extends Controllers
                 case 'audio':
                     $midiaId = $mensagemData['audio']['id'] ?? '';
                     $midiaTipo = $mensagemData['audio']['mime_type'] ?? 'audio/ogg';
-                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do MinIO
+                    // $conteudo = $midiaId; // Temporário, será substituído pelo caminho do MinIO
+                    $conteudo = $mensagemData['audio']['text'] ?? '';; // Temporário, será substituído pelo caminho do MinIO
                     break;
                     
                 case 'video':

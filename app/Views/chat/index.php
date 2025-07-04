@@ -221,7 +221,7 @@
                                                     <td>
                                                         <?php
                                                         $statusClass = [
-                                                            'aberto' => 'badge-warning',
+                                                            'aberto' => 'badge-danger',
                                                             'em_andamento' => 'badge-warning',
                                                             'aguardando_cliente' => 'badge-info',
                                                             'resolvido' => 'badge-success',
@@ -243,7 +243,7 @@
                                                     <td>
                                                         <?= htmlspecialchars($conversa->contato_nome) ?>
                                                         <?php if (isset($conversa->nao_lidas) && $conversa->nao_lidas > 0): ?>
-                                                            <span class="badge bg-danger ms-1"><?= $conversa->nao_lidas ?></span>
+                                                            <span class="badge bg-warning ms-1"><?= $conversa->nao_lidas ?></span>
                                                         <?php endif; ?>
                                                     </td>
                                                     <td><?= htmlspecialchars($conversa->contato_numero) ?></td>

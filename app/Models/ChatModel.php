@@ -41,9 +41,9 @@ class ChatModel
     }
 
     /**
-     * Busca conversas com filtros e paginação
+     * Busca conversas com filtros
      */
-    public function buscarConversasComFiltros($usuario_id, $filtroContato = '', $filtroNumero = '', $limite = 10, $offset = 0)
+    public function buscarConversasComFiltros($usuario_id, $filtroContato = '', $filtroNumero = '', $limite = 10, $offset = 0, $filtroStatus = '')
     {
         $sql = "SELECT c.*, 
                 (SELECT COUNT(*) FROM mensagens_chat m 
@@ -53,8 +53,10 @@ class ChatModel
                  ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_mensagem,
                 (SELECT m2.enviado_em FROM mensagens_chat m2 
                  WHERE m2.conversa_id = c.id 
-                 ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_atividade
+                 ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_atividade,
+                u.nome as responsavel_nome
                 FROM conversas c 
+                LEFT JOIN usuarios u ON c.usuario_id = u.id
                 WHERE c.usuario_id = :usuario_id";
 
         // Aplicar filtros
@@ -68,6 +70,11 @@ class ChatModel
         if (!empty($filtroNumero)) {
             $sql .= " AND c.contato_numero LIKE :filtro_numero";
             $params[':filtro_numero'] = '%' . $filtroNumero . '%';
+        }
+        
+        if (!empty($filtroStatus)) {
+            $sql .= " AND c.status_atendimento = :filtro_status";
+            $params[':filtro_status'] = $filtroStatus;
         }
         
         $sql .= " ORDER BY c.atualizado_em DESC LIMIT :limite OFFSET :offset";
@@ -88,7 +95,7 @@ class ChatModel
     /**
      * Conta conversas com filtros
      */
-    public function contarConversasComFiltros($usuario_id, $filtroContato = '', $filtroNumero = '')
+    public function contarConversasComFiltros($usuario_id, $filtroContato = '', $filtroNumero = '', $filtroStatus = '')
     {
         $sql = "SELECT COUNT(*) as total FROM conversas c WHERE c.usuario_id = :usuario_id";
 
@@ -103,6 +110,11 @@ class ChatModel
         if (!empty($filtroNumero)) {
             $sql .= " AND c.contato_numero LIKE :filtro_numero";
             $params[':filtro_numero'] = '%' . $filtroNumero . '%';
+        }
+        
+        if (!empty($filtroStatus)) {
+            $sql .= " AND c.status_atendimento = :filtro_status";
+            $params[':filtro_status'] = $filtroStatus;
         }
 
         $this->db->query($sql);
@@ -649,9 +661,9 @@ class ChatModel
     }
 
     /**
-     * Busca conversas não atribuídas a nenhum usuário
+     * Busca conversas não atribuídas
      */
-    public function buscarConversasNaoAtribuidas($filtroContato = '', $filtroNumero = '', $limite = 10, $offset = 0)
+    public function buscarConversasNaoAtribuidas($filtroContato = '', $filtroNumero = '', $limite = 10, $offset = 0, $filtroStatus = '')
     {
         $sql = "SELECT c.*, 
                 (SELECT COUNT(*) FROM mensagens_chat m 
@@ -661,11 +673,9 @@ class ChatModel
                  ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_mensagem,
                 (SELECT m2.enviado_em FROM mensagens_chat m2 
                  WHERE m2.conversa_id = c.id 
-                 ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_atividade,
-                (SELECT COUNT(*) FROM mensagens_chat m3 
-                 WHERE m3.conversa_id = c.id) as total_mensagens
+                 ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_atividade
                 FROM conversas c 
-                WHERE c.usuario_id IS NULL OR c.usuario_id = 0";
+                WHERE (c.usuario_id IS NULL OR c.usuario_id = 0)";
 
         // Aplicar filtros
         $params = [];
@@ -680,7 +690,12 @@ class ChatModel
             $params[':filtro_numero'] = '%' . $filtroNumero . '%';
         }
         
-        $sql .= " ORDER BY c.atualizado_em DESC LIMIT :limite OFFSET :offset";
+        if (!empty($filtroStatus)) {
+            $sql .= " AND c.status_atendimento = :filtro_status";
+            $params[':filtro_status'] = $filtroStatus;
+        }
+
+        $sql .= " ORDER BY c.criado_em DESC LIMIT :limite OFFSET :offset";
 
         $this->db->query($sql);
         
@@ -691,16 +706,18 @@ class ChatModel
         
         $this->db->bind(':limite', $limite, PDO::PARAM_INT);
         $this->db->bind(':offset', $offset, PDO::PARAM_INT);
-        
+
         return $this->db->resultados();
     }
 
     /**
      * Conta conversas não atribuídas
      */
-    public function contarConversasNaoAtribuidas($filtroContato = '', $filtroNumero = '')
+    public function contarConversasNaoAtribuidas($filtroContato = '', $filtroNumero = '', $filtroStatus = '')
     {
-        $sql = "SELECT COUNT(*) as total FROM conversas c WHERE c.usuario_id IS NULL OR c.usuario_id = 0";
+        $sql = "SELECT COUNT(*) as total 
+                FROM conversas c 
+                WHERE (c.usuario_id IS NULL OR c.usuario_id = 0)";
 
         // Aplicar filtros
         $params = [];
@@ -714,14 +731,19 @@ class ChatModel
             $sql .= " AND c.contato_numero LIKE :filtro_numero";
             $params[':filtro_numero'] = '%' . $filtroNumero . '%';
         }
+        
+        if (!empty($filtroStatus)) {
+            $sql .= " AND c.status_atendimento = :filtro_status";
+            $params[':filtro_status'] = $filtroStatus;
+        }
 
         $this->db->query($sql);
-        
+
         // Bind dos parâmetros
         foreach ($params as $param => $valor) {
             $this->db->bind($param, $valor);
         }
-        
+
         $resultado = $this->db->resultado();
         return $resultado ? $resultado->total : 0;
     }
@@ -1343,6 +1365,306 @@ class ChatModel
         } catch (Exception $e) {
             error_log("Erro ao buscar dados do dashboard: " . $e->getMessage());
             return null;
+        }
+    }
+
+    /**
+     * Busca TODAS as conversas com filtros (apenas admin/analista)
+     */
+    public function buscarTodasConversasComFiltros($filtroContato = '', $filtroNumero = '', $limite = 10, $offset = 0, $filtroStatus = '')
+    {
+        try {
+            $sql = "SELECT c.*, 
+                    (SELECT COUNT(*) FROM mensagens_chat m 
+                     WHERE m.conversa_id = c.id AND m.lido = 0 AND m.remetente_id IS NULL) as nao_lidas,
+                    (SELECT m2.conteudo FROM mensagens_chat m2 
+                     WHERE m2.conversa_id = c.id 
+                     ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_mensagem,
+                    (SELECT m2.enviado_em FROM mensagens_chat m2 
+                     WHERE m2.conversa_id = c.id 
+                     ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_atividade,
+                    u.nome as responsavel_nome
+                    FROM conversas c 
+                    LEFT JOIN usuarios u ON c.usuario_id = u.id
+                    WHERE 1=1";
+
+            // Aplicar filtros
+            $params = [];
+            
+            if (!empty($filtroContato)) {
+                $sql .= " AND c.contato_nome LIKE :filtro_contato";
+                $params[':filtro_contato'] = '%' . $filtroContato . '%';
+            }
+            
+            if (!empty($filtroNumero)) {
+                $sql .= " AND c.contato_numero LIKE :filtro_numero";
+                $params[':filtro_numero'] = '%' . $filtroNumero . '%';
+            }
+            
+            if (!empty($filtroStatus)) {
+                $sql .= " AND c.status_atendimento = :filtro_status";
+                $params[':filtro_status'] = $filtroStatus;
+            }
+
+            $sql .= " ORDER BY c.atualizado_em DESC LIMIT :limite OFFSET :offset";
+
+            $this->db->query($sql);
+            
+            // Bind dos parâmetros
+            foreach ($params as $param => $valor) {
+                $this->db->bind($param, $valor);
+            }
+            
+            $this->db->bind(':limite', $limite, PDO::PARAM_INT);
+            $this->db->bind(':offset', $offset, PDO::PARAM_INT);
+
+            return $this->db->resultados();
+
+        } catch (Exception $e) {
+            error_log("Erro ao buscar todas as conversas: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Conta TODAS as conversas com filtros (apenas admin/analista)
+     */
+    public function contarTodasConversasComFiltros($filtroContato = '', $filtroNumero = '', $filtroStatus = '')
+    {
+        try {
+            $sql = "SELECT COUNT(*) as total FROM conversas c WHERE 1=1";
+
+            // Aplicar filtros
+            $params = [];
+            
+            if (!empty($filtroContato)) {
+                $sql .= " AND c.contato_nome LIKE :filtro_contato";
+                $params[':filtro_contato'] = '%' . $filtroContato . '%';
+            }
+            
+            if (!empty($filtroNumero)) {
+                $sql .= " AND c.contato_numero LIKE :filtro_numero";
+                $params[':filtro_numero'] = '%' . $filtroNumero . '%';
+            }
+            
+            if (!empty($filtroStatus)) {
+                $sql .= " AND c.status_atendimento = :filtro_status";
+                $params[':filtro_status'] = $filtroStatus;
+            }
+
+            $this->db->query($sql);
+
+            // Bind dos parâmetros
+            foreach ($params as $param => $valor) {
+                $this->db->bind($param, $valor);
+            }
+
+            $resultado = $this->db->resultado();
+            return $resultado ? $resultado->total : 0;
+        } catch (Exception $e) {
+            error_log("Erro ao contar todas as conversas: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    // =====================================================
+    // SISTEMA DE MENSAGENS RÁPIDAS
+    // =====================================================
+
+    /**
+     * Criar tabela de mensagens rápidas se não existir
+     */
+    public function criarTabelaMensagensRapidas()
+    {
+        $sql = "CREATE TABLE IF NOT EXISTS mensagens_rapidas (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            titulo VARCHAR(255) NOT NULL,
+            conteudo TEXT NOT NULL,
+            icone VARCHAR(100) DEFAULT 'fas fa-comment',
+            ativo TINYINT(1) DEFAULT 1,
+            ordem INT DEFAULT 0,
+            criado_por INT NOT NULL,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_ativo (ativo),
+            INDEX idx_ordem (ordem),
+            FOREIGN KEY (criado_por) REFERENCES usuarios(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+        try {
+            $this->db->query($sql);
+            $resultadoExecucao = $this->db->executa();
+            
+            if ($resultadoExecucao) {
+                // Verificar se a tabela está vazia e inserir mensagem padrão
+                $sqlVerificar = "SELECT COUNT(*) as total FROM mensagens_rapidas";
+                $this->db->query($sqlVerificar);
+                $resultado = $this->db->resultado();
+                
+                if ($resultado && $resultado->total == 0) {
+                    $this->inserirMensagemPadrao();
+                }
+            }
+            
+            return $resultadoExecucao;
+        } catch (Exception $e) {
+            error_log("Erro ao criar tabela mensagens_rapidas: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Inserir mensagem padrão do TJGO
+     */
+    private function inserirMensagemPadrao()
+    {
+        $sql = "INSERT INTO mensagens_rapidas (titulo, conteudo, icone, criado_por, ordem) VALUES (:titulo, :conteudo, :icone, :criado_por, :ordem)";
+        
+        try {
+            $this->db->query($sql);
+            $this->db->bind(':titulo', "Apresentação TJGO");
+            $this->db->bind(':conteudo', "Somos da Central de Intimação do Tribunal de Justiça do Estado de Goiás (TJGO) ⚖️. Caso tenha qualquer dúvida, consulte o site oficial do TJGO ou entre em contato com a secretaria do juízo responsável.");
+            $this->db->bind(':icone', "fas fa-gavel");
+            $this->db->bind(':criado_por', 1);
+            $this->db->bind(':ordem', 1);
+            
+            return $this->db->executa();
+        } catch (Exception $e) {
+            error_log("Erro ao inserir mensagem padrão: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Buscar todas as mensagens rápidas ativas
+     */
+    public function buscarMensagensRapidas($ativo = true)
+    {
+        $this->criarTabelaMensagensRapidas(); // Garantir que a tabela existe
+        
+        $sql = "SELECT mr.*, u.nome as criador_nome 
+                FROM mensagens_rapidas mr
+                LEFT JOIN usuarios u ON mr.criado_por = u.id";
+        
+        if ($ativo) {
+            $sql .= " WHERE mr.ativo = 1";
+        }
+        
+        $sql .= " ORDER BY mr.ordem ASC, mr.id ASC";
+        
+        $this->db->query($sql);
+        return $this->db->resultados();
+    }
+
+    /**
+     * Buscar mensagem rápida por ID
+     */
+    public function buscarMensagemRapidaPorId($id)
+    {
+        $sql = "SELECT mr.*, u.nome as criador_nome 
+                FROM mensagens_rapidas mr
+                LEFT JOIN usuarios u ON mr.criado_por = u.id
+                WHERE mr.id = :id";
+        
+        $this->db->query($sql);
+        $this->db->bind(':id', $id);
+        return $this->db->resultado();
+    }
+
+    /**
+     * Criar nova mensagem rápida
+     */
+    public function criarMensagemRapida($dados)
+    {
+        $this->criarTabelaMensagensRapidas(); // Garantir que a tabela existe
+        
+        $sql = "INSERT INTO mensagens_rapidas (titulo, conteudo, icone, ativo, ordem, criado_por) 
+                VALUES (:titulo, :conteudo, :icone, :ativo, :ordem, :criado_por)";
+        
+        $this->db->query($sql);
+        $this->db->bind(':titulo', $dados['titulo']);
+        $this->db->bind(':conteudo', $dados['conteudo']);
+        $this->db->bind(':icone', $dados['icone'] ?? 'fas fa-comment');
+        $this->db->bind(':ativo', $dados['ativo'] ?? 1);
+        $this->db->bind(':ordem', $dados['ordem'] ?? 0);
+        $this->db->bind(':criado_por', $dados['criado_por']);
+        
+        return $this->db->executa();
+    }
+
+    /**
+     * Atualizar mensagem rápida
+     */
+    public function atualizarMensagemRapida($id, $dados)
+    {
+        $sql = "UPDATE mensagens_rapidas 
+                SET titulo = :titulo, conteudo = :conteudo, icone = :icone, ativo = :ativo, ordem = :ordem 
+                WHERE id = :id";
+        
+        $this->db->query($sql);
+        $this->db->bind(':titulo', $dados['titulo']);
+        $this->db->bind(':conteudo', $dados['conteudo']);
+        $this->db->bind(':icone', $dados['icone'] ?? 'fas fa-comment');
+        $this->db->bind(':ativo', $dados['ativo'] ?? 1);
+        $this->db->bind(':ordem', $dados['ordem'] ?? 0);
+        $this->db->bind(':id', $id);
+        
+        return $this->db->executa();
+    }
+
+    /**
+     * Excluir mensagem rápida
+     */
+    public function excluirMensagemRapida($id)
+    {
+        $sql = "DELETE FROM mensagens_rapidas WHERE id = :id";
+        $this->db->query($sql);
+        $this->db->bind(':id', $id);
+        
+        return $this->db->executa();
+    }
+
+    /**
+     * Contar mensagens rápidas
+     */
+    public function contarMensagensRapidas($ativo = null)
+    {
+        $sql = "SELECT COUNT(*) as total FROM mensagens_rapidas";
+        
+        if ($ativo !== null) {
+            $sql .= " WHERE ativo = :ativo";
+            $this->db->query($sql);
+            $this->db->bind(':ativo', $ativo ? 1 : 0);
+        } else {
+            $this->db->query($sql);
+        }
+        
+        $resultado = $this->db->resultado();
+        return $resultado ? $resultado->total : 0;
+    }
+
+    /**
+     * Reordenar mensagens rápidas
+     */
+    public function reordenarMensagensRapidas($ordens)
+    {
+        // Como não temos transações explícitas na classe Database, vamos fazer individualmente
+        try {
+            foreach ($ordens as $id => $ordem) {
+                $sql = "UPDATE mensagens_rapidas SET ordem = :ordem WHERE id = :id";
+                $this->db->query($sql);
+                $this->db->bind(':ordem', $ordem);
+                $this->db->bind(':id', $id);
+                
+                if (!$this->db->executa()) {
+                    return false;
+                }
+            }
+            
+            return true;
+        } catch (Exception $e) {
+            error_log("Erro ao reordenar mensagens: " . $e->getMessage());
+            return false;
         }
     }
 }

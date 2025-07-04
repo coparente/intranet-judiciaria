@@ -14,7 +14,7 @@ $rotasAPI = [
     'chat/downloadMidia',
     'chat/enviarMensagemInterativa',
     'chat/consultarStatus',
-    'chat/qrCode',
+    'chat/apiMensagensRapidas',
     'agenda/eventos',
     'agenda/detalhesEvento',
     'agenda/moverEvento',

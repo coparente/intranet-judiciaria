@@ -287,6 +287,9 @@
                             <?php else: ?>
                                 <form action="<?= URL ?>/chat/enviarMensagem/<?= $dados['conversa']->id ?>" method="POST" enctype="multipart/form-data" id="messageForm">
                                     <div class="input-group-modern">
+                                        <button type="button" class="btn-quick-message" id="quickMessageBtn" title="Mensagens Rápidas" data-toggle="modal" data-target="#modalMensagensRapidas">
+                                            <i class="fas fa-bolt"></i>
+                                        </button>
                                         <button type="button" class="btn-attachment" onclick="document.getElementById('fileInput').click()" title="Anexar arquivo" id="attachBtn">
                                             <i class="fas fa-paperclip"></i>
                                         </button>
@@ -524,6 +527,69 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- NOVO: Modal Mensagens Rápidas -->
+<div class="modal fade" id="modalMensagensRapidas" tabindex="-1" aria-labelledby="modalMensagensRapidasLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalMensagensRapidasLabel">
+                    <i class="fas fa-bolt me-2"></i> Mensagens Rápidas
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Instruções:</strong> Clique na mensagem desejada para inserir no campo de texto.
+                </div>
+                
+                <!-- Loading -->
+                <div class="text-center py-4" id="loadingMensagens">
+                    <i class="fas fa-spinner fa-spin fa-2x text-muted"></i>
+                    <p class="mt-2 text-muted">Carregando mensagens...</p>
+                </div>
+                
+                <!-- Lista de mensagens (carregada via AJAX) -->
+                <div class="list-group" id="listaMensagensRapidas" style="display: none;">
+                    <!-- Mensagens serão inseridas aqui via JavaScript -->
+                </div>
+                
+                <!-- Mensagem de erro -->
+                <div class="alert alert-warning" id="erroMensagens" style="display: none;">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Aviso:</strong> Não foi possível carregar as mensagens rápidas.
+                </div>
+                
+                <!-- Mensagem quando não há mensagens -->
+                <div class="text-center py-4" id="semMensagens" style="display: none;">
+                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                    <h6 class="text-muted">Nenhuma mensagem rápida configurada</h6>
+                    <p class="text-muted">Entre em contato com o administrador para configurar mensagens rápidas.</p>
+                </div>
+                
+                <div class="mt-3">
+                    <small class="text-muted">
+                        <i class="fas fa-lightbulb me-1"></i>
+                        <strong>Dica:</strong> Após inserir a mensagem, você pode editá-la antes de enviar.
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fas fa-times me-1"></i> Fechar
+                </button>
+                <?php if (in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])): ?>
+                    <a href="<?= URL ?>/chat/gerenciarMensagensRapidas" class="btn btn-primary">
+                        <i class="fas fa-cog me-1"></i> Gerenciar Mensagens
+                    </a>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -1826,7 +1892,309 @@
         setTimeout(verificarStatusTicket, 100);
 
         // === FIM DAS FUNÇÕES DE TICKET ===
+
+        // ========== SISTEMA DE MENSAGENS RÁPIDAS ==========
+        
+        // Inicializar sistema de mensagens rápidas
+        function initQuickMessages() {
+            // Carregar mensagens quando o modal for aberto
+            $('#modalMensagensRapidas').on('show.bs.modal', function() {
+                carregarMensagensRapidas();
+            });
+        }
+        
+        // Carregar mensagens rápidas do banco de dados
+        function carregarMensagensRapidas() {
+            const loadingDiv = document.getElementById('loadingMensagens');
+            const listaMensagens = document.getElementById('listaMensagensRapidas');
+            const erroDiv = document.getElementById('erroMensagens');
+            const semMensagensDiv = document.getElementById('semMensagens');
+            
+            // Mostrar loading
+            loadingDiv.style.display = 'block';
+            listaMensagens.style.display = 'none';
+            erroDiv.style.display = 'none';
+            semMensagensDiv.style.display = 'none';
+            
+            console.log('MENSAGENS_RAPIDAS: Iniciando carregamento...');
+            
+            // Buscar mensagens via AJAX
+            fetch('<?= URL ?>/chat/apiMensagensRapidas', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                console.log('MENSAGENS_RAPIDAS: Response status:', response.status);
+                console.log('MENSAGENS_RAPIDAS: Response headers:', response.headers);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                return response.json();
+            })
+            .then(data => {
+                console.log('MENSAGENS_RAPIDAS: Data received:', data);
+                loadingDiv.style.display = 'none';
+                
+                if (data.success && data.mensagens && data.mensagens.length > 0) {
+                    console.log('MENSAGENS_RAPIDAS: Carregando', data.mensagens.length, 'mensagens');
+                    
+                    // Limpar lista anterior
+                    listaMensagens.innerHTML = '';
+                    
+                    // Adicionar mensagens
+                    data.mensagens.forEach(mensagem => {
+                        const item = criarItemMensagemRapida(mensagem);
+                        listaMensagens.appendChild(item);
+                    });
+                    
+                    listaMensagens.style.display = 'block';
+                    
+                    // Reconfigurar event listeners
+                    configurarEventListenersMensagens();
+                    
+                } else if (data.success && data.mensagens && data.mensagens.length === 0) {
+                    console.log('MENSAGENS_RAPIDAS: Nenhuma mensagem encontrada');
+                    // Nenhuma mensagem encontrada
+                    semMensagensDiv.style.display = 'block';
+                } else {
+                    console.error('MENSAGENS_RAPIDAS: Erro na resposta:', data);
+                    // Erro na resposta - mostrar erro mais específico
+                    erroDiv.style.display = 'block';
+                    if (data.error) {
+                        erroDiv.innerHTML = `
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Erro:</strong> ${data.error}
+                            </div>
+                        `;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('MENSAGENS_RAPIDAS: Erro na requisição:', error);
+                loadingDiv.style.display = 'none';
+                erroDiv.style.display = 'block';
+                
+                // Mostrar erro mais detalhado
+                erroDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Erro de conexão:</strong> ${error.message}<br>
+                        <small>Verifique se o servidor está funcionando corretamente.</small>
+                    </div>
+                `;
+            });
+        }
+        
+        // Criar item de mensagem rápida
+        function criarItemMensagemRapida(mensagem) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'list-group-item list-group-item-action quick-message-item';
+            button.setAttribute('data-message', mensagem.conteudo);
+            button.setAttribute('data-id', mensagem.id);
+            
+            // Criar conteúdo truncado para preview
+            const conteudoTruncado = mensagem.conteudo.length > 150 
+                ? mensagem.conteudo.substring(0, 150) + '...'
+                : mensagem.conteudo;
+            
+            button.innerHTML = `
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">
+                        <i class="${mensagem.icone} me-2 text-primary"></i>
+                        ${mensagem.titulo}
+                    </h6>
+                    <small class="text-muted">
+                        <i class="fas fa-mouse-pointer me-1"></i>
+                        Clique para usar
+                    </small>
+                </div>
+                <p class="mb-1">${conteudoTruncado}</p>
+                <small class="text-muted">
+                    ${mensagem.conteudo.length} caracteres
+                </small>
+            `;
+            
+            return button;
+        }
+        
+        // Configurar event listeners para mensagens
+        function configurarEventListenersMensagens() {
+            const quickMessageItems = document.querySelectorAll('.quick-message-item');
+            const messageInput = document.getElementById('messageInput');
+            
+            quickMessageItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    const message = this.getAttribute('data-message');
+                    
+                    if (message && messageInput) {
+                        // Inserir a mensagem no input
+                        messageInput.value = message;
+                        
+                        // Ajustar altura do textarea
+                        messageInput.style.height = 'auto';
+                        messageInput.style.height = Math.min(messageInput.scrollHeight, 100) + 'px';
+                        
+                        // Atualizar botão de envio
+                        updateSendButton();
+                        
+                        // Fechar modal
+                        $('#modalMensagensRapidas').modal('hide');
+                        
+                        // Focar no input para permitir edição
+                        setTimeout(() => {
+                            messageInput.focus();
+                            // Posicionar cursor no final
+                            messageInput.setSelectionRange(message.length, message.length);
+                        }, 300);
+                        
+                        // Feedback visual
+                        mostrarNotificacaoSucesso('Mensagem inserida com sucesso!');
+                    }
+                });
+            });
+        }
+        
+        // Mostrar notificação de sucesso
+        function mostrarNotificacaoSucesso(mensagem) {
+            const toast = document.createElement('div');
+            toast.className = 'toast-notification';
+            toast.innerHTML = `<i class="fas fa-check me-2"></i>${mensagem}`;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 100);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (document.body.contains(toast)) {
+                        document.body.removeChild(toast);
+                    }
+                }, 300);
+            }, 2000);
+        }
+        
+        // Inicializar quando o DOM estiver carregado
+        setTimeout(initQuickMessages, 100);
+
+        // === FIM DO SISTEMA DE MENSAGENS RÁPIDAS ===
     });
 </script>
+
+<style>
+    /* Estilos para o botão de mensagens rápidas */
+    .btn-quick-message {
+        background: linear-gradient(135deg, #25d366, #128c7e);
+        border: none;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        transition: all 0.3s ease;
+        margin-right: 8px;
+        cursor: pointer;
+    }
+
+    .btn-quick-message:hover {
+        background: linear-gradient(135deg, #128c7e, #075e54);
+        transform: scale(1.1);
+        box-shadow: 0 4px 12px rgba(37, 211, 102, 0.4);
+        color: white;
+    }
+
+    .btn-quick-message:active {
+        transform: scale(0.95);
+    }
+
+    .btn-quick-message i {
+        font-size: 16px;
+    }
+
+    /* Estilos para os itens de mensagem rápida no modal */
+    .quick-message-item {
+        border-radius: 8px;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+
+    .quick-message-item:hover {
+        background-color: #f8f9fa;
+        border-color: #25d366;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .quick-message-item:active {
+        transform: translateY(0);
+    }
+
+    /* Notificação toast */
+    .toast-notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #25d366, #128c7e);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        z-index: 9999;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease;
+        font-weight: 500;
+    }
+
+    .toast-notification.show {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    /* Melhorias nos estilos do modal */
+    #modalMensagensRapidas .modal-header {
+        background: linear-gradient(135deg, #25d366, #128c7e);
+        color: white;
+        border-radius: 8px 8px 0 0;
+    }
+
+    #modalMensagensRapidas .modal-header .close {
+        color: white;
+        opacity: 0.8;
+    }
+
+    #modalMensagensRapidas .modal-header .close:hover {
+        opacity: 1;
+    }
+
+    /* Responsividade */
+    @media (max-width: 768px) {
+        .btn-quick-message {
+            width: 35px;
+            height: 35px;
+            margin-right: 5px;
+        }
+        
+        .btn-quick-message i {
+            font-size: 14px;
+        }
+        
+        .toast-notification {
+            right: 10px;
+            left: 10px;
+            width: auto;
+        }
+    }
+</style>
 
 <?php include 'app/Views/include/footer.php' ?>

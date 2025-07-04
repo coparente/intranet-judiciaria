@@ -50,6 +50,15 @@ class Chat extends Controllers
         // Parâmetros de filtro
         $filtroContato = $_GET['filtro_contato'] ?? '';
         $filtroNumero = $_GET['filtro_numero'] ?? '';
+        $filtroStatus = $_GET['filtro_status'] ?? ''; // Novo filtro por status de ticket
+        
+        // Parâmetro de aba (minhas, nao_atribuidas, todas)
+        $aba = $_GET['aba'] ?? 'minhas';
+        
+        // Validar aba
+        if (!in_array($aba, ['minhas', 'nao_atribuidas', 'todas'])) {
+            $aba = 'minhas';
+        }
 
         // Parâmetros de paginação
         $registrosPorPagina = 10;
@@ -59,21 +68,73 @@ class Chat extends Controllers
         // Calcular offset
         $offset = ($paginaAtual - 1) * $registrosPorPagina;
 
-        // Buscar conversas com filtros e paginação
-        $conversas = $this->chatModel->buscarConversasComFiltros(
-            $_SESSION['usuario_id'],
-            $filtroContato,
-            $filtroNumero,
-            $registrosPorPagina,
-            $offset
-        );
-
-        // Contar total de registros para paginação
-        $totalRegistros = $this->chatModel->contarConversasComFiltros(
-            $_SESSION['usuario_id'],
-            $filtroContato,
-            $filtroNumero
-        );
+        // Buscar conversas baseado na aba selecionada
+        switch ($aba) {
+            case 'nao_atribuidas':
+                // Verificar permissão para conversas não atribuídas
+                if (!in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])) {
+                    Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado para conversas não atribuídas', 'alert alert-danger');
+                    Helper::redirecionar('chat/index?aba=minhas');
+                    return;
+                }
+                
+                $conversas = $this->chatModel->buscarConversasNaoAtribuidas(
+                    $filtroContato,
+                    $filtroNumero,
+                    $registrosPorPagina,
+                    $offset,
+                    $filtroStatus
+                );
+                
+                $totalRegistros = $this->chatModel->contarConversasNaoAtribuidas(
+                    $filtroContato,
+                    $filtroNumero,
+                    $filtroStatus
+                );
+                break;
+                
+            case 'todas':
+                // Verificar permissão para todas as conversas
+                if (!in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])) {
+                    Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado para todas as conversas', 'alert alert-danger');
+                    Helper::redirecionar('chat/index?aba=minhas');
+                    return;
+                }
+                
+                $conversas = $this->chatModel->buscarTodasConversasComFiltros(
+                    $filtroContato,
+                    $filtroNumero,
+                    $registrosPorPagina,
+                    $offset,
+                    $filtroStatus
+                );
+                
+                $totalRegistros = $this->chatModel->contarTodasConversasComFiltros(
+                    $filtroContato,
+                    $filtroNumero,
+                    $filtroStatus
+                );
+                break;
+                
+            case 'minhas':
+            default:
+                $conversas = $this->chatModel->buscarConversasComFiltros(
+                    $_SESSION['usuario_id'],
+                    $filtroContato,
+                    $filtroNumero,
+                    $registrosPorPagina,
+                    $offset,
+                    $filtroStatus
+                );
+                
+                $totalRegistros = $this->chatModel->contarConversasComFiltros(
+                    $_SESSION['usuario_id'],
+                    $filtroContato,
+                    $filtroNumero,
+                    $filtroStatus
+                );
+                break;
+        }
 
         // Calcular informações de paginação
         $totalPaginas = ceil($totalRegistros / $registrosPorPagina);
@@ -82,13 +143,23 @@ class Chat extends Controllers
 
         // Construir query string para manter filtros na paginação
         $queryParams = [];
+        $queryParams[] = 'aba=' . urlencode($aba);
         if (!empty($filtroContato)) {
             $queryParams[] = 'filtro_contato=' . urlencode($filtroContato);
         }
         if (!empty($filtroNumero)) {
             $queryParams[] = 'filtro_numero=' . urlencode($filtroNumero);
         }
+        if (!empty($filtroStatus)) {
+            $queryParams[] = 'filtro_status=' . urlencode($filtroStatus);
+        }
         $queryString = !empty($queryParams) ? '&' . implode('&', $queryParams) : '';
+
+        // Buscar lista de usuários para atribuição (se for admin/analista)
+        $usuarios = [];
+        if (in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])) {
+            $usuarios = $this->chatModel->buscarUsuariosParaAtribuicao();
+        }
 
         $dados = [
             'tituloPagina' => 'Chat',
@@ -100,7 +171,10 @@ class Chat extends Controllers
             'registro_fim' => $registroFim,
             'query_string' => $queryString,
             'filtro_contato' => $filtroContato,
-            'filtro_numero' => $filtroNumero
+            'filtro_numero' => $filtroNumero,
+            'filtro_status' => $filtroStatus,
+            'aba_atual' => $aba,
+            'usuarios' => $usuarios
         ];
 
         $this->view('chat/index', $dados);
@@ -3260,7 +3334,7 @@ class Chat extends Controllers
         // Buscar dados do relatório
         $estatisticas = $this->chatModel->estatisticasTickets($usuario_filtro);
         $relatorioPorStatus = $this->chatModel->relatorioTicketsPorStatus($usuario_filtro);
-        $ticketsVencidos = $this->chatModel->buscarTicketsVencidos(24, $usuario_filtro);
+        $ticketsVencidos = $this->chatModel->buscarTicketsVencidos(2, $usuario_filtro);
         $usuariosDisponiveis = $this->chatModel->buscarUsuariosParaAtribuicao();
 
         $dados = [
@@ -3342,6 +3416,247 @@ class Chat extends Controllers
         }
 
         Helper::redirecionar("chat/conversa/{$conversa_id}");
+    }
+
+    /**
+     * =====================================================
+     * SISTEMA DE MENSAGENS RÁPIDAS
+     * =====================================================
+     */
+
+    /**
+     * Gerenciar mensagens rápidas
+     */
+    public function gerenciarMensagensRapidas()
+    {
+        // Verificar permissão
+        if (!in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+
+
+        // Processar ações POST
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $acao = $_POST['acao'] ?? '';
+
+            switch ($acao) {
+                case 'criar':
+                    $this->criarMensagemRapida();
+                    return;
+                    
+                case 'editar':
+                    $this->editarMensagemRapida();
+                    return;
+                    
+                case 'excluir':
+                    $this->excluirMensagemRapida();
+                    return;
+                    
+                case 'reordenar':
+                    $this->reordenarMensagensRapidas();
+                    return;
+            }
+        }
+
+        try {
+            
+            $tabelaCriada = $this->chatModel->criarTabelaMensagensRapidas();
+
+
+            $mensagens = $this->chatModel->buscarMensagensRapidas(false); // Incluir inativas
+
+            $totalMensagens = $this->chatModel->contarMensagensRapidas();
+
+            $mensagensAtivas = $this->chatModel->contarMensagensRapidas(true);
+
+            $dados = [
+                'tituloPagina' => 'Gerenciar Mensagens Rápidas',
+                'mensagens' => $mensagens,
+                'total_mensagens' => $totalMensagens,
+                'mensagens_ativas' => $mensagensAtivas
+            ];
+
+            $this->view('chat/gerenciar_mensagens_rapidas', $dados);
+
+        } catch (Exception $e) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Erro ao carregar mensagens rápidas: ' . $e->getMessage(), 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+        }
+    }
+
+    /**
+     * Criar nova mensagem rápida
+     */
+    private function criarMensagemRapida()
+    {
+        $titulo = $_POST['titulo'] ?? '';
+        $conteudo = $_POST['conteudo'] ?? '';
+        $icone = $_POST['icone'] ?? 'fas fa-comment';
+        $ativo = isset($_POST['ativo']) ? 1 : 0;
+        $ordem = (int)($_POST['ordem'] ?? 0);
+
+        // Validação
+        if (empty($titulo) || empty($conteudo)) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Título e conteúdo são obrigatórios', 'alert alert-danger');
+            Helper::redirecionar('chat/gerenciarMensagensRapidas');
+            return;
+        }
+
+        $dados = [
+            'titulo' => $titulo,
+            'conteudo' => $conteudo,
+            'icone' => $icone,
+            'ativo' => $ativo,
+            'ordem' => $ordem,
+            'criado_por' => $_SESSION['usuario_id']
+        ];
+
+        if ($this->chatModel->criarMensagemRapida($dados)) {
+            Helper::mensagem('chat', '<i class="fas fa-check"></i> Mensagem rápida criada com sucesso', 'alert alert-success');
+            Helper::mensagemSweetAlert('chat', 'Mensagem criada com sucesso', 'success');
+        } else {
+            Helper::mensagem('chat', '<i class="fas fa-times"></i> Erro ao criar mensagem rápida', 'alert alert-danger');
+        }
+
+        Helper::redirecionar('chat/gerenciarMensagensRapidas');
+    }
+
+    /**
+     * Editar mensagem rápida
+     */
+    private function editarMensagemRapida()
+    {
+        $id = $_POST['id'] ?? null;
+        $titulo = $_POST['titulo'] ?? '';
+        $conteudo = $_POST['conteudo'] ?? '';
+        $icone = $_POST['icone'] ?? 'fas fa-comment';
+        $ativo = isset($_POST['ativo']) ? 1 : 0;
+        $ordem = (int)($_POST['ordem'] ?? 0);
+
+        // Validação
+        if (!$id || empty($titulo) || empty($conteudo)) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Dados incompletos', 'alert alert-danger');
+            Helper::redirecionar('chat/gerenciarMensagensRapidas');
+            return;
+        }
+
+        // Verificar se a mensagem existe
+        $mensagem = $this->chatModel->buscarMensagemRapidaPorId($id);
+        if (!$mensagem) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Mensagem não encontrada', 'alert alert-danger');
+            Helper::redirecionar('chat/gerenciarMensagensRapidas');
+            return;
+        }
+
+        $dados = [
+            'titulo' => $titulo,
+            'conteudo' => $conteudo,
+            'icone' => $icone,
+            'ativo' => $ativo,
+            'ordem' => $ordem
+        ];
+
+        if ($this->chatModel->atualizarMensagemRapida($id, $dados)) {
+            Helper::mensagem('chat', '<i class="fas fa-check"></i> Mensagem rápida atualizada com sucesso', 'alert alert-success');
+            Helper::mensagemSweetAlert('chat', 'Mensagem atualizada com sucesso', 'success');
+        } else {
+            Helper::mensagem('chat', '<i class="fas fa-times"></i> Erro ao atualizar mensagem rápida', 'alert alert-danger');
+        }
+
+        Helper::redirecionar('chat/gerenciarMensagensRapidas');
+    }
+
+    /**
+     * Excluir mensagem rápida
+     */
+    private function excluirMensagemRapida()
+    {
+        $id = $_POST['id'] ?? null;
+
+        if (!$id) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> ID da mensagem não informado', 'alert alert-danger');
+            Helper::redirecionar('chat/gerenciarMensagensRapidas');
+            return;
+        }
+
+        // Verificar se a mensagem existe
+        $mensagem = $this->chatModel->buscarMensagemRapidaPorId($id);
+        if (!$mensagem) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Mensagem não encontrada', 'alert alert-danger');
+            Helper::redirecionar('chat/gerenciarMensagensRapidas');
+            return;
+        }
+
+        if ($this->chatModel->excluirMensagemRapida($id)) {
+            Helper::mensagem('chat', '<i class="fas fa-check"></i> Mensagem rápida excluída com sucesso', 'alert alert-success');
+            Helper::mensagemSweetAlert('chat', 'Mensagem excluída com sucesso', 'success');
+        } else {
+            Helper::mensagem('chat', '<i class="fas fa-times"></i> Erro ao excluir mensagem rápida', 'alert alert-danger');
+        }
+
+        Helper::redirecionar('chat/gerenciarMensagensRapidas');
+    }
+
+    /**
+     * Reordenar mensagens rápidas
+     */
+    private function reordenarMensagensRapidas()
+    {
+        $ordens = $_POST['ordens'] ?? [];
+
+        if (empty($ordens) || !is_array($ordens)) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Dados de ordenação inválidos', 'alert alert-danger');
+            Helper::redirecionar('chat/gerenciarMensagensRapidas');
+            return;
+        }
+
+        if ($this->chatModel->reordenarMensagensRapidas($ordens)) {
+            Helper::mensagem('chat', '<i class="fas fa-check"></i> Ordem das mensagens atualizada com sucesso', 'alert alert-success');
+        } else {
+            Helper::mensagem('chat', '<i class="fas fa-times"></i> Erro ao reordenar mensagens', 'alert alert-danger');
+        }
+
+        Helper::redirecionar('chat/gerenciarMensagensRapidas');
+    }
+
+    /**
+     * API para buscar mensagens rápidas (para o modal)
+     */
+    public function apiMensagensRapidas()
+    {
+        header('Content-Type: application/json');
+        
+        try {
+            
+            
+            // Garantir que a tabela existe
+            $tabelaCriada = $this->chatModel->criarTabelaMensagensRapidas();
+            
+            $mensagens = $this->chatModel->buscarMensagensRapidas(true); // Apenas ativas
+            
+            $resultado = array_map(function($msg) {
+                return [
+                    'id' => $msg->id,
+                    'titulo' => $msg->titulo,
+                    'conteudo' => $msg->conteudo,
+                    'icone' => $msg->icone
+                ];
+            }, $mensagens);
+            
+
+            echo json_encode([
+                'success' => true,
+                'mensagens' => $resultado
+            ]);
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Erro ao buscar mensagens rápidas: ' . $e->getMessage()
+            ]);
+        }
     }
 }
 

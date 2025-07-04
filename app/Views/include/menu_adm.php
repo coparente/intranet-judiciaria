@@ -11,7 +11,7 @@
                     <li class="nav-item submenu">
                         <?php
                         // Verifica se está na seção de configurações
-                        $isConfigSection = strpos($_SERVER['REQUEST_URI'], '/usuarios/listar') !== false || strpos($_SERVER['REQUEST_URI'], '/modulos/listar') !== false || strpos($_SERVER['REQUEST_URI'], '/uploadtxt/index') !== false || strpos($_SERVER['REQUEST_URI'], '/uploadtxt/estatisticas') !== false || strpos($_SERVER['REQUEST_URI'], '/atividades/listar') !== false;
+                        $isConfigSection = strpos($_SERVER['REQUEST_URI'], '/usuarios/listar') !== false || strpos($_SERVER['REQUEST_URI'], '/modulos/listar') !== false || strpos($_SERVER['REQUEST_URI'], '/uploadtxt/index') !== false || strpos($_SERVER['REQUEST_URI'], '/uploadtxt/estatisticas') !== false || strpos($_SERVER['REQUEST_URI'], '/atividades/listar') !== false || strpos($_SERVER['REQUEST_URI'], '/chat/gerenciarMensagensRapidas') !== false;
                         ?>
                         <a class="nav-link d-flex justify-content-between" role="button" aria-expanded="<?= $isConfigSection ? 'true' : 'false' ?>" data-toggle="collapse" aria-controls="configCollapse" href="#configCollapse">
                             <span><i class="fas fa-cogs me-2"></i> Configurações</span>
@@ -28,6 +28,11 @@
                             <li role="navigation">
                                 <a class="nav-link d-flex justify-content-between <?= strpos($_SERVER['REQUEST_URI'], '/usuarios/listar') !== false ? 'active' : '' ?>" href="<?= URL ?>/usuarios/listar">
                                     <i class="fas fa-users me-2"></i> Gerenciar Usuários
+                                </a>
+                            </li>
+                            <li role="navigation">
+                                <a class="nav-link d-flex justify-content-between <?= strpos($_SERVER['REQUEST_URI'], '/chat/gerenciarMensagensRapidas') !== false ? 'active' : '' ?>" href="<?= URL ?>/chat/gerenciarMensagensRapidas">
+                                    <i class="fas fa-bolt me-2"></i> Mensagens Rápidas
                                 </a>
                             </li>
                             <li role="navigation">

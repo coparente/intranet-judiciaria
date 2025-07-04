@@ -1475,7 +1475,7 @@ class Chat extends Controllers
                             // CORREÇÃO: Salvar apenas o caminho no banco, não a URL assinada
                             $caminhoMinio = $resultadoDownload['caminho_minio'];
                             $midiaFilename = $resultadoDownload['nome_arquivo'];
-                            $conteudo = $caminhoMinio; // Usar caminho do MinIO ao invés do ID
+                            // $conteudo = $caminhoMinio; // Usar caminho do MinIO ao invés do ID
                             $midiaUrl = $caminhoMinio; // Salvar caminho no campo midia_url (não URL assinada)
                             
                             error_log("✅ Mídia N8N baixada e salva no MinIO: {$caminhoMinio}");

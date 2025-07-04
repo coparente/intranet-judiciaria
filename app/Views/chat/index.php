@@ -221,7 +221,7 @@
                                                     <td>
                                                         <?php
                                                         $statusClass = [
-                                                            'aberto' => 'badge-danger',
+                                                            'aberto' => 'badge-warning',
                                                             'em_andamento' => 'badge-warning',
                                                             'aguardando_cliente' => 'badge-info',
                                                             'resolvido' => 'badge-success',

@@ -198,6 +198,9 @@
                                                         <source src="<?= URL ?>/media/<?= $mensagem->midia_url ?>" type="audio/mpeg">
                                                         Seu navegador não suporta áudios HTML5.
                                                     </audio>
+                                                    <div class="message-content">
+                                                        <?= nl2br(htmlspecialchars($mensagem->conteudo)) ?>
+                                                    </div>
                                                 </div>
                                             <?php elseif ($mensagem->tipo == 'document'): ?>
                                                 <div class="document-preview">

@@ -1428,7 +1428,8 @@ class Chat extends Controllers
                 case 'image':
                     $midiaId = $mensagemData['image']['id'] ?? '';
                     $midiaTipo = $mensagemData['image']['mime_type'] ?? 'image/jpeg';
-                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do MinIO
+                    $conteudo = $mensagemData['image']['caption'] ?? ''; // Temporário, será substituído pelo caminho do MinIO
+                    // $conteudo = $midiaId; // Temporário, será substituído pelo caminho do MinIO
                     break;
                     
                 case 'audio':

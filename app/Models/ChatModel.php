@@ -1522,8 +1522,8 @@ class ChatModel
         
         try {
             $this->db->query($sql);
-            $this->db->bind(':titulo', "Apresentação TJGO");
-            $this->db->bind(':conteudo', "Somos da Central de Intimação do Tribunal de Justiça do Estado de Goiás (TJGO) ⚖️. Caso tenha qualquer dúvida, consulte o site oficial do TJGO ou entre em contato com a secretaria do juízo responsável.");
+            $this->db->bind(':titulo', "Template de mensagem padrão");
+            $this->db->bind(':conteudo', "Somos da Central de Intimação do Tribunal de Justiça do Estado de Goiás (TJGO) ⚖️. Informamos que existe um processo judicial em seu nome, de número XX, em andamento na Comarca de XX.");
             $this->db->bind(':icone', "fas fa-gavel");
             $this->db->bind(':criado_por', 1);
             $this->db->bind(':ordem', 1);

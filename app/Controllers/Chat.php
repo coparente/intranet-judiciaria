@@ -1449,7 +1449,8 @@ class Chat extends Controllers
                     $midiaId = $mensagemData['document']['id'] ?? '';
                     $midiaTipo = $mensagemData['document']['mime_type'] ?? 'application/octet-stream';
                     $midiaFilename = $mensagemData['document']['filename'] ?? 'documento';
-                    $conteudo = $midiaId; // Temporário, será substituído pelo caminho do MinIO
+                    // $conteudo = $midiaId; // Temporário, será substituído pelo caminho do MinIO
+                    $conteudo = $mensagemData['document']['caption'] ?? '';
                     break;
                     
                 case 'button':

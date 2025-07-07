@@ -288,12 +288,13 @@
                                                                 <i class="fas fa-user-plus me-1"></i> Atribuir
                                                             </button>
                                                         <?php endif; ?>
-                                                        
+                                                        <?php if (in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])): ?>
                                                         <button type="button" class="btn btn-danger btn-sm" 
                                                                 data-toggle="modal" 
                                                                 data-target="#modalExcluirConversa<?= $conversa->id ?>">
-                                                            <i class="fas fa-trash me-1"></i> Excluir
-                                                        </button>
+                                                                <i class="fas fa-trash me-1"></i> Excluir
+                                                            </button>
+                                                        <?php endif; ?>
                                                     </td>
                                                 </tr>
 

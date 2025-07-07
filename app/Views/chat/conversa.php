@@ -93,9 +93,9 @@
                                                     <a class="dropdown-item" href="#" onclick="alterarStatusTicket('aguardando_cliente')">
                                                         <i class="fas fa-clock text-info me-2"></i> Aguardando Cliente
                                                     </a>
-                                                    <a class="dropdown-item" href="#" onclick="alterarStatusTicket('resolvido')">
+                                                    <!-- <a class="dropdown-item" href="#" onclick="alterarStatusTicket('resolvido')">
                                                         <i class="fas fa-check text-success me-2"></i> Resolvido
-                                                    </a>
+                                                    </a> -->
                                                     <div class="dropdown-divider"></div>
                                                     <a class="dropdown-item text-danger" href="#" onclick="encerrarTicket()">
                                                         <i class="fas fa-times-circle me-2"></i> Encerrar Ticket

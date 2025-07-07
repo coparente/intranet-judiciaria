@@ -774,7 +774,7 @@ class ChatModel
             $sql = "UPDATE conversas SET 
                     usuario_id = :usuario_id, 
                     atualizado_em = NOW() 
-                    WHERE id = :conversa_id AND (usuario_id IS NULL OR usuario_id = 0)";
+                    WHERE id = :conversa_id";
 
             $this->db->query($sql);
             $this->db->bind(':usuario_id', $usuario_id);

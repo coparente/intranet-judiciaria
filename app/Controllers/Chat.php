@@ -261,12 +261,12 @@ class Chat extends Controllers
         // Verificar permissão
         if (!isset($_SESSION['usuario_perfil']) || !in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])) {
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
-            Helper::redirecionar('chat/conversasNaoAtribuidas');
+            Helper::redirecionar('chat/index');
             return;
         }
 
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            Helper::redirecionar('chat/conversasNaoAtribuidas');
+            Helper::redirecionar('chat/index');
             return;
         }
 
@@ -276,7 +276,7 @@ class Chat extends Controllers
         // Validação básica
         if (empty($conversa_id) || empty($usuario_id)) {
             Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Dados incompletos para atribuição', 'alert alert-danger');
-            Helper::redirecionar('chat/conversasNaoAtribuidas');
+            Helper::redirecionar('chat/index');
             return;
         }
 
@@ -284,13 +284,13 @@ class Chat extends Controllers
         $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
         if (!$conversa) {
             Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Conversa não encontrada', 'alert alert-danger');
-            Helper::redirecionar('chat/conversasNaoAtribuidas');
+            Helper::redirecionar('chat/index');
             return;
         }
 
         if ($conversa->usuario_id !== null && $conversa->usuario_id !== 0) {
             Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Conversa já está atribuída a outro usuário', 'alert alert-warning');
-            Helper::redirecionar('chat/conversasNaoAtribuidas');
+            Helper::redirecionar('chat/index');
             return;
         }
 
@@ -337,7 +337,7 @@ class Chat extends Controllers
             Helper::mensagem('chat', '<i class="fas fa-times"></i> Erro ao atribuir conversa', 'alert alert-danger');
         }
 
-        Helper::redirecionar('chat/conversasNaoAtribuidas');
+        Helper::redirecionar('chat/index');
     }
 
     /**
@@ -354,7 +354,7 @@ class Chat extends Controllers
         
         if (!$conversa) {
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Conversa não encontrada', 'alert alert-danger');
-            Helper::redirecionar('chat/conversasNaoAtribuidas');
+            Helper::redirecionar('chat/index');
             return;
         }
 
@@ -386,7 +386,7 @@ class Chat extends Controllers
         }
         
         // 2. Se é admin/analista e a conversa não está atribuída (para visualização de conversas não atribuídas)
-        if (in_array($_SESSION['usuario_perfil'], ['admin', 'analista']) && 
+        if (in_array($_SESSION['usuario_perfil'], ['admin', 'analista', 'usuario']) && 
             ($conversa->usuario_id === null || $conversa->usuario_id == 0)) {
             $temPermissao = true;
         }
@@ -398,11 +398,11 @@ class Chat extends Controllers
             $podeTomarConversa = true;
         }
         
-        if (!$temPermissao && !$podeTomarConversa) {
-            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado a esta conversa', 'alert alert-danger');
-            Helper::redirecionar('chat/conversasNaoAtribuidas');
-            return;
-        }
+        // if (!$temPermissao && !$podeTomarConversa) {
+        //     Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado a esta conversa', 'alert alert-danger');
+        //     Helper::redirecionar('chat/conversasNaoAtribuidas');
+        //     return;
+        // }
 
         // Processar ações POST
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -437,7 +437,8 @@ class Chat extends Controllers
             );
             
             // Não permitir envio de mensagens enquanto não tomar a conversa
-            $mensagens = [];
+            // $mensagens = [];
+            $mensagens = $this->chatModel->buscarMensagens($conversa_id);
             $dados = [
                 'tituloPagina' => 'Conversa - ' . $conversa->contato_nome . ' (Conflito)',
                 'conversa' => $conversa,

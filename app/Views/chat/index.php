@@ -281,14 +281,14 @@
                                                             <i class="fas fa-comments me-1"></i> Abrir
                                                         </a>
                                                         
-                                                        <?php if ($dados['aba_atual'] == 'nao_atribuidas' && !empty($dados['usuarios'])): ?>
+                                                        <?php if (in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])): ?>
+                                                        <?php if ($dados['aba_atual'] == 'nao_atribuidas' || $dados['aba_atual'] == 'todas' && !empty($dados['usuarios'])): ?>
                                                             <button type="button" class="btn btn-success btn-sm" 
                                                                     data-toggle="modal" 
                                                                     data-target="#modalAtribuirConversa<?= $conversa->id ?>">
                                                                 <i class="fas fa-user-plus me-1"></i> Atribuir
                                                             </button>
                                                         <?php endif; ?>
-                                                        <?php if (in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])): ?>
                                                         <button type="button" class="btn btn-danger btn-sm" 
                                                                 data-toggle="modal" 
                                                                 data-target="#modalExcluirConversa<?= $conversa->id ?>">
@@ -299,7 +299,7 @@
                                                 </tr>
 
                                                 <!-- Modal Atribuir Conversa -->
-                                                <?php if ($dados['aba_atual'] == 'nao_atribuidas' && !empty($dados['usuarios'])): ?>
+                                                <?php if ($dados['aba_atual'] == 'nao_atribuidas' || $dados['aba_atual'] == 'todas' && !empty($dados['usuarios'])): ?>
                                                     <div class="modal fade" id="modalAtribuirConversa<?= $conversa->id ?>" tabindex="-1">
                                                         <div class="modal-dialog">
                                                             <div class="modal-content">

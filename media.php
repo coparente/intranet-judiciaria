@@ -31,16 +31,18 @@ function verificarAcesso($caminhoArquivo) {
             return true;
         }
         
+        // CORREÇÃO: Criar parâmetros distintos para cada uso do caminho
         // Verificar se o usuário tem acesso a alguma conversa que contenha este arquivo
         $sql = "SELECT DISTINCT c.usuario_id 
                 FROM mensagens_chat m 
                 INNER JOIN conversas c ON m.conversa_id = c.id 
-                WHERE (m.midia_url = :caminho OR m.conteudo = :caminho)
+                WHERE (m.midia_url = :caminho1 OR m.conteudo = :caminho2)
                 AND c.usuario_id = :usuario_id
                 LIMIT 1";
         
         $db->query($sql);
-        $db->bind(':caminho', $caminhoArquivo);
+        $db->bind(':caminho1', $caminhoArquivo);
+        $db->bind(':caminho2', $caminhoArquivo);
         $db->bind(':usuario_id', $_SESSION['usuario_id']);
         
         return $db->resultado() !== false;

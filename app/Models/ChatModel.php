@@ -828,16 +828,19 @@ class ChatModel
      */
     public function verificarAcessoMidiaMinIO($usuario_id, $caminhoMinio)
     {
+        // AND m.conteudo = :caminho_minio:
         try {
+            // CORREÇÃO: Criar parâmetros distintos para cada uso do caminho
             $sql = "SELECT c.* FROM conversas c 
                     INNER JOIN mensagens_chat m ON c.id = m.conversa_id 
                     WHERE c.usuario_id = :usuario_id 
-                    AND m.conteudo = :caminho_minio
+                    AND (m.midia_url = :caminho_minio1 OR m.conteudo = :caminho_minio2)
                     LIMIT 1";
 
             $this->db->query($sql);
             $this->db->bind(':usuario_id', $usuario_id);
-            $this->db->bind(':caminho_minio', $caminhoMinio);
+            $this->db->bind(':caminho_minio1', $caminhoMinio);
+            $this->db->bind(':caminho_minio2', $caminhoMinio);
 
             return $this->db->resultado() !== false;
 

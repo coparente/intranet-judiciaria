@@ -173,8 +173,25 @@
                                                 </div>
                                             <?php elseif ($mensagem->tipo == 'image'): ?>
                                                 <div class="message-media">
-                                                    <img src="<?= URL ?>/media/<?= $mensagem->midia_url ?>" alt="Imagem" class="img-thumbnail">
+                                                    <?php if (!empty($mensagem->midia_url)): ?>
+                                                        <img src="<?= URL ?>/media/<?= $mensagem->midia_url ?>" 
+                                                             alt="Imagem" 
+                                                             class="img-thumbnail"
+                                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                                        <div class="image-error" style="display:none; padding: 20px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; text-align: center;">
+                                                            <i class="fas fa-exclamation-triangle text-warning"></i>
+                                                            <p class="mb-0 mt-2">Erro ao carregar imagem</p>
+                                                            <small class="text-muted">Caminho: <?= htmlspecialchars($mensagem->midia_url) ?></small>
+                                                        </div>
+                                                    <?php else: ?>
+                                                        <div class="image-error" style="padding: 20px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; text-align: center;">
+                                                            <i class="fas fa-exclamation-triangle text-warning"></i>
+                                                            <p class="mb-0 mt-2">Imagem não disponível</p>
+                                                            <small class="text-muted">Caminho de mídia não encontrado</small>
+                                                        </div>
+                                                    <?php endif; ?>
                                                 </div>
+                                                
                                                 <?php if (!empty($mensagem->conteudo) && $mensagem->conteudo !== $mensagem->midia_url): ?>
                                                     <div class="message-content">
                                                         <?= nl2br(htmlspecialchars($mensagem->conteudo)) ?>

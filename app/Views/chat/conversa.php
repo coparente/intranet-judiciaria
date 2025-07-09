@@ -157,8 +157,7 @@
                             <?php else: ?>
                                 <?php foreach ($dados['mensagens'] as $mensagem): ?>
                                     <?php
-                                    // $isUsuario = $mensagem->remetente_id == $_SESSION['usuario_id'];
-                                    $isUsuario =  $_SESSION['usuario_id'];
+                                    $isUsuario = $mensagem->remetente_id == $_SESSION['usuario_id'];
                                     $messageClass = $isUsuario ? 'sent' : 'received';
                                     $bubbleClass = $isUsuario ? 'sent' : 'received';
                                     ?>

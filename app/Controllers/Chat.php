@@ -386,7 +386,7 @@ class Chat extends Controllers
         }
         
         // 2. Se é admin/analista e a conversa não está atribuída (para visualização de conversas não atribuídas)
-        if (in_array($_SESSION['usuario_perfil'], ['admin', 'analista', 'usuario']) && 
+        if (in_array($_SESSION['usuario_perfil'], ['admin', 'analista']) && 
             ($conversa->usuario_id === null || $conversa->usuario_id == 0)) {
             $temPermissao = true;
         }
@@ -398,11 +398,11 @@ class Chat extends Controllers
             $podeTomarConversa = true;
         }
         
-        // if (!$temPermissao && !$podeTomarConversa) {
-        //     Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado a esta conversa', 'alert alert-danger');
-        //     Helper::redirecionar('chat/conversasNaoAtribuidas');
-        //     return;
-        // }
+        if (!$temPermissao && !$podeTomarConversa) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado a esta conversa', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        }
 
         // Processar ações POST
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -471,7 +471,7 @@ class Chat extends Controllers
         // Verificar se é admin/analista
         if (!in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])) {
             Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
-            Helper::redirecionar('chat/conversasNaoAtribuidas');
+            Helper::redirecionar('chat/index');
             return;
         }
 

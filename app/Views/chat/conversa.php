@@ -157,7 +157,31 @@
                             <?php else: ?>
                                 <?php foreach ($dados['mensagens'] as $mensagem): ?>
                                     <?php
-                                    $isUsuario = $mensagem->remetente_id == $_SESSION['usuario_id'];
+                                    /* 
+                                     * LÓGICA DE ORGANIZAÇÃO DE MENSAGENS:
+                                     * 
+                                     * Para usuários normais:
+                                     * - Suas mensagens aparecem à direita (sent)
+                                     * - Mensagens de contatos aparecem à esquerda (received)
+                                     * 
+                                     * Para admins visualizando conversas de outros usuários:
+                                     * - Mensagens do proprietário da conversa aparecem à direita (sent)
+                                     * - Mensagens de contatos aparecem à esquerda (received)
+                                     * - Isso permite que o admin veja a conversa organizada como se fosse normal
+                                     */
+                                    
+                                    // NOVA LÓGICA: Organizar mensagens baseado no proprietário da conversa
+                                    // Se for admin visualizando conversa de outro usuário, organizar pela perspectiva do proprietário
+                                    if (isset($_SESSION['usuario_perfil']) && $_SESSION['usuario_perfil'] === 'admin' && 
+                                        isset($dados['conversa']->usuario_id) && $dados['conversa']->usuario_id != $_SESSION['usuario_id']) {
+                                        // Admin visualizando conversa de outro usuário
+                                        // Mensagens do proprietário da conversa vão para direita, outras para esquerda
+                                        $isUsuario = $mensagem->remetente_id == $dados['conversa']->usuario_id;
+                                    } else {
+                                        // Lógica normal: mensagens do usuário logado vão para direita
+                                        $isUsuario = $mensagem->remetente_id == $_SESSION['usuario_id'];
+                                    }
+                                    
                                     $messageClass = $isUsuario ? 'sent' : 'received';
                                     $bubbleClass = $isUsuario ? 'sent' : 'received';
                                     ?>
@@ -854,7 +878,7 @@
             const isUser = message.remetente_id == <?= $_SESSION['usuario_id'] ?>;
             const messageClass = isUser ? 'sent' : 'received';
             const bubbleClass = isUser ? 'sent' : 'received';
-
+            
             let content = '';
             if (message.tipo === 'text') {
                 content = `<div class="message-content">${message.conteudo}</div>`;

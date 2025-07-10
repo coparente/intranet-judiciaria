@@ -172,7 +172,7 @@
                                     
                                     // NOVA LÓGICA: Organizar mensagens baseado no proprietário da conversa
                                     // Se for admin visualizando conversa de outro usuário, organizar pela perspectiva do proprietário
-                                    if (isset($_SESSION['usuario_perfil']) && $_SESSION['usuario_perfil'] === 'admin' && 
+                                    if (isset($_SESSION['usuario_perfil']) && $_SESSION['usuario_perfil'] === 'admin' || $_SESSION['usuario_perfil'] === 'analista' &&
                                         isset($dados['conversa']->usuario_id) && $dados['conversa']->usuario_id != $_SESSION['usuario_id']) {
                                         // Admin visualizando conversa de outro usuário
                                         // Mensagens do proprietário da conversa vão para direita, outras para esquerda

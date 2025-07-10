@@ -2880,7 +2880,7 @@ class Chat extends Controllers
     {
         try {
             // Admins têm acesso a todas as mídias
-            if (isset($_SESSION['usuario_perfil']) && $_SESSION['usuario_perfil'] === 'admin') {
+            if (isset($_SESSION['usuario_perfil']) && ($_SESSION['usuario_perfil'] === 'admin' || $_SESSION['usuario_perfil'] === 'analista')) {
                 return true;
             }
 

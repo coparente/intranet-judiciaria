@@ -95,7 +95,7 @@ class ChatModel
     /**
      * Conta conversas com filtros
      */
-    public function contarConversasComFiltros($usuario_id, $filtroContato = '', $filtroNumero = '', $filtroStatus = '')
+    public function contarConversasComFiltros($usuario_id, $filtroContato = '', $filtroNumero = '', $filtroStatus = '', $filtroNome = '')
     {
         $sql = "SELECT COUNT(*) as total FROM conversas c WHERE c.usuario_id = :usuario_id";
 
@@ -115,6 +115,11 @@ class ChatModel
         if (!empty($filtroStatus)) {
             $sql .= " AND c.status_atendimento = :filtro_status";
             $params[':filtro_status'] = $filtroStatus;
+        }
+
+        if (!empty($filtroNome)) {
+            $sql .= " AND c.contato_nome LIKE :filtro_nome";
+            $params[':filtro_nome'] = '%' . $filtroNome . '%';
         }
 
         $this->db->query($sql);
@@ -765,11 +770,30 @@ class ChatModel
      */
     public function buscarUsuariosParaAtribuicao()
     {
-        $sql = "SELECT id, nome, email, perfil 
-                FROM usuarios 
-                WHERE status = 'ativo' 
-                AND perfil IN ('admin', 'analista', 'usuario')
-                ORDER BY nome ASC";
+        // Primeiro, tentar buscar usuários com acesso ao módulo chat
+        $sql = "SELECT DISTINCT u.id, u.nome, u.email, u.perfil 
+                FROM usuarios u 
+                INNER JOIN permissoes_usuario pu ON u.id = pu.usuario_id
+                INNER JOIN modulos m ON pu.modulo_id = m.id
+                WHERE u.status = 'ativo' 
+                AND u.perfil IN ('admin', 'analista', 'usuario')
+                AND (m.nome LIKE '%chat%' OR m.nome LIKE '%Chat%')
+                ORDER BY u.nome ASC";
+        
+        $this->db->query($sql);
+        $usuariosComPermissao = $this->db->resultados();
+        
+        // Se encontrou usuários com permissão específica, retornar
+        if (!empty($usuariosComPermissao)) {
+            return $usuariosComPermissao;
+        }
+        
+        // Se não encontrou, retornar todos os usuários ativos com perfis adequados
+        $sql = "SELECT u.id, u.nome, u.email, u.perfil 
+                FROM usuarios u 
+                WHERE u.status = 'ativo' 
+                AND u.perfil IN ('admin', 'analista', 'usuario')
+                ORDER BY u.nome ASC";
         
         $this->db->query($sql);
         return $this->db->resultados();
@@ -1386,7 +1410,7 @@ class ChatModel
     /**
      * Busca TODAS as conversas com filtros (apenas admin/analista)
      */
-    public function buscarTodasConversasComFiltros($filtroContato = '', $filtroNumero = '', $limite = 10, $offset = 0, $filtroStatus = '')
+    public function buscarTodasConversasComFiltros($filtroContato = '', $filtroNumero = '', $limite = 10, $offset = 0, $filtroStatus = '', $filtroNome = '')
     {
         try {
             $sql = "SELECT c.*, 
@@ -1420,6 +1444,11 @@ class ChatModel
                 $sql .= " AND c.status_atendimento = :filtro_status";
                 $params[':filtro_status'] = $filtroStatus;
             }
+            
+            if (!empty($filtroNome)) {
+                $sql .= " AND c.usuario_id = :filtro_nome";
+                $params[':filtro_nome'] = $filtroNome;
+            }
 
             $sql .= " ORDER BY c.atualizado_em DESC LIMIT :limite OFFSET :offset";
 
@@ -1444,7 +1473,7 @@ class ChatModel
     /**
      * Conta TODAS as conversas com filtros (apenas admin/analista)
      */
-    public function contarTodasConversasComFiltros($filtroContato = '', $filtroNumero = '', $filtroStatus = '')
+    public function contarTodasConversasComFiltros($filtroContato = '', $filtroNumero = '', $filtroStatus = '', $filtroNome = '')
     {
         try {
             $sql = "SELECT COUNT(*) as total FROM conversas c WHERE 1=1";
@@ -1465,6 +1494,11 @@ class ChatModel
             if (!empty($filtroStatus)) {
                 $sql .= " AND c.status_atendimento = :filtro_status";
                 $params[':filtro_status'] = $filtroStatus;
+            }
+            
+            if (!empty($filtroNome)) {
+                $sql .= " AND c.usuario_id = :filtro_nome";
+                $params[':filtro_nome'] = $filtroNome;
             }
 
             $this->db->query($sql);

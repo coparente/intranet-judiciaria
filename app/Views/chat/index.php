@@ -107,8 +107,24 @@
                                         </option>
                                     </select>
                                 </div>
+
+                                <?php if ($dados['aba_atual'] == 'todas'): ?>
+                                <div class="col-lg-3 col-md-6">
+                                    <label for="filtro_nome" class="form-label">
+                                        <i class="fas fa-user me-1"></i> Filtrar por Nome
+                                    </label>
+                                    <select class="form-control" id="filtro_nome" name="filtro_nome" autocomplete="off">
+                                        <option value="">Todos os Nomes</option>
+                                        <?php foreach ($dados['usuarios'] as $usuario): ?>
+                                            <option value="<?= htmlspecialchars($usuario->id) ?>" <?= $dados['filtro_nome'] == $usuario->id ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($usuario->nome) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>   
+                                </div>
+                                <?php endif; ?>
                                 
-                                <div class="col-lg-3 col-12 d-flex align-items-end">
+                                <div class="mt-4">
                                     <button type="submit" class="btn btn-primary me-2">
                                         <i class="fas fa-search me-1"></i> Filtrar
                                     </button>
@@ -133,6 +149,7 @@
                                             if (!empty($dados['filtro_contato'])) $filtrosAtivos[] = 'contato';
                                             if (!empty($dados['filtro_numero'])) $filtrosAtivos[] = 'número';
                                             if (!empty($dados['filtro_status'])) $filtrosAtivos[] = 'status';
+                                            if (!empty($dados['filtro_nome']) && $dados['aba_atual'] == 'todas') $filtrosAtivos[] = 'nome';
                                             ?>
                                             
                                             <?php if (!empty($filtrosAtivos)): ?>
@@ -181,6 +198,21 @@
                                                     <span class="badge bg-light text-dark me-1 mb-1">
                                                         <i class="fas fa-ticket-alt me-1"></i>
                                                         <?= ucfirst(str_replace('_', ' ', $dados['filtro_status'])) ?>
+                                                    </span>
+                                                <?php endif; ?>
+                                                <?php if (!empty($dados['filtro_nome']) && $dados['aba_atual'] == 'todas'): ?>
+                                                    <span class="badge bg-light text-dark me-1 mb-1">
+                                                        <i class="fas fa-user me-1"></i>
+                                                        <?php 
+                                                        $nomeUsuario = '';
+                                                        foreach ($dados['usuarios'] as $usuario) {
+                                                            if ($usuario->id == $dados['filtro_nome']) {
+                                                                $nomeUsuario = $usuario->nome;
+                                                                break;
+                                                            }
+                                                        }
+                                                        echo htmlspecialchars($nomeUsuario);
+                                                        ?>
                                                     </span>
                                                 <?php endif; ?>
                                             </div>
@@ -478,10 +510,11 @@
         const filtroContato = document.getElementById('filtro_contato');
         const filtroNumero = document.getElementById('filtro_numero');
         const filtroStatus = document.getElementById('filtro_status');
+        const filtroNome = document.getElementById('filtro_nome');
         const form = filtroContato ? filtroContato.closest('form') : null;
         
         // Adicionar listener para Enter nos campos de filtro
-        [filtroContato, filtroNumero, filtroStatus].forEach(campo => {
+        [filtroContato, filtroNumero, filtroStatus, filtroNome].forEach(campo => {
             if (campo) {
                 campo.addEventListener('keydown', function(e) {
                     if (e.key === 'Enter') {
@@ -503,6 +536,17 @@
                         this.classList.remove('border-primary');
                     }
                 });
+                
+                // Para select, usar evento change
+                if (campo.tagName === 'SELECT') {
+                    campo.addEventListener('change', function() {
+                        if (this.value.trim()) {
+                            this.classList.add('border-primary');
+                        } else {
+                            this.classList.remove('border-primary');
+                        }
+                    });
+                }
             }
         });
 

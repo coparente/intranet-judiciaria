@@ -51,6 +51,7 @@ class Chat extends Controllers
         $filtroContato = $_GET['filtro_contato'] ?? '';
         $filtroNumero = $_GET['filtro_numero'] ?? '';
         $filtroStatus = $_GET['filtro_status'] ?? ''; // Novo filtro por status de ticket
+        $filtroNome = $_GET['filtro_nome'] ?? ''; // Novo filtro por nome do contato
         
         // Parâmetro de aba (minhas, nao_atribuidas, todas)
         $aba = $_GET['aba'] ?? 'minhas';
@@ -106,13 +107,15 @@ class Chat extends Controllers
                     $filtroNumero,
                     $registrosPorPagina,
                     $offset,
-                    $filtroStatus
+                    $filtroStatus,
+                    $filtroNome
                 );
                 
                 $totalRegistros = $this->chatModel->contarTodasConversasComFiltros(
                     $filtroContato,
                     $filtroNumero,
-                    $filtroStatus
+                    $filtroStatus,
+                    $filtroNome
                 );
                 break;
                 
@@ -124,14 +127,16 @@ class Chat extends Controllers
                     $filtroNumero,
                     $registrosPorPagina,
                     $offset,
-                    $filtroStatus
+                    $filtroStatus,
+                    $filtroNome
                 );
                 
                 $totalRegistros = $this->chatModel->contarConversasComFiltros(
                     $_SESSION['usuario_id'],
                     $filtroContato,
                     $filtroNumero,
-                    $filtroStatus
+                    $filtroStatus,
+                    $filtroNome
                 );
                 break;
         }
@@ -153,6 +158,9 @@ class Chat extends Controllers
         if (!empty($filtroStatus)) {
             $queryParams[] = 'filtro_status=' . urlencode($filtroStatus);
         }
+        if (!empty($filtroNome)) {
+            $queryParams[] = 'filtro_nome=' . urlencode($filtroNome);
+        }
         $queryString = !empty($queryParams) ? '&' . implode('&', $queryParams) : '';
 
         // Buscar lista de usuários para atribuição (se for admin/analista)
@@ -173,6 +181,7 @@ class Chat extends Controllers
             'filtro_contato' => $filtroContato,
             'filtro_numero' => $filtroNumero,
             'filtro_status' => $filtroStatus,
+            'filtro_nome' => $filtroNome,
             'aba_atual' => $aba,
             'usuarios' => $usuarios
         ];

@@ -315,6 +315,18 @@ class ChatModel
     }
 
     /**
+     * Atualiza conversa
+     */
+    public function atualizarContatoConversa($dados)
+    {
+        $sql = "UPDATE conversas SET atualizado_em = NOW(), contato_nome = :contato_nome WHERE id = :id";
+        $this->db->query($sql);
+        $this->db->bind(':id', $dados['id']);
+        $this->db->bind(':contato_nome', $dados['contato_nome']);
+        return $this->db->executa();
+    }
+
+    /**
      * Marca conversa como lida
      */
     public function marcarComoLida($conversa_id)

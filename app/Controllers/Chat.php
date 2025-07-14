@@ -556,6 +556,41 @@ class Chat extends Controllers
             $this->view('chat/nova_conversa', $dados);
         }
     }
+    /**
+     * [ atualizarConversa ] - Atualiza os dados de uma conversa
+     * 
+     * @param int $id ID da conversa
+     * @return void
+     */
+    public function atualizarConversa($id)
+    {
+        
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            $formulario = filter_input_array(INPUT_POST, FILTER_SANITIZE_STRING);
+            
+            $conversa = $this->chatModel->buscarConversaPorId($id);
+            
+            if (!$conversa) {
+                Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Conversa não encontrada', 'alert alert-danger');
+                Helper::redirecionar('chat/index');
+                return;
+            }
+            
+            // Atualiza os dados da conversa
+            $dados = [
+                'id' => $id,
+                'contato_nome' => $formulario['nome']
+            ];
+            
+            if ($this->chatModel->atualizarContatoConversa($dados)) {
+                Helper::mensagem('chat', '<i class="fas fa-check"></i> Conversa atualizada com sucesso', 'alert alert-success');
+            } else {
+                Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro ao atualizar conversa', 'alert alert-danger');
+            }
+            
+            Helper::redirecionar("chat/conversa/{$id}");
+        }
+    }
 
     /**
      * [ enviarMensagem ] - Envia uma mensagem via WhatsApp

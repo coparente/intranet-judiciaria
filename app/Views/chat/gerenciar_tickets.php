@@ -22,6 +22,9 @@
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h1 class="h3">
                             <i class="fas fa-tickets-alt me-2"></i>Gerenciar Tickets
+                            <?php if (isset($dados['mostrar_todos']) && $dados['mostrar_todos']): ?>
+                                <span class="badge badge-info ms-2">Todos os Tickets</span>
+                            <?php endif; ?>
                         </h1>
                         <div class="d-flex gap-2">
                             <a href="<?= URL ?>/chat/dashboardTickets" class="btn btn-outline-primary btn-sm">
@@ -203,6 +206,9 @@
                                         <thead>
                                             <tr>
                                                 <th>Contato</th>
+                                                <?php if (isset($dados['mostrar_todos']) && $dados['mostrar_todos']): ?>
+                                                    <th>Responsável</th>
+                                                <?php endif; ?>
                                                 <th>Status</th>
                                                 <th>Última Mensagem</th>
                                                 <th>Tempo em Aberto</th>
@@ -226,6 +232,21 @@
                                                             </div>
                                                         </div>
                                                     </td>
+                                                    <?php if (isset($dados['mostrar_todos']) && $dados['mostrar_todos']): ?>
+                                                        <td>
+                                                            <?php if (isset($conversa->responsavel_nome) && $conversa->responsavel_nome): ?>
+                                                                <span class="badge badge-primary">
+                                                                    <i class="fas fa-user me-1"></i>
+                                                                    <?= htmlspecialchars($conversa->responsavel_nome) ?>
+                                                                </span>
+                                                            <?php else: ?>
+                                                                <span class="badge badge-secondary">
+                                                                    <i class="fas fa-user-slash me-1"></i>
+                                                                    Não atribuído
+                                                                </span>
+                                                            <?php endif; ?>
+                                                        </td>
+                                                    <?php endif; ?>
                                                     <td>
                                                         <?php
                                                         $statusClass = [

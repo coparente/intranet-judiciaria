@@ -3325,16 +3325,26 @@ class Chat extends Controllers
         $pagina = $_GET['pagina'] ?? 1;
         $offset = ($pagina - 1) * $limite;
 
+        // Determinar se deve mostrar todos os tickets ou apenas os do usuário
+        $mostrarTodos = in_array($_SESSION['usuario_perfil'], ['admin', 'analista']);
+        $usuario_id = $mostrarTodos ? null : $_SESSION['usuario_id'];
+
         // Buscar conversas baseado no filtro
         if ($filtroStatus === 'todos') {
-            $conversas = $this->chatModel->buscarConversasComFiltros($_SESSION['usuario_id'], '', '', $limite, $offset);
+            if ($mostrarTodos) {
+                // Para admin/analista: buscar todas as conversas
+                $conversas = $this->chatModel->buscarTodasConversasComFiltros('', '', $limite, $offset);
+            } else {
+                // Para usuário comum: buscar apenas suas conversas
+                $conversas = $this->chatModel->buscarConversasComFiltros($_SESSION['usuario_id'], '', '', $limite, $offset);
+            }
         } else {
-            $conversas = $this->chatModel->buscarConversasPorStatusTicket($filtroStatus, $_SESSION['usuario_id'], $limite, $offset);
+            $conversas = $this->chatModel->buscarConversasPorStatusTicket($filtroStatus, $usuario_id, $limite, $offset);
         }
 
         // Buscar estatísticas
-        $estatisticas = $this->chatModel->estatisticasTickets($_SESSION['usuario_id']);
-        $ticketsVencidos = $this->chatModel->buscarTicketsVencidos(24, $_SESSION['usuario_id']);
+        $estatisticas = $this->chatModel->estatisticasTickets($usuario_id);
+        $ticketsVencidos = $this->chatModel->buscarTicketsVencidos(24, $usuario_id);
 
         $dados = [
             'tituloPagina' => 'Gerenciar Tickets',
@@ -3342,7 +3352,8 @@ class Chat extends Controllers
             'estatisticas' => $estatisticas,
             'tickets_vencidos' => $ticketsVencidos,
             'filtro_status' => $filtroStatus,
-            'pagina_atual' => $pagina
+            'pagina_atual' => $pagina,
+            'mostrar_todos' => $mostrarTodos
         ];
 
         $this->view('chat/gerenciar_tickets', $dados);
@@ -3362,7 +3373,7 @@ class Chat extends Controllers
 
         // Buscar dados do dashboard
         $dashboardGeral = $this->chatModel->dashboardTickets(); // Todos os tickets
-        $dashboardUsuario = $this->chatModel->dashboardTickets(); // Tickets do usuário
+        $dashboardUsuario = $this->chatModel->dashboardTickets($_SESSION['usuario_id']); // Tickets do usuário
 
         $dados = [
             'tituloPagina' => 'Dashboard de Tickets',

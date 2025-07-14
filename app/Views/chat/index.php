@@ -113,7 +113,7 @@
                                     <label for="filtro_nome" class="form-label">
                                         <i class="fas fa-user me-1"></i> Filtrar por Nome
                                     </label>
-                                    <select class="form-control" id="filtro_nome" name="filtro_nome" autocomplete="off">
+                                    <select class="form-control select2" id="filtro_nome" name="filtro_nome" autocomplete="off">
                                         <option value="">Todos os Nomes</option>
                                         <?php foreach ($dados['usuarios'] as $usuario): ?>
                                             <option value="<?= htmlspecialchars($usuario->id) ?>" <?= $dados['filtro_nome'] == $usuario->id ? 'selected' : '' ?>>
@@ -309,22 +309,25 @@
                                                         <?php endif; ?>
                                                     </td>
                                                     <td>
-                                                        <a href="<?= URL ?>/chat/conversa/<?= $conversa->id ?>" class="btn btn-info btn-sm">
-                                                            <i class="fas fa-comments me-1"></i> Abrir
+                                                        <a href="<?= URL ?>/chat/conversa/<?= $conversa->id ?>" class="btn btn-info btn-sm"
+                                                            title="Abrir Conversa">
+                                                            <i class="fas fa-comments me-1"></i>
                                                         </a>
                                                         
                                                         <?php if (in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])): ?>
                                                         <?php if ($dados['aba_atual'] == 'nao_atribuidas' || $dados['aba_atual'] == 'todas' && !empty($dados['usuarios'])): ?>
                                                             <button type="button" class="btn btn-success btn-sm" 
                                                                     data-toggle="modal" 
-                                                                    data-target="#modalAtribuirConversa<?= $conversa->id ?>">
-                                                                <i class="fas fa-user-plus me-1"></i> Atribuir
+                                                                    data-target="#modalAtribuirConversa<?= $conversa->id ?>"
+                                                                    title="Atribuir Conversa">
+                                                                <i class="fas fa-user-plus me-1"></i>
                                                             </button>
                                                         <?php endif; ?>
                                                         <button type="button" class="btn btn-danger btn-sm" 
                                                                 data-toggle="modal" 
-                                                                data-target="#modalExcluirConversa<?= $conversa->id ?>">
-                                                                <i class="fas fa-trash me-1"></i> Excluir
+                                                                data-target="#modalExcluirConversa<?= $conversa->id ?>" 
+                                                                title="Excluir Conversa">
+                                                                <i class="fas fa-trash me-1"></i>
                                                             </button>
                                                         <?php endif; ?>
                                                     </td>

@@ -3362,7 +3362,7 @@ class Chat extends Controllers
 
         // Buscar dados do dashboard
         $dashboardGeral = $this->chatModel->dashboardTickets(); // Todos os tickets
-        $dashboardUsuario = $this->chatModel->dashboardTickets($_SESSION['usuario_id']); // Tickets do usuário
+        $dashboardUsuario = $this->chatModel->dashboardTickets(); // Tickets do usuário
 
         $dados = [
             'tituloPagina' => 'Dashboard de Tickets',

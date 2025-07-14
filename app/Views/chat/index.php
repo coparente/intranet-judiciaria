@@ -242,9 +242,9 @@
                                                     </td>
                                                     <td>
                                                         <?= htmlspecialchars($conversa->contato_nome) ?>
-                                                        <?php if (isset($conversa->nao_lidas) && $conversa->nao_lidas > 0): ?>
-                                                            <span class="badge bg-warning ms-1"><?= $conversa->nao_lidas ?></span>
-                                                        <?php endif; ?>
+                                                        <?php //if (isset($conversa->nao_lidas) && $conversa->nao_lidas > 0): ?>
+                                                            <!-- <span class="badge bg-warning ms-1"><?= $conversa->nao_lidas ?></span> -->
+                                                        <?php //endif; ?>
                                                     </td>
                                                     <td><?= htmlspecialchars($conversa->contato_numero) ?></td>
                                                     <?php if ($dados['aba_atual'] != 'minhas'): ?>

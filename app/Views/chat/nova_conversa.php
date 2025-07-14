@@ -37,9 +37,9 @@
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <label for="numero" class="form-label">Número de Telefone: <span class="text-danger">*</span></label>
-                                        <input type="text" name="numero" id="numero" class="form-control" placeholder="Ex: (62) 99999-9999" required>
+                                        <input type="text" name="numero" id="numero" class="form-control" placeholder="Ex: 55(62)99999-9999" required>
                                         <small class="form-text text-muted">
-                                            Digite apenas números ou no formato (XX) XXXXX-XXXX
+                                            Digite o código do país + DDD + número sem o nono dígito. Ex: 556296185598
                                         </small>
                                     </div>
                                 </div>
@@ -63,22 +63,29 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Máscara para o campo de telefone
+    // Campo de telefone - apenas números, sem máscara
     const numeroInput = document.getElementById('numero');
     
     numeroInput.addEventListener('input', function(e) {
+        // Remove tudo que não for número
         let value = e.target.value.replace(/\D/g, '');
         
-        if (value.length <= 11) {
-            if (value.length > 2) {
-                value = `(${value.substring(0, 2)}) ${value.substring(2)}`;
-            }
-            if (value.length > 10) {
-                value = `${value.substring(0, 10)}-${value.substring(10)}`;
-            }
+        // Limita a 13 dígitos (código país + DDD + número)
+        if (value.length > 13) {
+            value = value.substring(0, 13);
         }
         
         e.target.value = value;
+    });
+    
+    // Placeholder com exemplo sem máscara
+    numeroInput.placeholder = 'Ex: 556296185795';
+    
+    // Posicionar cursor no final ao focar
+    numeroInput.addEventListener('focus', function() {
+        setTimeout(() => {
+            this.setSelectionRange(this.value.length, this.value.length);
+        }, 0);
     });
 });
 </script>

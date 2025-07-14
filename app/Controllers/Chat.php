@@ -516,6 +516,15 @@ class Chat extends Controllers
             // Formata o número de telefone (remove caracteres não numéricos)
             $numero = preg_replace('/[^0-9]/', '', $formulario['numero']);
 
+            
+            // Verifica se o número tem pelo menos 11 dígitos
+            if (strlen($numero) < 11) {
+                Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> O número deve ter pelo menos 11 dígitos', 'alert alert-danger');
+                Helper::mensagemSweetAlert('chat', 'O número deve ter pelo menos 11 dígitos', 'error');
+                Helper::redirecionar('chat/novaConversa');
+                return;
+            }
+
             // Verifica se já existe uma conversa com este número
             $conversaExistente = $this->chatModel->buscarConversaPorNumero($numero, $_SESSION['usuario_id']);
 

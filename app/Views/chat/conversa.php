@@ -2229,7 +2229,7 @@
         // Chama ao carregar a página
         recarregarMensagens();
         // Chama a cada 10 segundos
-        setInterval(recarregarMensagens, 10000);
+        setInterval(recarregarMensagens, 20000);
 
         // Função para configurar listeners nos áudios
         function configurarAudioListeners() {

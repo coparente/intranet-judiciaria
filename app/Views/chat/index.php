@@ -113,7 +113,7 @@
                                     <label for="filtro_nome" class="form-label">
                                         <i class="fas fa-user me-1"></i> Filtrar por Nome
                                     </label>
-                                    <select class="form-control select2" id="filtro_nome" name="filtro_nome" autocomplete="off">
+                                    <select class="form-control select2." id="filtro_nome" name="filtro_nome" autocomplete="off">
                                         <option value="">Todos os Nomes</option>
                                         <?php foreach ($dados['usuarios'] as $usuario): ?>
                                             <option value="<?= htmlspecialchars($usuario->id) ?>" <?= $dados['filtro_nome'] == $usuario->id ? 'selected' : '' ?>>
@@ -274,9 +274,9 @@
                                                     </td>
                                                     <td>
                                                         <?= htmlspecialchars($conversa->contato_nome) ?>
-                                                        <?php //if (isset($conversa->nao_lidas) && $conversa->nao_lidas > 0): ?>
-                                                            <!-- <span class="badge bg-warning ms-1"><?= $conversa->nao_lidas ?></span> -->
-                                                        <?php //endif; ?>
+                                                        <?php if (isset($conversa->nao_lidas) && $conversa->nao_lidas > 0): ?>
+                                                            <span class="badge bg-warning ms-1"><?= $conversa->nao_lidas ?></span>
+                                                        <?php endif; ?>
                                                     </td>
                                                     <td><?= htmlspecialchars($conversa->contato_numero) ?></td>
                                                     <?php if ($dados['aba_atual'] != 'minhas'): ?>
@@ -558,6 +558,27 @@
 
         // Verificar status da API a cada 30 segundos
         setInterval(verificarStatusAPI, 30000);
+
+        // Seleciona todos os botões de abrir conversa
+        document.querySelectorAll('a.btn-info.btn-sm[title="Abrir Conversa"]').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                const url = btn.getAttribute('href');
+                const match = url.match(/conversa\/(\d+)/);
+                if (match) {
+                    const conversaId = match[1];
+                    // Chama o endpoint para marcar como lida
+                    fetch('<?= URL ?>/chat/marcarLida', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ conversa_id: conversaId })
+                    }).then(() => {
+                        // Remove badge de não lidas da linha
+                        const badge = btn.closest('tr').querySelector('.badge.bg-warning');
+                        if (badge) badge.remove();
+                    });
+                }
+            });
+        });
     });
 </script>
 

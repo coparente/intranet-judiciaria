@@ -15,6 +15,7 @@ $rotasAPI = [
     'chat/enviarMensagemInterativa',
     'chat/consultarStatus',
     'chat/apiMensagensRapidas',
+    'chat/marcarLida',
     'agenda/eventos',
     'agenda/detalhesEvento',
     'agenda/moverEvento',

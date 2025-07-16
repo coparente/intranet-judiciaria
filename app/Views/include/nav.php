@@ -26,18 +26,7 @@
         <!-- Menu de navega&ccedil;&atilde;o -->
         <ul class="nav justify-content-end">
 
-            <li class="nav-item">
-                <a class="nav-link position-relative cor-texto-branco" href="<?= URL ?>/notificacoes/index" style="color: #ffffff !important; background-color: transparent !important;">
-                    <i class="fas fa-bell"></i>
-                    <?php
-                    $notificacaoModel = new NotificacaoModel();
-                    $count = count($notificacaoModel->buscarNotificacoesPendentes($_SESSION['usuario_id']));
-                    if ($count > 0) :
-                    ?>
-                        <span class="badge bg-danger rounded-pill"><?= $count ?></span>
-                    <?php endif; ?>
-                </a>
-            </li>
+            <!-- Removido badge global de mensagens não lidas, pois agora a notificação é por conversa -->
 
             <!-- Acessibilidade -->
             <li class="nav-item dropdown">

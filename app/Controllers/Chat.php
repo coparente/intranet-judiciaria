@@ -1371,17 +1371,26 @@ class Chat extends Controllers
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(405);
+            echo json_encode(['success' => false, 'error' => 'Método não permitido']);
             return;
         }
 
         $input = json_decode(file_get_contents('php://input'), true);
 
         if (!$input || !isset($input['conversa_id'])) {
-            echo json_encode(['success' => false]);
+            echo json_encode(['success' => false, 'error' => 'ID da conversa não informado']);
             return;
         }
 
-        $resultado = $this->chatModel->marcarConversaComoLida($input['conversa_id']);
+        $conversa_id = $input['conversa_id'];
+        // Verifica se o usuário tem acesso à conversa
+        $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
+        if (!$conversa || ($conversa->usuario_id != $_SESSION['usuario_id'] && !in_array($_SESSION['usuario_perfil'], ['admin', 'analista']))) {
+            echo json_encode(['success' => false, 'error' => 'Acesso negado']);
+            return;
+        }
+
+        $resultado = $this->chatModel->marcarMensagensComoLidas($conversa_id);
         echo json_encode(['success' => $resultado]);
     }
 
@@ -3333,10 +3342,10 @@ class Chat extends Controllers
         if ($filtroStatus === 'todos') {
             if ($mostrarTodos) {
                 // Para admin/analista: buscar todas as conversas
-                $conversas = $this->chatModel->buscarTodasConversasComFiltros('', '', $limite, $offset);
+                $conversas = $this->chatModel->buscarTodasConversasComFiltros('', '', $limite, $offset, '');
             } else {
                 // Para usuário comum: buscar apenas suas conversas
-                $conversas = $this->chatModel->buscarConversasComFiltros($_SESSION['usuario_id'], '', '', $limite, $offset);
+                $conversas = $this->chatModel->buscarConversasComFiltros($_SESSION['usuario_id'], '', '', $limite, $offset, '');
             }
         } else {
             $conversas = $this->chatModel->buscarConversasPorStatusTicket($filtroStatus, $usuario_id, $limite, $offset);

@@ -71,8 +71,8 @@ document.addEventListener('DOMContentLoaded', function() {
         let value = e.target.value.replace(/\D/g, '');
         
         // Limita a 13 dígitos (código país + DDD + número)
-        if (value.length > 12) {
-            value = value.substring(0, 12);
+        if (value.length > 14) {
+            value = value.substring(0, 14);
         }
         
         e.target.value = value;

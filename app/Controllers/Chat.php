@@ -62,7 +62,7 @@ class Chat extends Controllers
         }
 
         // Parâmetros de paginação
-        $registrosPorPagina = 10;
+        $registrosPorPagina = 20;
         $paginaAtual = isset($_GET['pagina']) && is_numeric($_GET['pagina']) ? (int)$_GET['pagina'] : 1;
         $paginaAtual = max(1, $paginaAtual); // Garantir que não seja menor que 1
 

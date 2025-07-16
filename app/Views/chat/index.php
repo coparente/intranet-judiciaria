@@ -113,7 +113,7 @@
                                     <label for="filtro_nome" class="form-label">
                                         <i class="fas fa-user me-1"></i> Filtrar por Nome
                                     </label>
-                                    <select class="form-control select2." id="filtro_nome" name="filtro_nome" autocomplete="off">
+                                    <select class="form-control select2" id="filtro_nome" name="filtro_nome" autocomplete="off">
                                         <option value="">Todos os Nomes</option>
                                         <?php foreach ($dados['usuarios'] as $usuario): ?>
                                             <option value="<?= htmlspecialchars($usuario->id) ?>" <?= $dados['filtro_nome'] == $usuario->id ? 'selected' : '' ?>>

@@ -691,6 +691,9 @@
         let lastMessageId = <?= !empty($dados['mensagens']) ? end($dados['mensagens'])->id : 0 ?>;
         let isApiOnline = null;
 
+        let intervaloMensagens = null;
+        let audioTocando = false;
+
         // Scroll suave para o final
         function scrollToBottom() {
             if (chatMessages) {
@@ -2130,6 +2133,141 @@
         setTimeout(initQuickMessages, 100);
 
         // === FIM DO SISTEMA DE MENSAGENS RÁPIDAS ===
+
+        // Função para atualizar status das mensagens
+        function atualizarStatusMensagens() {
+            fetch('<?= URL ?>/chat/atualizarStatusMensagens/<?= $dados['conversa']->id ?>')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.mensagens_atualizadas) {
+                        // Para cada mensagem atualizada, atualiza o ícone na interface
+                        data.mensagens_atualizadas.forEach(function(msg) {
+                            const msgEl = document.querySelector('.message-wrapper[data-message-id="' + msg.id + '"] .message-status');
+                            if (msgEl) {
+                                let icon = '';
+                                if (msg.status_novo === 'enviado') icon = '<i class="fas fa-check" title="Enviado"></i>';
+                                else if (msg.status_novo === 'entregue') icon = '<i class="fas fa-check-double" title="Entregue"></i>';
+                                else if (msg.status_novo === 'lido') icon = '<i class="fas fa-check-double text-lido" title="Lido"></i>';
+                                else if (msg.status_novo === 'falhou') icon = '<i class="fas fa-exclamation-triangle text-danger" title="Falhou"></i>';
+                                else icon = '<i class="fas fa-clock" title="Pendente"></i>';
+                                msgEl.innerHTML = icon;
+                            }
+                        });
+                    }
+                });
+        }
+        // Chama ao carregar a página
+        atualizarStatusMensagens();
+        // Chama a cada 10 segundos
+        setInterval(atualizarStatusMensagens, 10000);
+
+        // Função para recarregar as mensagens da conversa
+        function recarregarMensagens() {
+            if (audioTocando) return; // Não atualiza se áudio está tocando
+            fetch('<?= URL ?>/chat/mensagens/<?= $dados['conversa']->id ?>')
+                .then(response => response.json())
+                .then(mensagens => {
+                    if (!Array.isArray(mensagens)) return;
+                    const chatMessages = document.getElementById('chatMessages');
+                    if (!chatMessages) return;
+                    let html = '';
+                    if (mensagens.length === 0) {
+                        html = `<div class=\"empty-chat\">
+                            <i class=\"fas fa-comments\"></i>
+                            <h5>Nenhuma mensagem ainda</h5>
+                            <p>Envie uma mensagem para iniciar a conversa com <?= htmlspecialchars($dados['conversa']->contato_nome) ?></p>
+                        </div>`;
+                    } else {
+                        mensagens.forEach(function(mensagem) {
+                            let isUsuario = mensagem.remetente_id == <?= (int)$_SESSION['usuario_id'] ?>;
+                            let messageClass = isUsuario ? 'sent' : 'received';
+                            let bubbleClass = isUsuario ? 'sent' : 'received';
+                            html += `<div class=\"message-wrapper ${messageClass}\" data-message-id=\"${mensagem.id}\">`;
+                            html += `<div class=\"message-bubble ${bubbleClass} ${mensagem.tipo == 'audio' ? 'has-audio' : ''}\">`;
+                            if (mensagem.tipo == 'text' || mensagem.tipo == 'button') {
+                                html += `<div class=\"message-content\">${mensagem.conteudo.replace(/\n/g, '<br>')}</div>`;
+                            } else if (mensagem.tipo == 'image') {
+                                if (mensagem.midia_url) {
+                                    html += `<div class=\"message-media\"><img src=\"<?= URL ?>/media/${mensagem.midia_url}\" class=\"img-thumbnail\"></div>`;
+                                }
+                                if (mensagem.conteudo && mensagem.conteudo !== mensagem.midia_url) {
+                                    html += `<div class=\"message-content\">${mensagem.conteudo.replace(/\n/g, '<br>')}</div>`;
+                                }
+                            } else if (mensagem.tipo == 'video') {
+                                html += `<div class=\"message-media\"><video controls><source src=\"<?= URL ?>/media/${mensagem.midia_url}\" type=\"video/mp4\"></video></div>`;
+                                if (mensagem.conteudo && mensagem.conteudo !== mensagem.midia_url) {
+                                    html += `<div class=\"message-content\">${mensagem.conteudo.replace(/\n/g, '<br>')}</div>`;
+                                }
+                            } else if (mensagem.tipo == 'audio') {
+                                html += `<div class=\"message-media\"><audio controls class=\"audio-player\"><source src=\"<?= URL ?>/media/${mensagem.midia_url}\" type=\"audio/mpeg\"></audio></div>`;
+                                if (mensagem.conteudo) {
+                                    html += `<div class=\"message-content\">${mensagem.conteudo.replace(/\n/g, '<br>')}</div>`;
+                                }
+                            } else if (mensagem.tipo == 'document') {
+                                html += `<div class=\"document-preview\"><div class=\"document-icon\"><i class=\"fas fa-file-alt\"></i></div><div class=\"document-info\"><a href=\"<?= URL ?>/media/${mensagem.midia_url}\" target=\"_blank\" class=\"document-name\">${mensagem.midia_nome || 'Documento'}</a><div class=\"document-size\">Clique para baixar</div></div></div>`;
+                                if (mensagem.conteudo && mensagem.conteudo !== mensagem.midia_url) {
+                                    html += `<div class=\"message-content\">${mensagem.conteudo.replace(/\n/g, '<br>')}</div>`;
+                                }
+                            }
+                            html += `<div class=\"message-time\"><span>${new Date(mensagem.enviado_em).toLocaleString('pt-BR')}</span>`;
+                            if (isUsuario) {
+                                html += `<span class=\"message-status\">`;
+                                if (mensagem.status == 'enviado') html += '<i class="fas fa-check" title="Enviado"></i>';
+                                else if (mensagem.status == 'entregue') html += '<i class="fas fa-check-double" title="Entregue"></i>';
+                                else if (mensagem.status == 'lido') html += '<i class="fas fa-check-double text-lido" title="Lido"></i>';
+                                else if (mensagem.status == 'falhou') html += '<i class="fas fa-exclamation-triangle text-danger" title="Falhou"></i>';
+                                else html += '<i class="fas fa-clock" title="Pendente"></i>';
+                                html += `</span>`;
+                            }
+                            html += `</div></div></div>`;
+                        });
+                    }
+                    chatMessages.innerHTML = html;
+                    configurarAudioListeners();
+                });
+        }
+        // Chama ao carregar a página
+        recarregarMensagens();
+        // Chama a cada 10 segundos
+        setInterval(recarregarMensagens, 10000);
+
+        // Função para configurar listeners nos áudios
+        function configurarAudioListeners() {
+            const audios = document.querySelectorAll('audio');
+            audios.forEach(function(audio) {
+                audio.removeEventListener('play', onAudioPlay);
+                audio.removeEventListener('pause', onAudioPause);
+                audio.removeEventListener('ended', onAudioPause);
+                audio.addEventListener('play', onAudioPlay);
+                audio.addEventListener('pause', onAudioPause);
+                audio.addEventListener('ended', onAudioPause);
+            });
+        }
+
+        function onAudioPlay() {
+            audioTocando = true;
+            if (intervaloMensagens) {
+                clearInterval(intervaloMensagens);
+                intervaloMensagens = null;
+            }
+        }
+        function onAudioPause() {
+            // Só retoma se nenhum áudio estiver tocando
+            setTimeout(function() {
+                const audios = document.querySelectorAll('audio');
+                const algumTocando = Array.from(audios).some(a => !a.paused && !a.ended);
+                if (!algumTocando) {
+                    audioTocando = false;
+                    if (!intervaloMensagens) {
+                        intervaloMensagens = setInterval(recarregarMensagens, 10000);
+                    }
+                }
+            }, 200);
+        }
+
+        // Inicializar intervalo de atualização automática
+        intervaloMensagens = setInterval(recarregarMensagens, 10000);
+        configurarAudioListeners();
     });
 </script>
 

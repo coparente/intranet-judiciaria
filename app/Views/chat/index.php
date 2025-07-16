@@ -562,6 +562,7 @@
         // Seleciona todos os botões de abrir conversa
         document.querySelectorAll('a.btn-info.btn-sm[title="Abrir Conversa"]').forEach(function(btn) {
             btn.addEventListener('click', function(e) {
+                e.preventDefault(); // Previne o redirecionamento imediato
                 const url = btn.getAttribute('href');
                 const match = url.match(/conversa\/(\d+)/);
                 if (match) {
@@ -575,7 +576,15 @@
                         // Remove badge de não lidas da linha
                         const badge = btn.closest('tr').querySelector('.badge.bg-warning');
                         if (badge) badge.remove();
+                        // Redireciona para a conversa após marcar como lida
+                        window.location.href = url;
+                    }).catch(() => {
+                        // Em caso de erro, ainda assim redireciona
+                        window.location.href = url;
                     });
+                } else {
+                    // Se não encontrar o ID, redireciona normalmente
+                    window.location.href = url;
                 }
             });
         });

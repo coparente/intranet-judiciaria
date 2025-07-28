@@ -328,7 +328,31 @@
                                     <strong>Conversa Bloqueada</strong><br>
                                     <small>Esta conversa está sendo atendida por outro agente. Use o botão "Assumir Conversa" acima para poder enviar mensagens.</small>
                                 </div>
+                            <?php elseif (isset($dados['conversa']->precisa_novo_template) && $dados['conversa']->precisa_novo_template): ?>
+                                <!-- Bloqueado devido a template vencido -->
+                                <div class="alert alert-warning text-center">
+                                    <i class="fas fa-clock me-2"></i>
+                                    <strong>Template Vencido - 24h sem resposta</strong><br>
+                                    <small>Esta conversa precisa de um novo template. O cliente não respondeu em 24 horas.</small>
+                                    <br><br>
+                                    <button type="button" class="btn btn-warning btn-sm" data-toggle="modal" data-target="#modalReenviarTemplate">
+                                        <i class="fas fa-redo me-1"></i> Reenviar Template
+                                    </button>
+                                </div>
+                            <?php elseif (isset($dados['conversa']->template_enviado_em) && !isset($dados['conversa']->ultima_resposta_cliente)): ?>
+                                <!-- Template enviado, aguardando primeira resposta do cliente -->
+                                <div class="alert alert-info text-center">
+                                    <i class="fas fa-hourglass-half me-2"></i>
+                                    <strong>Template Enviado</strong><br>
+                                    <small>Aguardando primeira resposta do cliente. O envio de mensagens está bloqueado até receber uma resposta.</small>
+                                    <br><br>
+                                    <small class="text-muted">
+                                        <i class="fas fa-clock me-1"></i>
+                                        Enviado em: <?= date('d/m/Y H:i', strtotime($dados['conversa']->template_enviado_em)) ?>
+                                    </small>
+                                </div>
                             <?php else: ?>
+                                <!-- Área de envio normal -->
                                 <form action="<?= URL ?>/chat/enviarMensagem/<?= $dados['conversa']->id ?>" method="POST" enctype="multipart/form-data" id="messageForm">
                                     <div class="input-group-modern">
                                         <button type="button" class="btn-quick-message" id="quickMessageBtn" title="Mensagens Rápidas" data-toggle="modal" data-target="#modalMensagensRapidas">
@@ -650,6 +674,82 @@
     <div class="emoji-content">
         <div class="emoji-grid" id="emojiGrid">
             <!-- Emojis serão carregados aqui via JavaScript -->
+        </div>
+    </div>
+</div>
+
+<!-- NOVO: Modal Reenviar Template -->
+<div class="modal fade" id="modalReenviarTemplate" tabindex="-1" aria-labelledby="modalReenviarTemplateLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form action="<?= URL ?>/chat/reenviarTemplate" method="POST">
+                <input type="hidden" name="conversa_id" value="<?= $dados['conversa']->id ?>">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalReenviarTemplateLabel">
+                        <i class="fas fa-redo me-2"></i> Reenviar Template
+                    </h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Fechar">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Informação:</strong> O template inicial foi enviado há mais de 24 horas sem resposta do cliente. 
+                        Para continuar a conversa, é necessário reenviar um template.
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="template_mensagem" class="form-label">
+                            <i class="fas fa-comment me-1"></i> Mensagem do Template
+                        </label>
+                        <textarea class="form-control" id="template_mensagem" name="template_mensagem" rows="6" 
+                                  placeholder="Digite a mensagem do template que será enviada ao cliente..." required>Somos da Central de Intimação do Tribunal de Justiça do Estado de Goiás (TJGO) ⚖️. Informamos que existe um processo judicial em seu nome, de número XX, em andamento na Comarca de XX.</textarea>
+                        <small class="form-text text-muted">
+                            Esta mensagem será enviada como template inicial para o cliente.
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-clock me-1"></i> Informações do Template Anterior
+                        </label>
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <small class="text-muted">
+                                    <strong>Template enviado em:</strong> 
+                                    <?= isset($dados['conversa']->template_enviado_em) ? date('d/m/Y H:i', strtotime($dados['conversa']->template_enviado_em)) : 'Não registrado' ?>
+                                </small><br>
+                                <small class="text-muted">
+                                    <strong>Tempo sem resposta:</strong> 
+                                    <?php 
+                                    if (isset($dados['conversa']->horas_sem_resposta)) {
+                                        $horas = $dados['conversa']->horas_sem_resposta;
+                                        if ($horas >= 24) {
+                                            $dias = floor($horas / 24);
+                                            $horasRestantes = $horas % 24;
+                                            echo "{$dias} dia(s) e {$horasRestantes} hora(s)";
+                                        } else {
+                                            echo "{$horas} hora(s)";
+                                        }
+                                    } else {
+                                        echo "Não calculado";
+                                    }
+                                    ?>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                        <i class="fas fa-times me-1"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-redo me-1"></i> Reenviar Template
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -2268,6 +2368,29 @@
         // Inicializar intervalo de atualização automática
         intervaloMensagens = setInterval(recarregarMensagens, 10000);
         configurarAudioListeners();
+
+        // Chama ao carregar a página
+        atualizarStatusMensagens();
+
+        // Verificar se template pode ser reenviado a cada minuto
+        setInterval(verificarReenvioTemplate, 60000);
+
+        // Função para verificar se template pode ser reenviado
+        function verificarReenvioTemplate() {
+            const templateEnviadoEm = '<?= $dados['conversa']->template_enviado_em ?? null ?>';
+            const ultimaResposta = '<?= $dados['conversa']->ultima_resposta_cliente ?? null ?>';
+            
+            if (templateEnviadoEm && !ultimaResposta) {
+                const enviadoEm = new Date(templateEnviadoEm);
+                const agora = new Date();
+                const horasPassadas = (agora - enviadoEm) / (1000 * 60 * 60);
+                
+                if (horasPassadas >= 24) {
+                    // Atualizar a página para mostrar o botão de reenvio
+                    location.reload();
+                }
+            }
+        }
     });
 </script>
 
@@ -2376,6 +2499,26 @@
             left: 10px;
             width: auto;
         }
+    }
+
+    /* Estilos para avisos de template */
+    .alert-info {
+        background: linear-gradient(135deg, #d1ecf1, #bee5eb);
+        border-color: #17a2b8;
+        color: #0c5460;
+    }
+
+    .alert-warning {
+        background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+        border-color: #ffc107;
+        color: #856404;
+        animation: pulse-gentle 3s infinite;
+    }
+
+    @keyframes pulse-gentle {
+        0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
     }
 </style>
 

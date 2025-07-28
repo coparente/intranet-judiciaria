@@ -43,7 +43,7 @@ class ChatModel
     /**
      * Busca conversas com filtros
      */
-    public function buscarConversasComFiltros($usuario_id, $filtroContato = '', $filtroNumero = '', $limite = 10, $offset = 0, $filtroStatus = '')
+    public function buscarConversasComFiltros($usuario_id, $filtroContato = '', $filtroNumero = '', $limite = 10, $offset = 0, $filtroStatus = '', $filtroNome = '')
     {
         $sql = "SELECT c.*, 
                 (SELECT COUNT(*) FROM mensagens_chat m 
@@ -54,7 +54,16 @@ class ChatModel
                 (SELECT m2.enviado_em FROM mensagens_chat m2 
                  WHERE m2.conversa_id = c.id 
                  ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_atividade,
-                u.nome as responsavel_nome
+                u.nome as responsavel_nome,
+                c.template_enviado_em,
+                c.precisa_novo_template,
+                c.ultima_resposta_cliente,
+                TIMESTAMPDIFF(HOUR, COALESCE(c.ultima_resposta_cliente, c.template_enviado_em), NOW()) as horas_sem_resposta,
+                CASE 
+                    WHEN c.template_enviado_em IS NOT NULL AND c.precisa_novo_template = 1 THEN 'Template Vencido'
+                    WHEN c.template_enviado_em IS NOT NULL AND c.precisa_novo_template = 0 THEN 'Template Ativo'
+                    ELSE 'Sem Template'
+                END as template_nome
                 FROM conversas c 
                 LEFT JOIN usuarios u ON c.usuario_id = u.id
                 WHERE c.usuario_id = :usuario_id";
@@ -77,6 +86,11 @@ class ChatModel
             $params[':filtro_status'] = $filtroStatus;
         }
         
+        if (!empty($filtroNome)) {
+            $sql .= " AND c.contato_nome LIKE :filtro_nome";
+            $params[':filtro_nome'] = '%' . $filtroNome . '%';
+        }
+
         $sql .= " ORDER BY c.atualizado_em DESC LIMIT :limite OFFSET :offset";
 
         $this->db->query($sql);
@@ -690,8 +704,19 @@ class ChatModel
                  ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_mensagem,
                 (SELECT m2.enviado_em FROM mensagens_chat m2 
                  WHERE m2.conversa_id = c.id 
-                 ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_atividade
+                 ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_atividade,
+                u.nome as responsavel_nome,
+                c.template_enviado_em,
+                c.precisa_novo_template,
+                c.ultima_resposta_cliente,
+                TIMESTAMPDIFF(HOUR, COALESCE(c.ultima_resposta_cliente, c.template_enviado_em), NOW()) as horas_sem_resposta,
+                CASE 
+                    WHEN c.template_enviado_em IS NOT NULL AND c.precisa_novo_template = 1 THEN 'Template Vencido'
+                    WHEN c.template_enviado_em IS NOT NULL AND c.precisa_novo_template = 0 THEN 'Template Ativo'
+                    ELSE 'Sem Template'
+                END as template_nome
                 FROM conversas c 
+                LEFT JOIN usuarios u ON c.usuario_id = u.id
                 WHERE (c.usuario_id IS NULL OR c.usuario_id = 0)";
 
         // Aplicar filtros
@@ -1422,7 +1447,16 @@ class ChatModel
                     (SELECT m2.enviado_em FROM mensagens_chat m2 
                      WHERE m2.conversa_id = c.id 
                      ORDER BY m2.enviado_em DESC LIMIT 1) as ultima_atividade,
-                    u.nome as responsavel_nome
+                    u.nome as responsavel_nome,
+                    c.template_enviado_em,
+                    c.precisa_novo_template,
+                    c.ultima_resposta_cliente,
+                    TIMESTAMPDIFF(HOUR, COALESCE(c.ultima_resposta_cliente, c.template_enviado_em), NOW()) as horas_sem_resposta,
+                    CASE 
+                        WHEN c.template_enviado_em IS NOT NULL AND c.precisa_novo_template = 1 THEN 'Template Vencido'
+                        WHEN c.template_enviado_em IS NOT NULL AND c.precisa_novo_template = 0 THEN 'Template Ativo'
+                        ELSE 'Sem Template'
+                    END as template_nome
                     FROM conversas c 
                     LEFT JOIN usuarios u ON c.usuario_id = u.id
                     WHERE 1=1";
@@ -1713,6 +1747,291 @@ class ChatModel
             return true;
         } catch (Exception $e) {
             error_log("Erro ao reordenar mensagens: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * API para buscar mensagens rápidas (para o modal)
+     */
+    public function apiMensagensRapidas()
+    {
+        header('Content-Type: application/json');
+        
+        try {
+            
+            
+            // Garantir que a tabela existe
+            $tabelaCriada = $this->criarTabelaMensagensRapidas();
+            
+            $mensagens = $this->buscarMensagensRapidas(true); // Apenas ativas
+            
+            $resultado = array_map(function($msg) {
+                return [
+                    'id' => $msg->id,
+                    'titulo' => $msg->titulo,
+                    'conteudo' => $msg->conteudo,
+                    'icone' => $msg->icone
+                ];
+            }, $mensagens);
+            
+
+            echo json_encode([
+                'success' => true,
+                'mensagens' => $resultado
+            ]);
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Erro ao buscar mensagens rápidas: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * =====================================================
+     * CONTROLE DE TEMPO DE RESPOSTA DOS TEMPLATES
+     * =====================================================
+     */
+
+    /**
+     * Marca quando um template foi enviado
+     */
+    public function marcarTemplateEnviado($conversa_id)
+    {
+        try {
+            $sql = "UPDATE conversas SET 
+                    template_enviado_em = NOW(),
+                    precisa_novo_template = 0,
+                    atualizado_em = NOW()
+                    WHERE id = :conversa_id";
+            
+            $this->db->query($sql);
+            $this->db->bind(':conversa_id', $conversa_id);
+            return $this->db->executa();
+        } catch (Exception $e) {
+            error_log("Erro ao marcar template enviado: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Marca quando o cliente respondeu
+     */
+    public function marcarRespostaCliente($conversa_id)
+    {
+        try {
+            $sql = "UPDATE conversas SET 
+                    ultima_resposta_cliente = NOW(),
+                    precisa_novo_template = 0,
+                    atualizado_em = NOW()
+                    WHERE id = :conversa_id";
+            
+            $this->db->query($sql);
+            $this->db->bind(':conversa_id', $conversa_id);
+            return $this->db->executa();
+        } catch (Exception $e) {
+            error_log("Erro ao marcar resposta do cliente: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Verifica se uma conversa precisa de novo template (24h sem resposta)
+     */
+    public function verificarPrecisaNovoTemplate($conversa_id)
+    {
+        try {
+            $sql = "SELECT c.*, 
+                    TIMESTAMPDIFF(HOUR, COALESCE(c.ultima_resposta_cliente, c.template_enviado_em), NOW()) as horas_sem_resposta
+                    FROM conversas c 
+                    WHERE c.id = :conversa_id";
+            
+            $this->db->query($sql);
+            $this->db->bind(':conversa_id', $conversa_id);
+            $conversa = $this->db->resultado();
+            
+            if (!$conversa) {
+                return false;
+            }
+
+            // Se tem template enviado e passou mais de 24 horas sem resposta
+            if ($conversa->template_enviado_em && $conversa->horas_sem_resposta >= 24) {
+                // Marcar como precisa de novo template
+                $this->marcarPrecisaNovoTemplate($conversa_id);
+                return true;
+            }
+
+            return false;
+        } catch (Exception $e) {
+            error_log("Erro ao verificar se precisa novo template: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Marca conversa como precisa de novo template
+     */
+    public function marcarPrecisaNovoTemplate($conversa_id)
+    {
+        try {
+            $sql = "UPDATE conversas SET 
+                    precisa_novo_template = 1,
+                    atualizado_em = NOW()
+                    WHERE id = :conversa_id";
+            
+            $this->db->query($sql);
+            $this->db->bind(':conversa_id', $conversa_id);
+            return $this->db->executa();
+        } catch (Exception $e) {
+            error_log("Erro ao marcar precisa novo template: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Busca conversas que precisam de novo template
+     */
+    public function buscarConversasPrecisamNovoTemplate($usuario_id = null)
+    {
+        try {
+            $sql = "SELECT c.*, 
+                    TIMESTAMPDIFF(HOUR, COALESCE(c.ultima_resposta_cliente, c.template_enviado_em), NOW()) as horas_sem_resposta,
+                    u.nome as responsavel_nome
+                    FROM conversas c 
+                    LEFT JOIN usuarios u ON c.usuario_id = u.id
+                    WHERE c.precisa_novo_template = 1";
+            
+            if ($usuario_id) {
+                $sql .= " AND c.usuario_id = :usuario_id";
+            }
+            
+            $sql .= " ORDER BY c.template_enviado_em ASC";
+            
+            $this->db->query($sql);
+            
+            if ($usuario_id) {
+                $this->db->bind(':usuario_id', $usuario_id);
+            }
+            
+            return $this->db->resultados();
+        } catch (Exception $e) {
+            error_log("Erro ao buscar conversas que precisam de novo template: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Atualiza automaticamente o status de conversas que precisam de novo template
+     */
+    public function atualizarStatusTemplatesVencidos()
+    {
+        try {
+            $sql = "UPDATE conversas SET 
+                    precisa_novo_template = 1,
+                    atualizado_em = NOW()
+                    WHERE template_enviado_em IS NOT NULL 
+                    AND precisa_novo_template = 0
+                    AND (ultima_resposta_cliente IS NULL OR ultima_resposta_cliente < DATE_SUB(NOW(), INTERVAL 24 HOUR))
+                    AND TIMESTAMPDIFF(HOUR, COALESCE(ultima_resposta_cliente, template_enviado_em), NOW()) >= 24";
+            
+            $this->db->query($sql);
+            $resultado = $this->db->executa();
+            
+            if ($resultado) {
+                error_log("Templates vencidos atualizados: " . $resultado . " conversas marcadas");
+            }
+            
+            return $resultado;
+        } catch (Exception $e) {
+            error_log("Erro ao atualizar status de templates vencidos: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Conta conversas que precisam de novo template
+     */
+    public function contarConversasPrecisamNovoTemplate($usuario_id = null)
+    {
+        try {
+            $sql = "SELECT COUNT(*) as total FROM conversas c WHERE c.precisa_novo_template = 1";
+            
+            if ($usuario_id) {
+                $sql .= " AND c.usuario_id = :usuario_id";
+            }
+
+            $this->db->query($sql);
+            
+            if ($usuario_id) {
+                $this->db->bind(':usuario_id', $usuario_id);
+            }
+
+            $resultado = $this->db->resultado();
+            return $resultado ? $resultado->total : 0;
+        } catch (Exception $e) {
+            error_log("Erro ao contar conversas que precisam de novo template: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Verifica se uma conversa específica precisa de novo template
+     */
+    public function verificarConversaPrecisaNovoTemplate($conversa_id)
+    {
+        try {
+            $sql = "SELECT precisa_novo_template, template_enviado_em, ultima_resposta_cliente 
+                    FROM conversas 
+                    WHERE id = :conversa_id";
+            
+            $this->db->query($sql);
+            $this->db->bind(':conversa_id', $conversa_id);
+            
+            $resultado = $this->db->resultado();
+            
+            if ($resultado) {
+                return [
+                    'precisa_novo_template' => (bool)$resultado->precisa_novo_template,
+                    'template_enviado_em' => $resultado->template_enviado_em,
+                    'ultima_resposta_cliente' => $resultado->ultima_resposta_cliente
+                ];
+            }
+            
+            return null;
+        } catch (Exception $e) {
+            error_log("Erro ao verificar se conversa precisa de novo template: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Verifica se template pode ser reenviado (após 24 horas sem resposta)
+     */
+    public function verificarPodeReenviarTemplate($conversa_id)
+    {
+        try {
+            $sql = "SELECT c.template_enviado_em, c.ultima_resposta_cliente,
+                    TIMESTAMPDIFF(HOUR, c.template_enviado_em, NOW()) as horas_passadas
+                    FROM conversas c 
+                    WHERE c.id = :conversa_id";
+            
+            $this->db->query($sql);
+            $this->db->bind(':conversa_id', $conversa_id);
+            $conversa = $this->db->resultado();
+            
+            if (!$conversa || !$conversa->template_enviado_em) {
+                return false;
+            }
+
+            // Se não tem resposta do cliente e passaram 24 horas
+            if (!$conversa->ultima_resposta_cliente && $conversa->horas_passadas >= 24) {
+                return true;
+            }
+
+            return false;
+        } catch (Exception $e) {
+            error_log("Erro ao verificar se pode reenviar template: " . $e->getMessage());
             return false;
         }
     }

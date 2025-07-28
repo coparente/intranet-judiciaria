@@ -169,6 +169,9 @@ class Chat extends Controllers
             $usuarios = $this->chatModel->buscarUsuariosParaAtribuicao();
         }
 
+        // ✅ NOVO: Buscar total de conversas que precisam de novo template
+        $totalPrecisamTemplate = $this->chatModel->contarConversasPrecisamNovoTemplate();
+
         $dados = [
             'tituloPagina' => 'Chat',
             'conversas' => $conversas,
@@ -183,7 +186,8 @@ class Chat extends Controllers
             'filtro_status' => $filtroStatus,
             'filtro_nome' => $filtroNome,
             'aba_atual' => $aba,
-            'usuarios' => $usuarios
+            'usuarios' => $usuarios,
+            'total_precisam_template' => $totalPrecisamTemplate
         ];
 
         $this->view('chat/index', $dados);
@@ -462,6 +466,12 @@ class Chat extends Controllers
         // ========== FIM CONTROLE ==========
 
         $mensagens = $this->chatModel->buscarMensagens($conversa_id);
+
+        // ✅ NOVO: Verificar se template está vencido
+        $this->chatModel->verificarPrecisaNovoTemplate($conversa_id);
+
+        // ✅ NOVO: Buscar conversa atualizada após verificação
+        $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
 
         $dados = [
             'tituloPagina' => 'Conversa - ' . $conversa->contato_nome,
@@ -787,6 +797,12 @@ class Chat extends Controllers
                 }
 
                 $this->chatModel->salvarMensagem($dadosMensagem);
+
+                // ✅ NOVO: Marcar template enviado se for primeira mensagem
+                if ($precisaTemplate) {
+                    $this->chatModel->marcarTemplateEnviado($conversa_id);
+                    error_log("✅ Template marcado como enviado para conversa {$conversa_id}");
+                }
 
                 // Atualizar conversa
                 $this->chatModel->atualizarConversa($conversa_id);
@@ -1568,6 +1584,9 @@ class Chat extends Controllers
                     if ($resultado) {
                         // Atualizar conversa
                         $this->chatModel->atualizarConversa($conversa->id);
+                        
+                        // ✅ NOVO: Marcar resposta do cliente
+                        $this->chatModel->marcarRespostaCliente($conversa->id);
                         
                         // Log de sucesso
                         $tipoLog = $midiaId ? "mídia ($tipo)" : "texto";
@@ -3732,6 +3751,214 @@ class Chat extends Controllers
             echo json_encode([
                 'success' => false,
                 'error' => 'Erro ao buscar mensagens rápidas: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * =====================================================
+     * CONTROLE DE TEMPO DE RESPOSTA DOS TEMPLATES
+     * =====================================================
+     */
+
+    /**
+     * Verifica e atualiza status dos templates vencidos
+     */
+    public function verificarTemplatesVencidos()
+    {
+        header('Content-Type: application/json');
+        
+        try {
+            // Atualizar status de templates vencidos
+            $templatesAtualizados = $this->chatModel->atualizarStatusTemplatesVencidos();
+            
+            // Buscar conversas que precisam de novo template
+            $conversasPrecisamTemplate = $this->chatModel->buscarConversasPrecisamNovoTemplate();
+            
+            // Contar total
+            $totalPrecisamTemplate = $this->chatModel->contarConversasPrecisamNovoTemplate();
+            
+            echo json_encode([
+                'success' => true,
+                'templates_atualizados' => $templatesAtualizados,
+                'conversas_precisam_template' => $conversasPrecisamTemplate,
+                'total_precisam_template' => $totalPrecisamTemplate
+            ]);
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Erro ao verificar templates vencidos: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Busca conversas que precisam de novo template
+     */
+    public function conversasPrecisamNovoTemplate()
+    {
+        // Verificar permissão
+        if (!in_array($_SESSION['usuario_perfil'], ['admin', 'analista'])) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        $conversas = $this->chatModel->buscarConversasPrecisamNovoTemplate();
+        $total = $this->chatModel->contarConversasPrecisamNovoTemplate();
+
+        $dados = [
+            'tituloPagina' => 'Conversas que Precisam de Novo Template',
+            'conversas' => $conversas,
+            'total' => $total
+        ];
+
+        $this->view('chat/conversas_precisam_template', $dados);
+    }
+
+    /**
+     * Marca conversa como não precisa mais de novo template
+     */
+    public function marcarTemplateReenviado()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        $conversa_id = $_POST['conversa_id'] ?? null;
+
+        if (!$conversa_id) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> ID da conversa não informado', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        // Verificar se o usuário tem acesso à conversa
+        $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
+        if (!$conversa || ($conversa->usuario_id != $_SESSION['usuario_id'] && !in_array($_SESSION['usuario_perfil'], ['admin', 'analista']))) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        // Marcar como template reenviado
+        if ($this->chatModel->marcarTemplateEnviado($conversa_id)) {
+            Helper::mensagem('chat', '<i class="fas fa-check"></i> Template marcado como reenviado', 'alert alert-success');
+            Helper::mensagemSweetAlert('chat', 'Template marcado como reenviado', 'success');
+        } else {
+            Helper::mensagem('chat', '<i class="fas fa-times"></i> Erro ao marcar template', 'alert alert-danger');
+        }
+
+        Helper::redirecionar("chat/conversa/{$conversa_id}");
+    }
+
+    /**
+     * Reenviar template para conversa com template vencido
+     */
+    public function reenviarTemplate()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        $conversa_id = $_POST['conversa_id'] ?? null;
+        $template_mensagem = trim($_POST['template_mensagem'] ?? '');
+
+        if (!$conversa_id || empty($template_mensagem)) {
+            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Dados incompletos para reenvio do template', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        // Verificar se o usuário tem acesso à conversa
+        $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
+        if (!$conversa || ($conversa->usuario_id != $_SESSION['usuario_id'] && !in_array($_SESSION['usuario_perfil'], ['admin', 'analista']))) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Acesso negado', 'alert alert-danger');
+            Helper::redirecionar('chat/index');
+            return;
+        }
+
+        // Verificar se realmente precisa de novo template
+        if (!isset($conversa->precisa_novo_template) || !$conversa->precisa_novo_template) {
+            Helper::mensagem('chat', '<i class="fas fa-info-circle"></i> Esta conversa não precisa de novo template', 'alert alert-info');
+            Helper::redirecionar("chat/conversa/{$conversa_id}");
+            return;
+        }
+
+        try {
+            // Enviar template
+            $resultado = $this->enviarPrimeiraMensagem($conversa->contato_numero, $template_mensagem);
+
+            if ($resultado && ($resultado['status'] == 200 || $resultado['status'] == 201)) {
+                // Salvar mensagem no banco
+                $messageId = $resultado['response']['id'] ?? uniqid();
+                
+                $dadosMensagem = [
+                    'conversa_id' => $conversa_id,
+                    'remetente_id' => $_SESSION['usuario_id'],
+                    'tipo' => 'text',
+                    'conteudo' => $template_mensagem,
+                    'message_id' => $messageId,
+                    'status' => 'enviado',
+                    'enviado_em' => date('Y-m-d H:i:s')
+                ];
+
+                $this->chatModel->salvarMensagem($dadosMensagem);
+
+                // Marcar template como enviado (resetar o status)
+                $this->chatModel->marcarTemplateEnviado($conversa_id);
+
+                // Atualizar conversa
+                $this->chatModel->atualizarConversa($conversa_id);
+
+                Helper::mensagem('chat', '<i class="fas fa-check"></i> Template reenviado com sucesso! A conversa foi desbloqueada.', 'alert alert-success');
+                Helper::mensagemSweetAlert('chat', 'Template reenviado com sucesso', 'success');
+            } else {
+                $erro = $resultado['error'] ?? 'Erro desconhecido';
+                Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro ao reenviar template: ' . $erro, 'alert alert-danger');
+            }
+        } catch (Exception $e) {
+            Helper::mensagem('chat', '<i class="fas fa-ban"></i> Erro interno: ' . $e->getMessage(), 'alert alert-danger');
+        }
+
+        Helper::redirecionar("chat/conversa/{$conversa_id}");
+    }
+
+    /**
+     * Verifica se pode reenviar template via AJAX
+     */
+    public function verificarPodeReenviarTemplate()
+    {
+        header('Content-Type: application/json');
+        
+        try {
+            $conversa_id = $_GET['conversa_id'] ?? null;
+            
+            if (!$conversa_id) {
+                echo json_encode(['success' => false, 'error' => 'ID da conversa não informado']);
+                return;
+            }
+
+            // Verificar se o usuário tem acesso à conversa
+            $conversa = $this->chatModel->buscarConversaPorId($conversa_id);
+            if (!$conversa || ($conversa->usuario_id != $_SESSION['usuario_id'] && !in_array($_SESSION['usuario_perfil'], ['admin', 'analista']))) {
+                echo json_encode(['success' => false, 'error' => 'Acesso negado']);
+                return;
+            }
+
+            $podeReenviar = $this->chatModel->verificarPodeReenviarTemplate($conversa_id);
+            
+            echo json_encode([
+                'success' => true,
+                'pode_reenviar' => $podeReenviar,
+                'conversa_id' => $conversa_id
+            ]);
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Erro ao verificar: ' . $e->getMessage()
             ]);
         }
     }

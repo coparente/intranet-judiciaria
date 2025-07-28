@@ -25,11 +25,21 @@
                                 <span id="apiStatus" class="badge bg-secondary ms-2" title="Verificando status da API...">
                                     <i class="fas fa-circle-notch fa-spin"></i>
                                 </span>
+                                <?php 
+                                // Verificar conversas que precisam de novo template
+                                $totalPrecisamTemplate = $dados['total_precisam_template'] ?? 0;
+                                ?>
+                                 
                             </h5>
                             <div>
                                 <a href="<?= URL ?>/chat/novaConversa" class="btn btn-light btn-sm">
                                     <i class="fas fa-plus"></i> Nova Conversa
                                 </a>
+                                <?php if ($totalPrecisamTemplate > 0): ?>
+                                <a href="<?= URL ?>/chat/conversasPrecisamNovoTemplate" class="btn btn-warning btn-sm">
+                                    <i class="fas fa-exclamation-triangle"></i> Templates Vencidos (<?= $totalPrecisamTemplate ?>)
+                                </a>
+                                <?php endif; ?>
                                 <a href="<?= URL ?>/chat/dashboardTickets" class="btn btn-light btn-sm">
                                     <i class="fas fa-ticket-alt"></i> Dashboard Tickets
                                 </a>
@@ -226,6 +236,7 @@
                                     <thead>
                                         <tr>
                                             <th>Status do Ticket</th>
+                                            <th>Template</th>
                                             <th>Contato</th>
                                             <th>Número</th>
                                             <?php if ($dados['aba_atual'] != 'minhas'): ?>
@@ -271,6 +282,29 @@
                                                         <span class="badge <?= $statusClass[$status] ?? 'badge-secondary' ?>">
                                                             <?= $statusNomes[$status] ?? 'Desconhecido' ?>
                                                         </span>
+                                                    </td>
+                                                    <td>
+                                                        <?php if (isset($conversa->template_nome)): ?>
+                                                            <span class="badge bg-info text-white">
+                                                                <i class="fas fa-file-alt me-1"></i>
+                                                                <?= htmlspecialchars($conversa->template_nome) ?>
+                                                            </span>
+                                                        <?php else: ?>
+                                                            <span class="badge bg-secondary text-white">
+                                                                <i class="fas fa-file-alt me-1"></i>
+                                                                Sem Template
+                                                            </span>
+                                                        <?php endif; ?>
+                                                        
+                                                        <?php 
+                                                        // Verificar se precisa de novo template
+                                                        if (isset($conversa->precisa_novo_template) && $conversa->precisa_novo_template): 
+                                                        ?>
+                                                        <span class="badge bg-warning ms-1" title="Precisa de novo template - 24h sem resposta">
+                                                            <i class="fas fa-exclamation-triangle me-1"></i>
+                                                            Vencido
+                                                        </span>
+                                                        <?php endif; ?>
                                                     </td>
                                                     <td>
                                                         <?= htmlspecialchars($conversa->contato_nome) ?>
@@ -559,6 +593,9 @@
         // Verificar status da API a cada 30 segundos
         setInterval(verificarStatusAPI, 30000);
 
+        // Verificar templates vencidos automaticamente a cada 5 minutos
+        setInterval(verificarTemplatesVencidos, 300000);
+
         // Seleciona todos os botões de abrir conversa
         document.querySelectorAll('a.btn-info.btn-sm[title="Abrir Conversa"]').forEach(function(btn) {
             btn.addEventListener('click', function(e) {
@@ -588,6 +625,39 @@
                 }
             });
         });
+
+        // Função para verificar templates vencidos
+        function verificarTemplatesVencidos() {
+            fetch('<?= URL ?>/chat/verificarTemplatesVencidos', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.total_precisam_template > 0) {
+                    // Atualizar badge se houver templates vencidos
+                    const badge = document.querySelector('.badge.bg-warning');
+                    if (badge) {
+                        badge.textContent = data.total_precisam_template + ' Template(s) Vencido(s)';
+                    } else {
+                        // Criar novo badge se não existir
+                        const apiStatus = document.getElementById('apiStatus');
+                        if (apiStatus) {
+                            const newBadge = document.createElement('span');
+                            newBadge.className = 'badge bg-warning ms-2';
+                            newBadge.title = data.total_precisam_template + ' conversa(s) precisam de novo template';
+                            newBadge.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i>' + data.total_precisam_template + ' Template(s) Vencido(s)';
+                            apiStatus.parentNode.insertBefore(newBadge, apiStatus.nextSibling);
+                        }
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao verificar templates vencidos:', error);
+            });
+        }
     });
 </script>
 

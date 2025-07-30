@@ -2041,4 +2041,105 @@ class ChatModel
             return false;
         }
     }
+
+    /**
+     * Busca conversas que precisam de novo template com filtros
+     */
+    public function buscarConversasPrecisamNovoTemplateComFiltros($usuario_id = null, $filtroContato = '', $filtroNumero = '', $filtroResponsavel = '', $limite = 20, $offset = 0)
+    {
+        try {
+            $sql = "SELECT c.*, 
+                    TIMESTAMPDIFF(HOUR, COALESCE(c.ultima_resposta_cliente, c.template_enviado_em), NOW()) as horas_sem_resposta,
+                    u.nome as responsavel_nome
+                    FROM conversas c 
+                    LEFT JOIN usuarios u ON c.usuario_id = u.id
+                    WHERE c.precisa_novo_template = 1";
+            
+            $params = [];
+            
+            if ($usuario_id) {
+                $sql .= " AND c.usuario_id = :usuario_id";
+                $params[':usuario_id'] = $usuario_id;
+            }
+            
+            // Aplicar filtros
+            if (!empty($filtroContato)) {
+                $sql .= " AND c.contato_nome LIKE :filtro_contato";
+                $params[':filtro_contato'] = '%' . $filtroContato . '%';
+            }
+            
+            if (!empty($filtroNumero)) {
+                $sql .= " AND c.contato_numero LIKE :filtro_numero";
+                $params[':filtro_numero'] = '%' . $filtroNumero . '%';
+            }
+            
+            if (!empty($filtroResponsavel)) {
+                $sql .= " AND c.usuario_id = :filtro_responsavel";
+                $params[':filtro_responsavel'] = $filtroResponsavel;
+            }
+            
+            $sql .= " ORDER BY c.template_enviado_em ASC";
+            
+            // Adicionar LIMIT e OFFSET para paginação
+            $sql .= " LIMIT :limite OFFSET :offset";
+            $params[':limite'] = $limite;
+            $params[':offset'] = $offset;
+            
+            $this->db->query($sql);
+            
+            foreach ($params as $key => $value) {
+                $this->db->bind($key, $value);
+            }
+            
+            return $this->db->resultados();
+        } catch (Exception $e) {
+            error_log("Erro ao buscar conversas que precisam de novo template com filtros: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Conta conversas que precisam de novo template com filtros
+     */
+    public function contarConversasPrecisamNovoTemplateComFiltros($usuario_id = null, $filtroContato = '', $filtroNumero = '', $filtroResponsavel = '')
+    {
+        try {
+            $sql = "SELECT COUNT(*) as total FROM conversas c WHERE c.precisa_novo_template = 1";
+            
+            $params = [];
+            
+            if ($usuario_id) {
+                $sql .= " AND c.usuario_id = :usuario_id";
+                $params[':usuario_id'] = $usuario_id;
+            }
+            
+            // Aplicar filtros
+            if (!empty($filtroContato)) {
+                $sql .= " AND c.contato_nome LIKE :filtro_contato";
+                $params[':filtro_contato'] = '%' . $filtroContato . '%';
+            }
+            
+            if (!empty($filtroNumero)) {
+                $sql .= " AND c.contato_numero LIKE :filtro_numero";
+                $params[':filtro_numero'] = '%' . $filtroNumero . '%';
+            }
+            
+            if (!empty($filtroResponsavel)) {
+                $sql .= " AND c.usuario_id = :filtro_responsavel";
+                $params[':filtro_responsavel'] = $filtroResponsavel;
+            }
+
+            $this->db->query($sql);
+            
+            foreach ($params as $key => $value) {
+                $this->db->bind($key, $value);
+            }
+
+            $resultado = $this->db->resultado();
+            return $resultado ? $resultado->total : 0;
+        } catch (Exception $e) {
+            error_log("Erro ao contar conversas que precisam de novo template com filtros: " . $e->getMessage());
+            return 0;
+        }
+    }
 }

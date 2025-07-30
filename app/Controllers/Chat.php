@@ -1432,7 +1432,7 @@ class Chat extends Controllers
             $payload = json_decode(file_get_contents("php://input"), true);
 
             // Registrar o payload bruto no log
-            file_put_contents("log.txt", "RAW: " . json_encode($payload) . "\n", FILE_APPEND);
+            // file_put_contents("log.txt", "RAW: " . json_encode($payload) . "\n", FILE_APPEND);
 
             $mensagemTexto = '';
             $numero = '';
@@ -1459,7 +1459,7 @@ class Chat extends Controllers
             }
 
             // Registrar a mensagem simples no log
-            file_put_contents("log.txt", "Mensagem: $mensagemTexto | De: $numero\n", FILE_APPEND);
+            // file_put_contents("log.txt", "Mensagem: $mensagemTexto | De: $numero\n", FILE_APPEND);
 
             // 3. Processar mensagem do n8n diretamente
             if (isset($payload['messages'][0])) {
@@ -3804,13 +3804,64 @@ class Chat extends Controllers
             return;
         }
 
-        $conversas = $this->chatModel->buscarConversasPrecisamNovoTemplate();
-        $total = $this->chatModel->contarConversasPrecisamNovoTemplate();
+        // Obter filtros
+        $filtroResponsavel = $_GET['filtro_responsavel'] ?? '';
+        $filtroContato = $_GET['filtro_contato'] ?? '';
+        $filtroNumero = $_GET['filtro_numero'] ?? '';
+
+        // Configurações de paginação
+        $registrosPorPagina = 20;
+        $paginaAtual = max(1, intval($_GET['pagina'] ?? 1));
+        $offset = ($paginaAtual - 1) * $registrosPorPagina;
+
+        // Buscar conversas com filtros e paginação
+        $conversas = $this->chatModel->buscarConversasPrecisamNovoTemplateComFiltros(
+            null, // usuario_id (null para buscar todas)
+            $filtroContato,
+            $filtroNumero,
+            $filtroResponsavel,
+            $registrosPorPagina,
+            $offset
+        );
+        
+        $total = $this->chatModel->contarConversasPrecisamNovoTemplateComFiltros(
+            null, // usuario_id (null para buscar todas)
+            $filtroContato,
+            $filtroNumero,
+            $filtroResponsavel
+        );
+
+        // Calcular informações de paginação
+        $totalPaginas = ceil($total / $registrosPorPagina);
+        $registroInicio = $offset + 1;
+        $registroFim = min($offset + $registrosPorPagina, $total);
+
+        // Construir query string para paginação
+        $queryParams = [];
+        if (!empty($filtroContato)) $queryParams[] = 'filtro_contato=' . urlencode($filtroContato);
+        if (!empty($filtroNumero)) $queryParams[] = 'filtro_numero=' . urlencode($filtroNumero);
+        if (!empty($filtroResponsavel)) $queryParams[] = 'filtro_responsavel=' . urlencode($filtroResponsavel);
+        $queryString = !empty($queryParams) ? '&' . implode('&', $queryParams) : '';
+
+        // Buscar usuários para o filtro de responsável
+        $usuarios = $this->chatModel->buscarUsuariosParaAtribuicao();
 
         $dados = [
             'tituloPagina' => 'Conversas que Precisam de Novo Template',
             'conversas' => $conversas,
-            'total' => $total
+            'total' => $total,
+            'usuarios' => $usuarios,
+            'filtro_responsavel' => $filtroResponsavel,
+            'filtro_contato' => $filtroContato,
+            'filtro_numero' => $filtroNumero,
+            // Dados de paginação
+            'pagina_atual' => $paginaAtual,
+            'total_paginas' => $totalPaginas,
+            'registros_por_pagina' => $registrosPorPagina,
+            'registro_inicio' => $registroInicio,
+            'registro_fim' => $registroFim,
+            'total_registros' => $total,
+            'query_string' => $queryString
         ];
 
         $this->view('chat/conversas_precisam_template', $dados);

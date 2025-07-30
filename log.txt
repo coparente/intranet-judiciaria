@@ -1,8 +1,0 @@
-RAW: {"messages":[{"from":"556283070508","id":"wamid.HBgMNTU2Mjk5ODQzNjY5FQIAhggRDM3RTM4NzE0M0MyMTZDN0FDNjFBREFCRTgyRUI3222222s9","timestamp":"1752669286","type":"text","text":{"body":"Ol\u00e1 testando msg"},"document":{"id":"","caption":"","filename":"","mime_type":""},"image":{"id":"","caption":"","mime_type":""},"button":{"payload":"","text":""},"audio":{"mime_type":"","id":""}}]}
-Mensagem: Olá testando msg | De: 556283070508
-RAW: {"messages":[{"from":"5562996185892","id":"wamid.HBgMNTU2Mjk5ODQzNjY5FQIAhggRDM3RTM4NzE0M0MyMTZDN0FDNjFBREFCRTgyRUI322222s9","timestamp":"1752669286","type":"text","text":{"body":"Ol\u00e1 testando msg"},"document":{"id":"","caption":"","filename":"","mime_type":""},"image":{"id":"","caption":"","mime_type":""},"button":{"payload":"","text":""},"audio":{"mime_type":"","id":""}}]}
-Mensagem: Olá testando msg | De: 5562996185892
-RAW: {"messages":[{"from":"5562983070508","id":"wamid.HBgMNTU2Mjk5ODQzNjY5FQIAhggRDM3RTM4NzE0M0MyMTZDN0FDNjFBREFCRTgyRUI322gfg222s9","timestamp":"1752669286","type":"text","text":{"body":"Ol\u00e1 testando msg"},"document":{"id":"","caption":"","filename":"","mime_type":""},"image":{"id":"","caption":"","mime_type":""},"button":{"payload":"","text":""},"audio":{"mime_type":"","id":""}}]}
-Mensagem: Olá testando msg | De: 5562983070508
-RAW: {"messages":[{"from":"556296185892","id":"wamid.HBgMNTU2Mjk5ODQzNjY5FQIAhggRDM3RTM4NzE0M0MyMTZDN0FDNjFBREFCRTgyRUI322gfg222gfs9","timestamp":"1752669286","type":"text","text":{"body":"Ol\u00e1 testando msg kkkkkk"},"document":{"id":"","caption":"","filename":"","mime_type":""},"image":{"id":"","caption":"","mime_type":""},"button":{"payload":"","text":""},"audio":{"mime_type":"","id":""}}]}
-Mensagem: Olá testando msg kkkkkk | De: 556296185892

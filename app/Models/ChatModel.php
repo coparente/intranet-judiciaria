@@ -84,6 +84,9 @@ class ChatModel
         if (!empty($filtroStatus)) {
             $sql .= " AND c.status_atendimento = :filtro_status";
             $params[':filtro_status'] = $filtroStatus;
+        } else {
+            // Excluir conversas com status "fechado" quando não há filtro específico
+            $sql .= " AND (c.status_atendimento != 'fechado' OR c.status_atendimento IS NULL)";
         }
         
         if (!empty($filtroNome)) {
@@ -129,6 +132,9 @@ class ChatModel
         if (!empty($filtroStatus)) {
             $sql .= " AND c.status_atendimento = :filtro_status";
             $params[':filtro_status'] = $filtroStatus;
+        } else {
+            // Excluir conversas com status "fechado" quando não há filtro específico
+            $sql .= " AND (c.status_atendimento != 'fechado' OR c.status_atendimento IS NULL)";
         }
 
         if (!empty($filtroNome)) {

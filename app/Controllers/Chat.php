@@ -301,11 +301,11 @@ class Chat extends Controllers
             return;
         }
 
-        if ($conversa->usuario_id !== null && $conversa->usuario_id !== 0) {
-            Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Conversa já está atribuída a outro usuário', 'alert alert-warning');
-            Helper::redirecionar('chat/index');
-            return;
-        }
+        // if ($conversa->usuario_id !== null && $conversa->usuario_id !== 0) {
+        //     Helper::mensagem('chat', '<i class="fas fa-exclamation-triangle"></i> Conversa já está atribuída a outro usuário', 'alert alert-warning');
+        //     Helper::redirecionar('chat/index');
+        //     return;
+        // }
 
         // ========== NOVO: CONTROLE DE CONVERSAS CONFLITANTES ==========
         

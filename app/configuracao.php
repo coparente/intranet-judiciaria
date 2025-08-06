@@ -68,17 +68,9 @@ define('SERPRO_BASE_URL', 'https://api.whatsapp.serpro.gov.br');
 define('SERPRO_WABA_ID', '472202335973627');
 define('SERPRO_PHONE_NUMBER_ID', '642958872237822');
 
-// Configurações da API do Serpro 4822
-// define('SERPRO_CLIENT_ID', '749709211549367');
-// define('SERPRO_CLIENT_SECRET', 'bY1t0kLcSCuUsCgfyLdrCrEfXq4Wmsb8');
-// define('SERPRO_BASE_URL', 'https://api.whatsapp.serpro.gov.br');
-// define('SERPRO_WABA_ID', '472202335973627');
-// define('SERPRO_PHONE_NUMBER_ID', '749709211549367');
 
 // Configurações do Webhook
 define('WEBHOOK_VERIFY_TOKEN', 'tjgo_intranet_webhook_2025_secreto_serpro');
-
-
 
 /**
  * Configurações da API do DataJud
